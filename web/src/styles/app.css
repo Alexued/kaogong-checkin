@@ -1,0 +1,171 @@
+/* 全局共享样式 */
+/* ViewPager 滑动结构：舞台定高裁切，轨道横向 flex 平移，
+   5 个 Tab 页常驻、各自独立竖向滚动（保留各自滚动位置）。
+   注意：flex-basis 必须为 0（flex:1 1 0），若用 auto 会被最长页内容撑高，
+   导致所有页高度虚高、短页内容排到视口外。 */
+.swipe-stage {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.swipe-track {
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  will-change: transform;
+}
+
+.swipe-page {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 二级页容器（任务管理 / 计时历史 / 日期详情）：独立竖向滚动 */
+.page-layer {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  /* flex 项：内容不足一屏时撑满视口，超出一屏时随内容伸长（#app 为 flex 列） */
+  flex: 1 0 auto;
+  padding: 18px 16px calc(84px + env(safe-area-inset-bottom));
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 6px 0 4px;
+  letter-spacing: 0.2px;
+}
+
+.page-sub {
+  color: var(--text-2);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+  transition:
+    transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 160ms ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--text-2);
+  border: 1px solid var(--card-border);
+}
+
+.btn.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--card-border);
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--card-border);
+  background: var(--bg-elev);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 15px;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    background-color 280ms ease,
+    color 280ms ease;
+}
+
+.input:focus {
+  border-color: var(--accent-solid);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-solid);
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-2);
+  margin: 22px 2px 10px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 14px;
+  padding: 34px 0;
+}
+
+/* 页面切换：淡入 + 轻微位移 */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+}
+
+/* 平板 / 桌面宽屏适配：内容列加宽居中 */
+@media (min-width: 768px) {
+  .page {
+    max-width: 880px;
+    padding: 24px 24px calc(96px + env(safe-area-inset-bottom));
+  }
+}

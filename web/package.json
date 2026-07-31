@@ -1,0 +1,32 @@
+{
+  "name": "kaogong-checkin-web",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.4.2",
+    "@vueuse/motion": "^3.0.3",
+    "canvas-confetti": "^1.9.3",
+    "capacitor-udp-socket": "^7.0.0",
+    "pinia": "^3.0.3",
+    "qrcode": "^1.5.4",
+    "vue": "^3.5.18",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.2",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/qrcode": "^1.5.5",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.1"
+  }
+}

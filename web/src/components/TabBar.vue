@@ -1,0 +1,105 @@
+<template>
+  <nav class="tabbar">
+    <router-link
+      v-for="t in tabs"
+      :key="t.to"
+      :to="t.to"
+      class="tab"
+      :class="{ active: isActive(t.to) }"
+    >
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="t.icon" />
+      <span>{{ t.label }}</span>
+    </router-link>
+  </nav>
+</template>
+
+<script setup lang="ts">
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+const tabs = [
+  {
+    to: '/',
+    label: '今日',
+    icon: '<rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/>',
+  },
+  {
+    to: '/timer',
+    label: '计时',
+    icon: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/>',
+  },
+  {
+    to: '/drill',
+    label: '背诵',
+    icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  },
+  {
+    to: '/stats',
+    label: '统计',
+    icon: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  },
+  {
+    to: '/settings',
+    label: '设置',
+    icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  },
+];
+
+function isActive(to: string) {
+  return to === '/' ? route.path === '/' : route.path.startsWith(to);
+}
+</script>
+
+<style scoped>
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  background: var(--tabbar);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-top: 1px solid var(--card-border);
+  z-index: 50;
+  transition: background-color 280ms ease;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  color: var(--text-3);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  transition:
+    color 200ms ease,
+    transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tab:active {
+  transform: scale(0.94);
+}
+
+.tab.active {
+  color: var(--accent-solid);
+}
+
+/* 平板 / 宽屏：底栏与内容列同宽居中 */
+@media (min-width: 768px) {
+  .tabbar {
+    left: 50%;
+    right: auto;
+    width: min(880px, 100%);
+    transform: translateX(-50%);
+    border-left: 1px solid var(--card-border);
+    border-right: 1px solid var(--card-border);
+  }
+}
+</style>

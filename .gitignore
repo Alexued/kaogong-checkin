@@ -1,0 +1,24 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+web/android/.gradle/
+web/android/app/build/
+web/android/build/
+web/android/capacitor-cordova-android-plugins/build/
+
+# 本机配置（含个人 SDK 路径）
+web/android/local.properties
+
+# 运行数据（个人打卡数据，不上传）
+server/data/
+
+# 二进制包
+*.apk
+
+# 测试截图与临时文件
+test-shots/
+
+# 系统文件
+.DS_Store
+Thumbs.db
