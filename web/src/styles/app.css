@@ -42,9 +42,10 @@
   width: 100%;
   max-width: 640px;
   margin: 0 auto;
-  /* flex 项：内容不足一屏时撑满视口，超出一屏时随内容伸长（#app 为 flex 列） */
+  /* flex 项：内容不足一屏时撑满视口，超出一屏时随内容伸长（#app 为 flex 列）。
+     顶部 padding 含状态栏安全区（edge-to-edge WebView 下避免与状态栏重叠） */
   flex: 1 0 auto;
-  padding: 18px 16px calc(84px + env(safe-area-inset-bottom));
+  padding: calc(18px + env(safe-area-inset-top)) 16px calc(84px + env(safe-area-inset-bottom));
 }
 
 .page-title {
@@ -166,6 +167,6 @@
 @media (min-width: 768px) {
   .page {
     max-width: 880px;
-    padding: 24px 24px calc(96px + env(safe-area-inset-bottom));
+    padding: calc(24px + env(safe-area-inset-top)) 24px calc(96px + env(safe-area-inset-bottom));
   }
 }
