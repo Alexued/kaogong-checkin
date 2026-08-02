@@ -110,23 +110,40 @@
     </div>
 
     <div class="section-title">版本更新</div>
-    <div class="card block">
-      <div class="row-end">
-        <span class="version-label">当前版本 v{{ APP_VERSION }}</span>
+    <div class="card block update-card">
+      <div class="row-end version-hold" @pointerdown="startVersionHold" @pointermove="moveVersionHold" @pointerup="cancelVersionHold" @pointercancel="cancelVersionHold" @pointerleave="cancelVersionHold">
+        <span class="version-label">当前版本 v{{ APP_VERSION }}<small>长按查看历史版本</small></span>
         <button class="btn" :disabled="checking" @click="checkUpdate">
           {{ checking ? '检查中…' : '检查更新' }}
         </button>
       </div>
       <div v-if="updateState === 'latest'" class="up-msg">已是最新版本</div>
       <div v-else-if="updateState === 'error'" class="up-msg bad">检查失败，请检查网络后重试</div>
-      <div v-else-if="updateState === 'has' && latest" class="up-has">
-        <div class="up-ver">发现新版本 v{{ latest.version }}</div>
-        <div v-if="latest.notes" class="up-notes">{{ latest.notes }}</div>
-        <button class="btn dl-btn" :disabled="downloadBusy" @click="download">
-          {{ downloadBusy ? '下载中…' : '下载安装' }}
-        </button>
+      <div v-else-if="updateState === 'has' && latest" class="up-has" :class="{ compact: downloadStarted }">
+        <div class="up-ver version-hold" @pointerdown="startVersionHold" @pointermove="moveVersionHold" @pointerup="cancelVersionHold" @pointercancel="cancelVersionHold" @pointerleave="cancelVersionHold"><span>发现新版本 v{{ latest.version }}<small class="update-source">{{ updateSourceLabel }}</small></span><small v-if="downloadStarted">{{ downloadStatusLabel }}</small></div>
+        <div v-if="latest.notes && !downloadStarted" class="up-notes">{{ latest.notes }}</div>
+        <div class="update-download-row">
+          <div class="update-actions">
+            <button v-if="downloadStatus?.status === 'downloaded'" class="btn download-primary" type="button" @click="installUpdate">安装更新</button>
+            <button v-else class="btn download-primary" :disabled="downloadBusy" type="button" @click="download">
+              {{ downloadBusy ? '下载中…' : downloadFailed ? '重新下载' : '应用内下载' }}
+            </button>
+            <button class="browser-download" type="button" @click="downloadInBrowser">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+              浏览器下载
+            </button>
+            <button v-if="downloadBusy" class="cancel-download" type="button" @click="cancelUpdate">取消</button>
+          </div>
+          <div v-if="downloadStarted" class="download-progress-compact">
+            <div class="progress-ring" :style="downloadRingStyle" aria-label="下载进度">
+              <span>{{ downloadPercent >= 0 ? `${downloadPercent}%` : '…' }}</span>
+            </div>
+            <span>{{ downloadSpeed || downloadStatusLabel }}</span>
+          </div>
+        </div>
+        <div v-if="downloadMessage" class="sync-message" :class="{ bad: downloadFailed }">{{ downloadMessage }}</div>
       </div>
-      <div v-if="downloadStatus && downloadStatus.status !== 'idle'" class="download-panel">
+      <div v-if="downloadStarted && updateState !== 'has'" class="download-panel">
         <div class="download-head">
           <div class="progress-ring" :style="downloadRingStyle" aria-label="下载进度">
             <span>{{ downloadPercent >= 0 ? `${downloadPercent}%` : '…' }}</span>
@@ -170,6 +187,25 @@
       </div>
     </div>
 
+    <teleport to="body">
+      <Transition name="history-sheet">
+        <div v-if="historyOpen" class="history-mask" @click.self="historyOpen = false">
+          <div class="history-sheet card">
+            <div class="history-head"><div><h2>历史版本</h2><p>最近发布的版本与更新说明</p></div><button type="button" aria-label="关闭" @click="historyOpen = false">×</button></div>
+            <div v-if="historyLoading" class="history-state"><PixelGrid preset="wave" label="正在读取历史版本" /> 正在读取…</div>
+            <div v-else-if="historyError" class="history-state bad">读取失败，请稍后重试</div>
+            <div v-else class="release-list" data-swipe-ignore>
+              <article v-for="release in releaseHistory" :key="release.version" class="release-item">
+                <div class="release-meta"><strong>v{{ release.version }}</strong><span>{{ formatReleaseDate(release.publishedAt) }}</span></div>
+                <p>{{ release.notes || '本版本未填写更新说明' }}</p>
+                <button v-if="release.apkUrl" type="button" @click="openDownload(release.apkUrl!)">浏览器下载</button>
+              </article>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </teleport>
+
     <DatePickerSheet
       v-model:open="planPickerOpen"
       :model-value="planEnd"
@@ -196,6 +232,8 @@ import {
   APP_VERSION,
   compareVersions,
   fetchLatestRelease,
+  fetchLatestGitHubRelease,
+  fetchReleaseHistory,
   openDownload,
   canDownloadInApp,
   cancelAppUpdate,
@@ -264,13 +302,26 @@ const updateState = ref<'' | 'latest' | 'has' | 'error'>('');
 const latest = ref<ReleaseInfo | null>(null);
 const downloadStatus = ref<AppUpdateDownloadStatus | null>(null);
 const downloadMessage = ref('');
+const historyOpen = ref(false);
+const historyLoading = ref(false);
+const historyError = ref(false);
+const releaseHistory = ref<ReleaseInfo[]>([]);
+let githubFallbackChecked = false;
 let updateListener: Awaited<ReturnType<typeof subscribeAppUpdateProgress>> | null = null;
+let versionHoldTimer: ReturnType<typeof setTimeout> | null = null;
+let versionHoldX = 0;
+let versionHoldY = 0;
+let downloadStallTimer: ReturnType<typeof setTimeout> | null = null;
+let lastDownloadBytes = 0;
 
 const downloadBusy = computed(() =>
   downloadStatus.value?.status === 'queued'
   || downloadStatus.value?.status === 'downloading'
   || downloadStatus.value?.status === 'paused',
 );
+const downloadStarted = computed(() => !!downloadStatus.value && downloadStatus.value.status !== 'idle' && downloadStatus.value.status !== 'cancelled');
+const downloadFailed = computed(() => downloadStatus.value?.status === 'failed' || downloadStatus.value?.status === 'not_found');
+const updateSourceLabel = computed(() => latest.value?.source === 'lan' ? '局域网' : 'GitHub');
 const downloadPercent = computed(() => {
   const percent = downloadStatus.value?.percent ?? -1;
   if (!Number.isFinite(percent) || percent < 0) return -1;
@@ -303,14 +354,56 @@ function formatBytes(value: number): string {
 
 function applyDownloadStatus(status: AppUpdateDownloadStatus) {
   downloadStatus.value = status;
-  if (status.status === 'failed') downloadMessage.value = '下载失败，请检查网络后重试';
-  else if (status.status === 'not_found') downloadMessage.value = '更新文件已失效，请重新下载';
-  else if (status.status !== 'downloaded') downloadMessage.value = '';
+  if (status.bytesDownloaded > lastDownloadBytes) {
+    lastDownloadBytes = status.bytesDownloaded;
+    armDownloadStallTimer();
+  }
+  if (!['queued', 'downloading', 'paused'].includes(status.status)) clearDownloadStallTimer();
+  if (status.status === 'failed') {
+    downloadMessage.value = '下载失败，请检查网络后重试';
+    void prepareGithubFallback();
+  } else if (status.status === 'not_found') {
+    downloadMessage.value = '更新文件已失效，请重新下载';
+    void prepareGithubFallback();
+  } else if (status.status !== 'downloaded') downloadMessage.value = '';
+}
+
+async function prepareGithubFallback() {
+  const lanRelease = latest.value;
+  if (githubFallbackChecked || lanRelease?.source !== 'lan') return;
+  githubFallbackChecked = true;
+  try {
+    const githubRelease = await fetchLatestGitHubRelease();
+    if (githubRelease.apkUrl && compareVersions(githubRelease.version, lanRelease.version) >= 0) {
+      latest.value = githubRelease;
+      downloadMessage.value = '局域网下载失败，已切换到 GitHub，可重新下载';
+    }
+  } catch {
+    // Keep the LAN release visible when GitHub is unavailable.
+  }
+}
+
+function clearDownloadStallTimer() {
+  if (downloadStallTimer) clearTimeout(downloadStallTimer);
+  downloadStallTimer = null;
+}
+
+function armDownloadStallTimer() {
+  clearDownloadStallTimer();
+  downloadStallTimer = setTimeout(() => {
+    if (!downloadBusy.value) return;
+    downloadMessage.value = '下载长时间没有进度，可以改用浏览器下载';
+  }, 30000);
 }
 
 async function checkUpdate() {
   checking.value = true;
   updateState.value = '';
+  githubFallbackChecked = false;
+  if (downloadStatus.value && ['failed', 'not_found', 'cancelled'].includes(downloadStatus.value.status)) {
+    downloadStatus.value = null;
+    downloadMessage.value = '';
+  }
   try {
     const release = await fetchLatestRelease();
     if (compareVersions(release.version, APP_VERSION) > 0) {
@@ -332,12 +425,52 @@ function download() {
     return;
   }
   downloadMessage.value = '';
+  lastDownloadBytes = 0;
+  armDownloadStallTimer();
   void startAppUpdateDownload(release.apkUrl, `kaogong-checkin-v${release.version}.apk`)
     .then(applyDownloadStatus)
     .catch(() => {
-      downloadStatus.value = { downloadId: null, status: 'failed', percent: -1, bytesDownloaded: 0, totalBytes: -1, speedBytesPerSecond: 0 };
-      downloadMessage.value = '下载失败，请检查网络后重试';
+      applyDownloadStatus({ downloadId: null, status: 'failed', percent: -1, bytesDownloaded: 0, totalBytes: -1, speedBytesPerSecond: 0 });
     });
+}
+
+function downloadInBrowser() {
+  const release = latest.value;
+  if (release) void openDownload(release.apkUrl || release.pageUrl);
+}
+
+function startVersionHold(event: PointerEvent) {
+  if ((event.target as Element | null)?.closest('button')) return;
+  cancelVersionHold();
+  versionHoldX = event.clientX;
+  versionHoldY = event.clientY;
+  versionHoldTimer = setTimeout(() => { void openVersionHistory(); }, 500);
+}
+
+function moveVersionHold(event: PointerEvent) {
+  if (Math.hypot(event.clientX - versionHoldX, event.clientY - versionHoldY) > 10) cancelVersionHold();
+}
+
+function cancelVersionHold() {
+  if (versionHoldTimer) clearTimeout(versionHoldTimer);
+  versionHoldTimer = null;
+}
+
+async function openVersionHistory() {
+  cancelVersionHold();
+  historyOpen.value = true;
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(10);
+  if (releaseHistory.value.length) return;
+  historyLoading.value = true;
+  historyError.value = false;
+  try { releaseHistory.value = await fetchReleaseHistory(); }
+  catch { historyError.value = true; }
+  finally { historyLoading.value = false; }
+}
+
+function formatReleaseDate(iso: string) {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(iso));
 }
 
 async function installUpdate() {
@@ -451,6 +584,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  cancelVersionHold();
+  clearDownloadStallTimer();
   unsubscribeDiscovery?.();
   void updateListener?.remove();
 });
@@ -495,9 +630,27 @@ onUnmounted(() => {
 .manual-field { display: block; margin-top: 10px; }.manual-field > span { display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-2); }
 .server-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }.server-actions .btn { padding-inline: 10px; }
 .sync-message { margin-top: 10px; color: var(--accent-solid); font-size: 12px; }.sync-message.bad, .up-msg.bad { color: var(--danger); }
-.row-end { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.version-label { font-size: 13px; color: var(--accent-solid); }
-.up-msg { margin-top: 12px; color: var(--accent-solid); font-size: 13px; font-weight: 700; }.up-has { margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; }
-.up-ver { color: var(--accent-solid); font-weight: 800; }.up-notes { max-height: 150px; overflow-y: auto; margin: 8px 0; color: var(--text-2); font-size: 12px; white-space: pre-line; }.dl-btn { width: 100%; }
+.row-end { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.version-hold { min-height: 44px; user-select: none; -webkit-user-select: none; }
+.version-label { font-size: 13px; color: var(--accent-solid); display: grid; gap: 3px; }
+.version-label small { color: var(--text-3); font-size: 10px; font-weight: 500; }
+.up-msg { margin-top: 12px; color: var(--accent-solid); font-size: 13px; font-weight: 700; }
+.up-has { margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; }
+.up-has.compact { padding-top: 10px; }
+.up-ver { color: var(--accent-solid); font-weight: 800; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.up-ver > span { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px; }
+.up-ver small { font-size: 11px; color: var(--text-3); font-weight: 600; }
+.up-ver .update-source { color: var(--accent-solid); font-size: 10px; }
+.up-notes { max-height: 150px; overflow-y: auto; margin: 8px 0 12px; color: var(--text-2); font-size: 12px; white-space: pre-line; }
+.update-download-row { display: grid; grid-template-columns: minmax(0, 1fr) 82px; align-items: center; gap: 14px; margin-top: 12px; min-height: 82px; }
+.update-actions { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: center; }
+.download-primary { min-height: 42px; padding-inline: 13px; }
+.browser-download { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--card-border); border-radius: 12px; padding: 0 10px; background: var(--bg-elev); color: var(--text-2); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.cancel-download { grid-column: 1 / -1; justify-self: start; border: 0; background: transparent; color: var(--text-3); font-size: 11px; padding: 2px 4px; }
+.download-progress-compact { width: 82px; display: grid; justify-items: center; gap: 4px; color: var(--text-3); font-size: 10px; text-align: center; }
+.download-progress-compact .progress-ring { width: 68px; height: 68px; }
+.download-progress-compact .progress-ring::after { inset: 6px; }
+.download-progress-compact .progress-ring span { font-size: 13px; }
 .download-panel { margin-top: 14px; border-top: 1px solid var(--card-border); padding-top: 14px; }
 .download-head { display: flex; align-items: center; gap: 14px; }
 .progress-ring { --download-progress: 0%; width: 76px; height: 76px; flex: none; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--accent-solid) var(--download-progress), var(--card-border) 0); position: relative; }
@@ -506,5 +659,18 @@ onUnmounted(() => {
 .download-copy { min-width: 0; display: grid; gap: 4px; }.download-copy strong { font-size: 15px; }.download-copy span { color: var(--text-3); font-size: 12px; }
 .progress-line { height: 7px; margin-top: 14px; overflow: hidden; border-radius: 999px; background: var(--card-border); }.progress-line span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent-from), var(--accent-to)); transition: width 300ms ease; }
 .download-actions { display: flex; gap: 9px; margin-top: 12px; }.download-actions .btn { flex: 1; }
-@media (max-width: 380px) { .overview-grid { grid-template-columns: 1fr 1fr; }.server-actions { grid-template-columns: 1fr; } }
+.history-mask { position: fixed; inset: 0; z-index: 120; display: flex; align-items: flex-end; justify-content: center; background: rgba(15,23,42,.42); }
+.history-sheet { width: 100%; max-width: 640px; max-height: 82vh; display: flex; flex-direction: column; border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+.history-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.history-head h2 { margin: 0; font-size: 19px; }.history-head p { margin: 3px 0 0; color: var(--text-3); font-size: 12px; }
+.history-head button { width: 36px; height: 36px; border: 1px solid var(--card-border); border-radius: 50%; background: var(--bg-elev); color: var(--text-2); font-size: 24px; line-height: 1; }
+.history-state { min-height: 160px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-3); font-size: 13px; }.history-state.bad { color: var(--danger); }
+.release-list { overflow-y: auto; overscroll-behavior: contain; }
+.release-item { padding: 13px 2px; border-top: 1px solid var(--card-border); }
+.release-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; }.release-meta strong { color: var(--accent-solid); font-size: 15px; }.release-meta span { color: var(--text-3); font-size: 11px; }
+.release-item p { margin: 7px 0; color: var(--text-2); font-size: 12px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; word-break: break-word; }
+.release-item button { border: 0; background: transparent; color: var(--accent-solid); padding: 4px 0; font-size: 12px; font-weight: 700; }
+.history-sheet-enter-active,.history-sheet-leave-active { transition: background-color 260ms cubic-bezier(.22,1,.36,1); }.history-sheet-enter-active .history-sheet,.history-sheet-leave-active .history-sheet { transition: transform 320ms cubic-bezier(.22,1,.36,1), opacity 220ms ease; }.history-sheet-enter-from,.history-sheet-leave-to { background-color: transparent; }.history-sheet-enter-from .history-sheet,.history-sheet-leave-to .history-sheet { transform: translateY(72px); opacity: 0; }
+@media (max-width: 380px) { .overview-grid { grid-template-columns: 1fr 1fr; }.server-actions { grid-template-columns: 1fr; }.update-download-row { grid-template-columns: minmax(0,1fr) 72px; gap: 9px; }.update-actions { grid-template-columns: 1fr; }.browser-download { width: 100%; }.download-progress-compact { width: 72px; }.download-progress-compact .progress-ring { width: 62px; height: 62px; } }
+@media (prefers-reduced-motion: reduce) { .history-sheet-enter-active,.history-sheet-leave-active,.history-sheet-enter-active .history-sheet,.history-sheet-leave-active .history-sheet { transition-duration: .01ms; } }
 </style>

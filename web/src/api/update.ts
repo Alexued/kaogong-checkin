@@ -4,9 +4,13 @@
  */
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
+import { getServerUrl } from './client';
+import { compareVersions, selectPreferredRelease } from './update-selection';
+
+export { compareVersions } from './update-selection';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.5.1';
 
 export interface ReleaseInfo {
   version: string;
@@ -16,6 +20,43 @@ export interface ReleaseInfo {
   pageUrl: string;
   notes: string;
   publishedAt: string;
+  source: 'lan' | 'github';
+}
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+export async function fetchReleaseHistory(limit = 10): Promise<ReleaseInfo[]> {
+  const r = await fetchWithTimeout(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${limit}`, {
+    headers: { Accept: 'application/vnd.github+json' },
+  }, 8000);
+  if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+  const releases = await r.json() as Array<Record<string, any>>;
+  return releases.filter((release) => !release.draft).map(parseRelease);
+}
+
+function parseRelease(release: Record<string, any>): ReleaseInfo {
+  const apk = (release.assets || []).find((asset: { name?: string }) => /\.apk$/i.test(asset?.name || ''));
+  return {
+    version: String(release.tag_name || '').replace(/^v/, ''),
+    name: release.name || release.tag_name || '',
+    apkUrl: apk ? apk.browser_download_url : null,
+    pageUrl: release.html_url,
+    notes: release.body || '',
+    publishedAt: release.published_at || '',
+    source: 'github',
+  };
 }
 
 export type AppUpdateDownloadState =
@@ -57,31 +98,56 @@ interface NativeAppUpdatePlugin {
 const NativeAppUpdate = registerPlugin<NativeAppUpdatePlugin>('AppUpdate');
 
 /** 比较语义化版本号：a > b 返回正数，相等 0，a < b 负数（忽略 v 前缀） */
-export function compareVersions(a: string, b: string): number {
-  const pa = a.replace(/^v/, '').split('.').map(Number);
-  const pb = b.replace(/^v/, '').split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d) return d;
+export async function fetchLatestGitHubRelease(): Promise<ReleaseInfo> {
+  const r = await fetchWithTimeout(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+    headers: { Accept: 'application/vnd.github+json' },
+  }, 8000);
+  if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+  return parseRelease(await r.json());
+}
+
+function serverHttpBase(serverUrl: string): string {
+  const withProtocol = /^https?:\/\//i.test(serverUrl) ? serverUrl : `http://${serverUrl}`;
+  return withProtocol.replace(/\/+$/, '');
+}
+
+export async function fetchLatestLanRelease(serverUrl = getServerUrl()): Promise<ReleaseInfo> {
+  if (!serverUrl.trim()) throw new Error('LAN server is not configured');
+  const baseUrl = serverHttpBase(serverUrl.trim());
+  const r = await fetchWithTimeout(`${baseUrl}/api/update/latest`, {
+    headers: { Accept: 'application/json' },
+  }, 3000);
+  if (!r.ok) throw new Error(`LAN update API ${r.status}`);
+  const release = await r.json() as Partial<ReleaseInfo>;
+  const version = release.version;
+  const rawApkUrl = release.apkUrl;
+  if (!version || !/^\d+\.\d+\.\d+$/.test(version) || !rawApkUrl) {
+    throw new Error('LAN update API returned invalid metadata');
   }
-  return 0;
+  const apkUrl = new URL(rawApkUrl, `${baseUrl}/`).toString();
+  if (!/^https?:\/\//i.test(apkUrl)) throw new Error('LAN update API returned an invalid APK URL');
+  return {
+    version,
+    name: release.name || `kaogong-checkin v${version}`,
+    apkUrl,
+    pageUrl: release.pageUrl ? new URL(release.pageUrl, `${baseUrl}/`).toString() : apkUrl,
+    notes: release.notes || '',
+    publishedAt: release.publishedAt || '',
+    source: 'lan',
+  };
 }
 
 export async function fetchLatestRelease(): Promise<ReleaseInfo> {
-  const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-    headers: { Accept: 'application/vnd.github+json' },
-  });
-  if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-  const j = await r.json();
-  const apk = (j.assets || []).find((a: { name?: string }) => /\.apk$/i.test(a?.name || ''));
-  return {
-    version: String(j.tag_name || '').replace(/^v/, ''),
-    name: j.name || j.tag_name || '',
-    apkUrl: apk ? apk.browser_download_url : null,
-    pageUrl: j.html_url,
-    notes: j.body || '',
-    publishedAt: j.published_at || '',
-  };
+  const serverUrl = getServerUrl();
+  const [lanResult, githubResult] = await Promise.allSettled([
+    serverUrl ? fetchLatestLanRelease(serverUrl) : Promise.resolve(null),
+    fetchLatestGitHubRelease(),
+  ]);
+  const lan = lanResult.status === 'fulfilled' ? lanResult.value : null;
+  const github = githubResult.status === 'fulfilled' ? githubResult.value : null;
+  const selected = selectPreferredRelease(lan, github);
+  if (!selected) throw new Error('No update source is available');
+  return selected;
 }
 
 /** 非 Android 原生环境的下载回退。 */

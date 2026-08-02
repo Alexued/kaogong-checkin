@@ -1,11 +1,12 @@
 {
   "name": "kaogong-checkin-web",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test test/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

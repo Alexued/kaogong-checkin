@@ -14,6 +14,7 @@ const fs = require('fs');
 const os = require('os');
 const dgram = require('dgram');
 const { WebSocketServer } = require('ws');
+const { findLatestApk, resolveApkFile } = require('./update');
 
 const HTTP_PORT = Number(process.env.KGC_HTTP_PORT || 8321);
 const UDP_PORT = Number(process.env.KGC_UDP_PORT || 8322);
@@ -24,6 +25,9 @@ const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const BAK_FILE = DATA_FILE + '.bak';
 const TMP_FILE = DATA_FILE + '.tmp';
 const WEB_DIST = path.join(__dirname, '..', '..', 'web', 'dist');
+const UPDATE_DIR = process.env.KGC_UPDATE_DIR
+  ? path.resolve(process.env.KGC_UPDATE_DIR)
+  : path.join(__dirname, '..', '..');
 
 // ---------- 存储 ----------
 function defaultData() {
@@ -205,6 +209,36 @@ app.put('/api/state', (req, res) => {
 app.get('/api/info', (req, res) =>
   res.json({ name: os.hostname(), httpPort: HTTP_PORT, ips: lanAddresses() })
 );
+
+app.get('/api/update/latest', (req, res) => {
+  try {
+    const apk = findLatestApk(UPDATE_DIR);
+    if (!apk) return res.status(404).json({ error: 'no update APK available' });
+    const downloadUrl = `${req.protocol}://${req.get('host')}/updates/${encodeURIComponent(apk.fileName)}`;
+    return res.json({
+      version: apk.version,
+      name: `kaogong-checkin v${apk.version}`,
+      apkUrl: downloadUrl,
+      pageUrl: downloadUrl,
+      notes: '由局域网服务器提供',
+      publishedAt: apk.publishedAt,
+      source: 'lan',
+      fileName: apk.fileName,
+      size: apk.size,
+    });
+  } catch (error) {
+    console.error('[update] scan failed:', error.message);
+    return res.status(500).json({ error: 'failed to scan update APKs' });
+  }
+});
+
+app.get('/updates/:fileName', (req, res) => {
+  const filePath = resolveApkFile(UPDATE_DIR, req.params.fileName);
+  if (!filePath) return res.sendStatus(404);
+  return res.download(filePath, req.params.fileName, {
+    headers: { 'Content-Type': 'application/vnd.android.package-archive' },
+  });
+});
 
 if (fs.existsSync(WEB_DIST)) {
   app.use(express.static(WEB_DIST));
