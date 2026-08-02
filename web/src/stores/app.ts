@@ -52,6 +52,7 @@ export const useAppStore = defineStore('app', {
     formulaDrills: [] as FormulaDrillRecord[],
     settings: { planEndDate: null, theme: 'light', markDate: null } as Settings,
     online: false,
+    pendingSyncCount: 0,
     loaded: false,
   }),
   actions: {

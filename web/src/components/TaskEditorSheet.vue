@@ -20,7 +20,16 @@
         </label>
         <label class="field">
           <span>{{ form.type === 'daily' ? '结束日期（可空）' : '截止日期' }}</span>
-          <input v-model="form.endDate" type="date" class="input" />
+          <button class="date-trigger" type="button" @click="datePickerOpen = true">
+            <span :class="{ placeholder: !form.endDate }">
+              {{ form.endDate ? formatCn(form.endDate) : '选择日期' }}
+            </span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="17" rx="3" />
+              <path d="M8 2v4M16 2v4M3 10h18" />
+            </svg>
+          </button>
         </label>
         <label class="field">
           <span>子任务（可空，在今日页点主任务展开）</span>
@@ -41,12 +50,21 @@
         </div>
       </div>
     </div>
+    <DatePickerSheet
+      v-if="form"
+      v-model:open="datePickerOpen"
+      v-model="form.endDate"
+      :title="form.type === 'daily' ? '选择结束日期' : '选择截止日期'"
+      :allow-clear="form.type === 'daily'"
+    />
   </teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Task, Subtask } from '../types';
+import DatePickerSheet from './DatePickerSheet.vue';
+import { formatCn } from '../lib/date';
 
 interface SubEdit {
   id?: string;
@@ -69,12 +87,14 @@ const emit = defineEmits<{
 }>();
 
 const form = ref<TaskEditState | null>(null);
+const datePickerOpen = ref(false);
 
 watch(
   () => props.open,
   (open) => {
     if (!open) {
       form.value = null;
+      datePickerOpen.value = false;
       return;
     }
     const t = props.task;
@@ -161,6 +181,24 @@ function save() {
   font-size: 13px;
   color: var(--text-2);
   margin-bottom: 6px;
+}
+
+.date-trigger {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 0 12px;
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.date-trigger .placeholder {
+  color: var(--text-3);
 }
 
 .seg {

@@ -1,32 +1,45 @@
 <template>
   <div class="page">
-    <div v-if="!store.online" class="offline-banner">
-      离线模式，数据将在恢复连接后同步
-    </div>
-
     <header class="head">
-      <div>
-        <h1 class="page-title">{{ formatCn(selectedDate) }} 周{{ weekdayCn(selectedDate) }}</h1>
+      <div class="head-copy">
+        <h1 class="page-title">
+          <span class="date-part">{{ formatCn(selectedDate) }}</span>
+          <span class="weekday-part">周{{ weekdayCn(selectedDate) }}</span>
+        </h1>
         <p class="page-sub">
           {{ isToday ? '今天的计划' : '查看历史' }}
-          <button v-if="!isToday" class="back-today" @click="selectedDate = todayStr()">回到今天</button>
+          <button v-if="!isToday" class="back-today" type="button" @click="selectedDate = todayStr()">
+            回到今天
+          </button>
         </p>
       </div>
-      <div class="head-right">
-        <ProgressRing :percent="progress">
-          <div class="ring-text">
-            <strong>{{ doneCount }}</strong
-            ><span>/{{ plan.today.length }}</span>
-          </div>
-        </ProgressRing>
-        <div class="head-btns">
-          <button class="head-btn" :class="{ on: reordering }" @click="reordering = !reordering">
-            {{ reordering ? '完成' : '排序' }}
-          </button>
-          <router-link to="/tasks" class="head-btn">管理</router-link>
-        </div>
+      <div class="head-actions">
+        <button class="head-btn" :class="{ on: reordering }" type="button" @click="reordering = !reordering">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 6h12M8 12h12M8 18h12" /><path d="M3 6h.01M3 12h.01M3 18h.01" />
+          </svg>
+          <span>{{ reordering ? '完成' : '排序' }}</span>
+        </button>
+        <router-link to="/tasks" class="head-btn" aria-label="管理任务">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" />
+          </svg>
+          <span>管理</span>
+        </router-link>
       </div>
     </header>
+
+    <section class="progress-overview" aria-label="今日完成进度">
+      <ProgressRing :percent="progress">
+        <div class="ring-text">
+          <strong>{{ doneCount }}</strong><span>/{{ plan.today.length }}</span>
+        </div>
+      </ProgressRing>
+      <div class="progress-copy">
+        <strong>{{ isToday ? '今日进度' : '当天进度' }}</strong>
+        <span>{{ plan.today.length ? `${Math.round(progress * 100)}% 已完成` : '暂无计划' }}</span>
+      </div>
+    </section>
 
     <!-- 重要日倒计时 -->
     <div v-if="markCountdown" class="mark-banner card">
@@ -39,10 +52,11 @@
       </strong>
     </div>
 
-    <!-- 周日历条（可滑动 / 展开月视图 / 长按标记） -->
+    <!-- 连续日期轨道（可左右浏览 / 上下展开月视图 / 长按标记） -->
     <CalendarStrip
       v-model="selectedDate"
       :mark-date="store.settings.markDate ?? null"
+      :completion-level="completionLevel"
       @mark="onMark"
     />
 
@@ -64,6 +78,7 @@
           @move="onMove"
           @toggle-sub="onToggleSub"
           @toggle-expand="onToggleExpand"
+          @edit="onEditTask"
         />
       </div>
     </template>
@@ -78,6 +93,7 @@
           :item="item"
           :index="plan.today.length + i"
           @toggle="onToggle"
+          @edit="onEditTask"
         />
       </div>
     </template>
@@ -88,14 +104,19 @@
 
     <!-- 右下角快速新增任务（teleport 出滑动轨道，保持相对视口固定；仅今日页激活时显示） -->
     <teleport to="body">
-      <button v-if="isActiveTab" class="fab" type="button" aria-label="新增任务" @click="sheetOpen = true">
+      <button v-if="isActiveTab" class="fab" type="button" aria-label="新增任务" @click="openNewTask">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
           stroke-width="2.6" stroke-linecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
     </teleport>
-    <TaskEditorSheet v-model:open="sheetOpen" @save="onSaveTask" />
+    <TaskEditorSheet
+      v-model:open="sheetOpen"
+      :task="editingTask"
+      :subtasks="editingTask ? taskSubtasks(editingTask.id) : []"
+      @save="onSaveTask"
+    />
 
     <CelebrationOverlay :show="showCelebration" @close="showCelebration = false" />
   </div>
@@ -107,6 +128,7 @@ import { useRoute } from 'vue-router';
 import confetti from 'canvas-confetti';
 import { useAppStore } from '../stores/app';
 import { generatePlan, type PlanItem } from '../lib/plan';
+import { completionForDate } from '../lib/completion';
 import { todayStr, diffDays, formatCn, weekdayCn } from '../lib/date';
 import TaskCard from '../components/TaskCard.vue';
 import ProgressRing from '../components/ProgressRing.vue';
@@ -121,6 +143,7 @@ const selectedDate = ref(todayStr());
 const showCelebration = ref(false);
 const reordering = ref(false);
 const sheetOpen = ref(false);
+const editingTask = ref<Task | null>(null);
 
 /** Tab 页常驻轨道后，FAB 只在今日页为当前路由时显示 */
 const isActiveTab = computed(() => route.path === '/');
@@ -173,6 +196,11 @@ const progress = computed(() =>
   plan.value.today.length ? doneCount.value / plan.value.today.length : 0
 );
 
+/** 任务日期的完成度色阶，与统计页共用 --heat-0 ~ --heat-4。 */
+function completionLevel(date: string): number {
+  return completionForDate(store.tasks, store.checkins, date, store.settings.planEndDate).level;
+}
+
 /** 重要日倒计时（已过去的标记日不再提示） */
 const markCountdown = computed(() => {
   const md = store.settings.markDate;
@@ -197,6 +225,21 @@ function onToggle(item: PlanItem, ev: MouseEvent) {
   }
 }
 
+function taskSubtasks(taskId: string) {
+  return store.subtasks.filter((s) => s.taskId === taskId).sort((a, b) => a.order - b.order);
+}
+
+function openNewTask() {
+  editingTask.value = null;
+  sheetOpen.value = true;
+}
+
+function onEditTask(item: PlanItem) {
+  if (reordering.value) return;
+  editingTask.value = item.task;
+  sheetOpen.value = true;
+}
+
 /** 排序模式：与相邻任务交换顺序（全局顺序，后续天数同步变化） */
 function onMove(item: PlanItem, dir: -1 | 1) {
   const list = plan.value.today;
@@ -207,17 +250,20 @@ function onMove(item: PlanItem, dir: -1 | 1) {
 }
 
 function onSaveTask(form: {
+  id?: string;
   title: string;
   type: Task['type'];
   endDate: string;
   subs: { id?: string; title: string }[];
 }) {
   const id = store.saveTask({
+    id: form.id,
     title: form.title,
     type: form.type,
     endDate: form.endDate || null,
   });
   if (id) store.saveSubtasks(id, form.subs);
+  editingTask.value = null;
 }
 
 /**
@@ -250,18 +296,6 @@ function celebrate(ev: MouseEvent) {
 </script>
 
 <style scoped>
-.offline-banner {
-  background: var(--warn-soft);
-  color: var(--warn);
-  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
-  border-radius: 12px;
-  padding: 9px 14px;
-  font-size: 13.5px;
-  font-weight: 600;
-  margin-bottom: 14px;
-  text-align: center;
-}
-
 .head {
   display: flex;
   justify-content: space-between;
@@ -269,30 +303,49 @@ function celebrate(ev: MouseEvent) {
   gap: 12px;
 }
 
-.head-right {
+.head-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.page-title .date-part,
+.page-title .weekday-part {
+  white-space: nowrap;
+}
+
+.head .page-title {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  column-gap: 6px;
+}
+
+.head-actions {
+  display: flex;
+  gap: 8px;
   flex: none;
 }
 
-.head-btns {
-  display: flex;
-  gap: 6px;
-}
-
 .head-btn {
-  font-size: 12px;
+  min-width: 78px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--accent-solid);
   background: var(--accent-soft);
   border: none;
   border-radius: 999px;
-  padding: 3px 12px;
   text-decoration: none;
   cursor: pointer;
   transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.head-btn svg {
+  flex: none;
 }
 
 .head-btn:active {
@@ -311,9 +364,33 @@ function celebrate(ev: MouseEvent) {
   font-size: 12px;
   font-weight: 600;
   border-radius: 999px;
-  padding: 2px 10px;
+  min-height: 36px;
+  padding: 5px 11px;
   margin-left: 6px;
   cursor: pointer;
+}
+
+.progress-overview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 2px 14px;
+}
+
+.progress-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-copy strong {
+  font-size: 16px;
+}
+
+.progress-copy span {
+  color: var(--text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .ring-text strong {

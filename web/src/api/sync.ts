@@ -28,7 +28,7 @@ function loadState(): AppState | null {
     const raw = localStorage.getItem(STATE_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as AppState;
-    s.settings = { planEndDate: null, theme: 'light', markDate: null, ...s.settings };
+    s.settings = Object.assign({ planEndDate: null, theme: 'light', markDate: null }, s.settings);
     return s;
   } catch {
     return null;
@@ -64,6 +64,7 @@ let queue: SyncMessage[] = loadQueue();
 let ws: WebSocket | null = null;
 let retryDelay = 1000;
 let started = false;
+let runGeneration = 0;
 let replayed = false;
 let subscribed = false;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,6 +76,7 @@ export function isSyncEnabled(): boolean {
 
 function persistQueue() {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  useAppStore().pendingSyncCount = queue.length;
 }
 
 export function enqueue(msg: SyncMessage) {
@@ -95,9 +97,10 @@ function flush() {
     replayed = false;
     // 队列重放完成后拉全量快照对齐（单用户 last-write-wins）
     const store = useAppStore();
+    const generation = runGeneration;
     fetchState()
       .then((s) => {
-        if (isSyncEnabled() && !replacing) store.applySnapshot(s);
+        if (generation === runGeneration && isSyncEnabled() && !replacing) store.applySnapshot(s);
       })
       .catch(() => {});
   }
@@ -105,14 +108,18 @@ function flush() {
 
 export async function startSync() {
   if (started) return;
+  const generation = ++runGeneration;
   started = true;
+  const isCurrentRun = () => generation === runGeneration;
   const store = useAppStore();
+  store.pendingSyncCount = queue.length;
   // 先用本地缓存水合并重放离线队列：离线重启数据不丢
   const cached = loadState();
   if (cached) {
     store.applySnapshot(cached);
   }
   if (!isSyncEnabled()) {
+    if (!isCurrentRun()) return;
     for (const m of queue) store.applyRemote(m);
     store.loaded = true;
     if (!subscribed) {
@@ -125,10 +132,11 @@ export async function startSync() {
   }
   try {
     const serverState = await fetchState();
-    if (isSyncEnabled()) store.applySnapshot(serverState);
+    if (isCurrentRun() && isSyncEnabled()) store.applySnapshot(serverState);
   } catch {
     // 服务器不可达：离线模式，使用本地缓存数据
   }
+  if (!isCurrentRun() || !isSyncEnabled()) return;
   for (const m of queue) store.applyRemote(m);
   store.loaded = true;
   // 之后所有状态变化都持久化到本地（只订阅一次，restartSync 不重复订阅）
@@ -188,6 +196,7 @@ function scheduleReconnect() {
 }
 
 export function stopSync() {
+  runGeneration += 1;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;

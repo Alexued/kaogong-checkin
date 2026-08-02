@@ -2,14 +2,24 @@
   <div
     v-motion
     class="card task-card"
-    :class="{ done: item.done, carried: item.overdueDays > 0, sorting: reorder }"
+    :class="{
+      done: item.done,
+      carried: item.overdueDays > 0,
+      sorting: reorder,
+      'long-press-active': longPressActive,
+    }"
     :initial="{ opacity: 0, y: 18 }"
     :enter="{
       opacity: 1,
       y: 0,
-      transition: { type: 'spring', stiffness: 260, damping: 26, delay: index * 55 },
+      transition: { type: 'spring', stiffness: 260, damping: 26, delay: Math.min(index, 5) * 45 },
     }"
     @click="onCardClick"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerCancel"
+    @lostpointercapture="onPointerCancel"
   >
     <div class="main-row">
       <CheckButton :done="item.done" @toggle="onToggle" />
@@ -62,10 +72,11 @@
       </div>
     </div>
   </div>
+
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import type { PlanItem } from '../lib/plan';
 import CheckButton from './CheckButton.vue';
 
@@ -95,9 +106,119 @@ const emit = defineEmits<{
   (e: 'move', item: PlanItem, dir: -1 | 1): void;
   (e: 'toggle-sub', sub: SubItem, ev: MouseEvent): void;
   (e: 'toggle-expand', item: PlanItem): void;
+  (e: 'edit', item: PlanItem): void;
 }>();
 
 const subDoneCount = computed(() => props.subItems.filter((s) => s.done).length);
+
+const LONG_PRESS_MS = 450;
+const MOVE_CANCEL_PX = 10;
+const longPressActive = ref(false);
+let pressTimer: ReturnType<typeof setTimeout> | null = null;
+let revealTimer: ReturnType<typeof setTimeout> | null = null;
+let pointerId: number | null = null;
+let startX = 0;
+let startY = 0;
+let suppressClick = false;
+let suppressClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearPressTimer() {
+  if (pressTimer) {
+    clearTimeout(pressTimer);
+    pressTimer = null;
+  }
+}
+
+function clearRevealTimer() {
+  if (revealTimer) {
+    clearTimeout(revealTimer);
+    revealTimer = null;
+  }
+}
+
+function armClickSuppression() {
+  suppressClick = true;
+  if (suppressClickTimer) clearTimeout(suppressClickTimer);
+  suppressClickTimer = setTimeout(() => {
+    suppressClickTimer = null;
+    suppressClick = false;
+  }, 900);
+}
+
+function resetPress() {
+  clearPressTimer();
+  clearRevealTimer();
+  if (suppressClickTimer) {
+    clearTimeout(suppressClickTimer);
+    suppressClickTimer = null;
+  }
+  suppressClick = false;
+  pointerId = null;
+  longPressActive.value = false;
+}
+
+function isLongPressTarget(target: EventTarget | null) {
+  const el = target instanceof Element ? target : null;
+  // The check button, subtask rows and sorting controls have their own gestures.
+  return !!el && !el.closest('button, input, textarea, select, a, .sub-row, [data-no-longpress]');
+}
+
+function onPointerDown(ev: PointerEvent) {
+  if (props.reorder || ev.button !== 0 || !isLongPressTarget(ev.target)) return;
+  resetPress();
+  pointerId = ev.pointerId;
+  startX = ev.clientX;
+  startY = ev.clientY;
+  const card = ev.currentTarget as HTMLElement;
+  try {
+    card.setPointerCapture(ev.pointerId);
+  } catch {
+    // Some older WebViews do not support pointer capture.
+  }
+  pressTimer = setTimeout(() => {
+    pressTimer = null;
+    if (pointerId !== ev.pointerId) return;
+    armClickSuppression();
+    longPressActive.value = true;
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(12);
+    // Let the lift state render before the editor sheet takes focus.
+    revealTimer = setTimeout(() => {
+      revealTimer = null;
+      emit('edit', props.item);
+      longPressActive.value = false;
+      pointerId = null;
+    }, 90);
+  }, LONG_PRESS_MS);
+}
+
+function onPointerMove(ev: PointerEvent) {
+  if (pointerId !== ev.pointerId || !pressTimer) return;
+  if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > MOVE_CANCEL_PX) {
+    resetPress();
+  }
+}
+
+function onPointerUp(ev: PointerEvent) {
+  if (pointerId !== ev.pointerId) return;
+  clearPressTimer();
+  pointerId = null;
+  // Keep the lifted state until the editor event has been delivered.
+  if (!revealTimer) longPressActive.value = false;
+}
+
+function onPointerCancel(ev: PointerEvent) {
+  if (pointerId !== ev.pointerId) return;
+  resetPress();
+}
+
+watch(
+  () => props.reorder,
+  (reordering) => {
+    if (reordering) resetPress();
+  }
+);
+
+onUnmounted(resetPress);
 
 function onToggle(ev: MouseEvent) {
   emit('toggle', props.item, ev);
@@ -105,6 +226,11 @@ function onToggle(ev: MouseEvent) {
 
 /** 整条卡片点击：有子任务时展开/收起，否则切换打卡/恢复；排序模式下不响应 */
 function onCardClick(ev: MouseEvent) {
+  if (suppressClick) {
+    suppressClick = false;
+    ev.preventDefault();
+    return;
+  }
   if (props.reorder) return;
   if (props.subItems.length) emit('toggle-expand', props.item);
   else emit('toggle', props.item, ev);
@@ -113,6 +239,8 @@ function onCardClick(ev: MouseEvent) {
 
 <style scoped>
 .task-card {
+  position: relative;
+  z-index: 1;
   padding: 14px 16px;
   margin-bottom: 10px;
   cursor: pointer;
@@ -125,8 +253,15 @@ function onCardClick(ev: MouseEvent) {
 }
 
 /* 卡片按压缩放回弹 */
-.task-card:active {
+.task-card:not(.long-press-active):active {
   transform: scale(0.97);
+}
+
+.task-card.long-press-active {
+  z-index: 81;
+  transform: translateY(-6px) scale(1.015) !important;
+  /* The wide spread dims the current scroll surface while this card stays above it. */
+  box-shadow: var(--shadow-lg), 0 0 0 100vmax rgba(15, 23, 42, 0.16);
 }
 
 .main-row {
@@ -248,5 +383,12 @@ function onCardClick(ev: MouseEvent) {
 
 .reorder-btns button:disabled {
   opacity: 0.3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-card,
+  .task-card.long-press-active {
+    transition-duration: 0.01ms;
+  }
 }
 </style>

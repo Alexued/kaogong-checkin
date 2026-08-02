@@ -1,12 +1,12 @@
 /**
  * 应用内检查更新：查询 GitHub 最新 Release，与当前版本比较；
- * 有新版本时用系统浏览器打开 APK 下载地址（浏览器下载后系统引导覆盖安装）。
+ * 安卓客户端在应用内下载 APK 并显示进度，网页预览保留浏览器下载回退。
  */
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0';
 
 export interface ReleaseInfo {
   version: string;
@@ -17,6 +17,44 @@ export interface ReleaseInfo {
   notes: string;
   publishedAt: string;
 }
+
+export type AppUpdateDownloadState =
+  | 'idle'
+  | 'queued'
+  | 'downloading'
+  | 'paused'
+  | 'downloaded'
+  | 'failed'
+  | 'not_found'
+  | 'unknown';
+
+export interface AppUpdateDownloadStatus {
+  downloadId: number | null;
+  status: AppUpdateDownloadState | 'cancelled';
+  percent: number;
+  bytesDownloaded: number;
+  totalBytes: number;
+  speedBytesPerSecond: number;
+  fileName?: string;
+  reason?: number;
+  localUri?: string;
+}
+
+interface NativeAppUpdatePlugin {
+  startDownload(options: { url: string; fileName?: string }): Promise<AppUpdateDownloadStatus>;
+  getDownloadStatus(options?: { downloadId?: number | string }): Promise<AppUpdateDownloadStatus>;
+  installDownloadedApk(options?: { downloadId?: number | string }): Promise<{
+    downloadId: number | null;
+    status: 'permissionRequired' | 'installing';
+  }>;
+  cancelDownload(options?: { downloadId?: number | string }): Promise<AppUpdateDownloadStatus>;
+  addListener(
+    eventName: 'downloadProgress',
+    listenerFunc: (status: AppUpdateDownloadStatus) => void,
+  ): Promise<PluginListenerHandle>;
+}
+
+const NativeAppUpdate = registerPlugin<NativeAppUpdatePlugin>('AppUpdate');
 
 /** 比较语义化版本号：a > b 返回正数，相等 0，a < b 负数（忽略 v 前缀） */
 export function compareVersions(a: string, b: string): number {
@@ -46,11 +84,37 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo> {
   };
 }
 
-/** 打开下载页：安卓走系统浏览器（触发 APK 下载），网页端新标签页 */
+/** 非 Android 原生环境的下载回退。 */
 export async function openDownload(url: string) {
   if (Capacitor.isNativePlatform()) {
     await Browser.open({ url });
   } else {
     window.open(url, '_blank');
   }
+}
+
+export function canDownloadInApp(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+}
+
+export function subscribeAppUpdateProgress(
+  listener: (status: AppUpdateDownloadStatus) => void,
+): Promise<PluginListenerHandle> {
+  return NativeAppUpdate.addListener('downloadProgress', listener);
+}
+
+export function getAppUpdateStatus(): Promise<AppUpdateDownloadStatus> {
+  return NativeAppUpdate.getDownloadStatus();
+}
+
+export function startAppUpdateDownload(url: string, fileName?: string): Promise<AppUpdateDownloadStatus> {
+  return NativeAppUpdate.startDownload({ url, fileName });
+}
+
+export function installAppUpdate(downloadId?: number | null) {
+  return NativeAppUpdate.installDownloadedApk(downloadId == null ? undefined : { downloadId });
+}
+
+export function cancelAppUpdate(downloadId?: number | null): Promise<AppUpdateDownloadStatus> {
+  return NativeAppUpdate.cancelDownload(downloadId == null ? undefined : { downloadId });
 }

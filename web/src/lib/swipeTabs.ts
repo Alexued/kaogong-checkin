@@ -1,7 +1,7 @@
 /**
  * Tab 根页左右滑动切换（ViewPager 方案）。
  *
- * 5 个 Tab 页常驻同一条横向轨道（只挂载一次，切换不卸载），
+ * 4 个 Tab 页常驻同一条横向轨道（只挂载一次，切换不卸载），
  * 轨道 translateX = -当前页索引×屏宽 + 拖动位移：
  * - 跟手：相邻页本来就在屏外就位，拖动零挂载、零卡顿；
  * - 松手：按位移/速度决定切到相邻页（滑满后换路由并瞬时归位）或弹回；
@@ -14,12 +14,12 @@
  * 手势判定：10px slop 内不决策；垂直分量更大则放行页面滚动；
  * 水平角 < ~30°（|dy| < |dx|·tan30°）才接管并 preventDefault。
  * touchstart 落在可横向滚动的容器（或标记 data-swipe-ignore）内时不劫持。
- * 仅 5 个 Tab 根页参与；二级页不响应（返回由 backButton 处理）。
+ * 仅 4 个 Tab 根页参与；二级页不响应（返回由 backButton 处理）。
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-export const TAB_PATHS = ['/', '/timer', '/drill', '/stats', '/settings'];
+export const TAB_PATHS = ['/', '/timer', '/drill', '/settings'];
 
 const SLOP = 10; // 决策阈值 px
 const TAN30 = 0.577; // 水平判定：|dy| < |dx| * tan(30°)

@@ -31,7 +31,7 @@ watch(
 
 // 安卓返回键/返回手势：二级页路由后退，Tab 根页退到桌面（不闪退）
 if (Capacitor.isNativePlatform()) {
-  const ROOT_TABS = new Set(['/', '/timer', '/drill', '/stats', '/settings']);
+  const ROOT_TABS = new Set(['/', '/timer', '/drill', '/settings']);
   void CapApp.addListener('backButton', () => {
     const path = router.currentRoute.value.path;
     if (!ROOT_TABS.has(path) && window.history.state?.back) {

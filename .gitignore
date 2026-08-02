@@ -25,3 +25,6 @@ test-shots/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 本地视觉设计会话
+.superpowers/

@@ -15,9 +15,11 @@ const os = require('os');
 const dgram = require('dgram');
 const { WebSocketServer } = require('ws');
 
-const HTTP_PORT = 8321;
-const UDP_PORT = 8322;
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const HTTP_PORT = Number(process.env.KGC_HTTP_PORT || 8321);
+const UDP_PORT = Number(process.env.KGC_UDP_PORT || 8322);
+const DATA_DIR = process.env.KGC_DATA_DIR
+  ? path.resolve(process.env.KGC_DATA_DIR)
+  : path.join(__dirname, '..', 'data');
 const DATA_FILE = path.join(DATA_DIR, 'data.json');
 const BAK_FILE = DATA_FILE + '.bak';
 const TMP_FILE = DATA_FILE + '.tmp';
@@ -42,7 +44,7 @@ function saveData(data) {
   } catch (e) {
     console.error('[store] backup failed:', e.message);
   }
-  fs.writeFileSync(TMP_FILE, JSON.stringify(data, null, 2));
+  fs.writeFileSync(TMP_FILE, JSON.stringify(data, null, 2), 'utf8');
   fs.renameSync(TMP_FILE, DATA_FILE);
 }
 
@@ -178,7 +180,10 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/state', (req, res) => res.json(data));
+app.get('/api/state', (req, res) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.json(data);
+});
 app.put('/api/state', (req, res) => {
   if (!isValidState(req.body)) {
     return res.status(400).json({ error: 'invalid state shape' });
@@ -190,6 +195,7 @@ app.put('/api/state', (req, res) => {
       data[key] = next[key];
     }
     broadcastSnapshot();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     return res.json(data);
   } catch (e) {
     console.error('[store] full replace failed:', e.message);

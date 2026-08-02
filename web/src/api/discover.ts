@@ -1,57 +1,163 @@
-/**
- * UDP 服务器自动发现（仅原生 APK 内生效，best effort）：
- * 监听 8322 端口广播 {name, httpPort}，收到后用发送方 IP 自动填写 serverUrl 并重连。
- * 已手动配置 serverUrl 时不覆盖（手动优先）。
- */
+/** UDP 局域网服务器扫描（仅原生 APK 内生效）。发现结果只展示，用户选择后才连接。 */
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { UdpSocket } from 'capacitor-udp-socket';
-import { getServerUrl, setServerUrl } from './client';
-import { isSyncEnabled, restartSync } from './sync';
+import { isSyncEnabled } from './sync';
 
 const UDP_PORT = 8322;
+const STALE_MS = 30000;
+
+export interface DiscoveredServer {
+  key: string;
+  name: string;
+  host: string;
+  httpPort: number;
+  lastSeen: number;
+}
+
 let activeSocketId: number | null = null;
 let receiveListener: PluginListenerHandle | null = null;
+let startPromise: Promise<void> | null = null;
+let discoveryGeneration = 0;
+let expiryTimer: ReturnType<typeof setInterval> | null = null;
+const candidates = new Map<string, DiscoveredServer>();
+const subscribers = new Set<(servers: DiscoveredServer[]) => void>();
 
-export async function startDiscovery(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
-  if (!isSyncEnabled() || activeSocketId !== null) return;
-  if (getServerUrl()) return; // 手动配置优先
+function snapshot(): DiscoveredServer[] {
+  const cutoff = Date.now() - STALE_MS;
+  for (const [key, server] of candidates) {
+    if (server.lastSeen < cutoff) candidates.delete(key);
+  }
+  return [...candidates.values()].sort((a, b) => b.lastSeen - a.lastSeen);
+}
+
+function notify() {
+  const servers = snapshot();
+  for (const subscriber of subscribers) subscriber(servers);
+}
+
+export function subscribeDiscovery(subscriber: (servers: DiscoveredServer[]) => void): () => void {
+  subscribers.add(subscriber);
+  subscriber(snapshot());
+  return () => subscribers.delete(subscriber);
+}
+
+export function clearDiscoveredServers() {
+  candidates.clear();
+  notify();
+}
+
+export function isDiscoveryRunning(): boolean {
+  return activeSocketId !== null;
+}
+
+function startExpiryTimer() {
+  if (expiryTimer) return;
+  expiryTimer = setInterval(() => {
+    const before = candidates.size;
+    snapshot();
+    if (candidates.size !== before) notify();
+  }, 5000);
+}
+
+function stopExpiryTimer() {
+  if (!expiryTimer) return;
+  clearInterval(expiryTimer);
+  expiryTimer = null;
+}
+
+async function closeSocket(socketId: number) {
   try {
-    const { socketId } = await UdpSocket.create();
-    activeSocketId = socketId;
-    await UdpSocket.bind({ socketId, port: UDP_PORT });
-    await UdpSocket.setBroadcast({ socketId, enabled: true });
-    receiveListener = await UdpSocket.addListener('receive', (ev) => {
-      if (!isSyncEnabled() || ev.socketId !== socketId || !ev.buffer || getServerUrl()) return;
-      try {
-        // 插件 buffer 为 base64；兼容明文
-        let text = ev.buffer;
-        try {
-          text = atob(ev.buffer);
-        } catch {
-          /* 按明文处理 */
-        }
-        const msg = JSON.parse(text);
-        const host = (ev.remoteAddress || '').replace(/^\//, '');
-        if (msg && msg.httpPort && host) {
-          console.log(`[discover] found server ${host}:${msg.httpPort} (${msg.name})`);
-          setServerUrl(`${host}:${msg.httpPort}`);
-          restartSync();
-          void stopDiscovery();
-        }
-      } catch {
-        /* 忽略非本应用广播 */
-      }
-    });
-    console.log(`[discover] listening udp :${UDP_PORT}`);
-  } catch (e) {
-    // 插件不可用等场景：跳过自动发现，保留手动输入
-    await stopDiscovery();
-    console.warn('[discover] unavailable:', e);
+    await UdpSocket.close({ socketId });
+  } catch {
+    /* socket already closed */
   }
 }
 
+export function startDiscovery(): Promise<void> {
+  if (!Capacitor.isNativePlatform() || !isSyncEnabled() || activeSocketId !== null) return Promise.resolve();
+  if (startPromise) return startPromise;
+
+  const generation = ++discoveryGeneration;
+  startPromise = (async () => {
+    let socketId: number | null = null;
+    try {
+      const created = await UdpSocket.create();
+      socketId = created.socketId;
+      if (generation !== discoveryGeneration || !isSyncEnabled()) {
+        await closeSocket(socketId);
+        return;
+      }
+      await UdpSocket.bind({ socketId, port: UDP_PORT });
+      if (generation !== discoveryGeneration || !isSyncEnabled()) {
+        await closeSocket(socketId);
+        return;
+      }
+      await UdpSocket.setBroadcast({ socketId, enabled: true });
+      if (generation !== discoveryGeneration || !isSyncEnabled()) {
+        await closeSocket(socketId);
+        return;
+      }
+      const listener = await UdpSocket.addListener('receive', (event) => {
+        if (!isSyncEnabled() || event.socketId !== socketId || event.socketId !== activeSocketId || !event.buffer) return;
+        try {
+          let text = event.buffer;
+          try {
+            text = atob(event.buffer);
+          } catch {
+            /* plugin may already provide plaintext */
+          }
+          const message = JSON.parse(text) as { name?: string; httpPort?: number };
+          const host = (event.remoteAddress || '').replace(/^\//, '');
+          if (!host || !message.httpPort) return;
+          const key = `${host}:${message.httpPort}`;
+          candidates.set(key, {
+            key,
+            host,
+            httpPort: Number(message.httpPort),
+            name: String(message.name || host),
+            lastSeen: Date.now(),
+          });
+          notify();
+        } catch {
+          /* ignore unrelated broadcast packets */
+        }
+      });
+      if (generation !== discoveryGeneration || !isSyncEnabled()) {
+        try { await listener.remove(); } catch { /* listener already removed */ }
+        await closeSocket(socketId);
+        return;
+      }
+      activeSocketId = socketId;
+      receiveListener = listener;
+      startExpiryTimer();
+      console.log(`[discover] scanning udp :${UDP_PORT}`);
+    } catch (error) {
+      if (socketId !== null && socketId !== activeSocketId) await closeSocket(socketId);
+      console.warn('[discover] unavailable:', error);
+    } finally {
+      startPromise = null;
+    }
+  })();
+  return startPromise;
+}
+
+export async function restartDiscovery(): Promise<void> {
+  await stopDiscovery();
+  clearDiscoveredServers();
+  await startDiscovery();
+}
+
 export async function stopDiscovery(): Promise<void> {
+  discoveryGeneration += 1;
+  stopExpiryTimer();
+  const pendingStart = startPromise;
+  if (pendingStart) {
+    try {
+      await pendingStart;
+    } catch {
+      /* startup cleanup is best effort */
+    }
+  }
   if (receiveListener) {
     const listener = receiveListener;
     receiveListener = null;
@@ -64,10 +170,7 @@ export async function stopDiscovery(): Promise<void> {
   if (activeSocketId !== null) {
     const socketId = activeSocketId;
     activeSocketId = null;
-    try {
-      await UdpSocket.close({ socketId });
-    } catch {
-      /* socket already closed */
-    }
+    await closeSocket(socketId);
   }
+  clearDiscoveredServers();
 }
