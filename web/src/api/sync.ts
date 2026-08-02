@@ -7,11 +7,12 @@
  * - WS 断开指数退避重连（1s → 2s → … → 30s 封顶）
  */
 import { useAppStore } from '../stores/app';
-import { fetchState, wsUrl } from './client';
-import type { AppState, SyncMessage } from '../types';
+import { fetchState, replaceState, wsUrl } from './client';
+import type { AppState, RemoteSyncMessage, SyncMessage } from '../types';
 
 const QUEUE_KEY = 'kgc-queue';
 const STATE_KEY = 'kgc-state';
+const SYNC_ENABLED_KEY = 'kgc-sync-enabled';
 
 function loadQueue(): SyncMessage[] {
   try {
@@ -65,6 +66,12 @@ let retryDelay = 1000;
 let started = false;
 let replayed = false;
 let subscribed = false;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let replacing = false;
+
+export function isSyncEnabled(): boolean {
+  return localStorage.getItem(SYNC_ENABLED_KEY) !== 'false';
+}
 
 function persistQueue() {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
@@ -77,7 +84,7 @@ export function enqueue(msg: SyncMessage) {
 }
 
 function flush() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (replacing || !isSyncEnabled() || !ws || ws.readyState !== WebSocket.OPEN) return;
   while (queue.length > 0 && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(queue[0]));
     queue.shift();
@@ -89,7 +96,9 @@ function flush() {
     // 队列重放完成后拉全量快照对齐（单用户 last-write-wins）
     const store = useAppStore();
     fetchState()
-      .then((s) => store.applySnapshot(s))
+      .then((s) => {
+        if (isSyncEnabled() && !replacing) store.applySnapshot(s);
+      })
       .catch(() => {});
   }
 }
@@ -102,13 +111,25 @@ export async function startSync() {
   const cached = loadState();
   if (cached) {
     store.applySnapshot(cached);
+  }
+  if (!isSyncEnabled()) {
     for (const m of queue) store.applyRemote(m);
+    store.loaded = true;
+    if (!subscribed) {
+      subscribed = true;
+      store.$subscribe(schedulePersistState);
+    }
+    schedulePersistState();
+    started = false;
+    return;
   }
   try {
-    store.applySnapshot(await fetchState());
+    const serverState = await fetchState();
+    if (isSyncEnabled()) store.applySnapshot(serverState);
   } catch {
     // 服务器不可达：离线模式，使用本地缓存数据
   }
+  for (const m of queue) store.applyRemote(m);
   store.loaded = true;
   // 之后所有状态变化都持久化到本地（只订阅一次，restartSync 不重复订阅）
   if (!subscribed) {
@@ -120,6 +141,7 @@ export async function startSync() {
 }
 
 function connect() {
+  if (!isSyncEnabled() || replacing) return;
   const store = useAppStore();
   try {
     ws = new WebSocket(wsUrl());
@@ -134,7 +156,9 @@ function connect() {
   };
   ws.onmessage = (ev) => {
     try {
-      store.applyRemote(JSON.parse(ev.data as string));
+      const msg = JSON.parse(ev.data as string) as RemoteSyncMessage;
+      if (msg.kind === 'snapshot') store.applySnapshot(msg.state);
+      else store.applyRemote(msg);
     } catch {
       /* 忽略坏消息 */
     }
@@ -154,13 +178,20 @@ function connect() {
 }
 
 function scheduleReconnect() {
+  if (!isSyncEnabled() || replacing || reconnectTimer) return;
   const delay = retryDelay;
   retryDelay = Math.min(retryDelay * 2, 30000);
-  setTimeout(connect, delay);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, delay);
 }
 
-/** 修改 serverUrl 后调用：以新地址重新初始化同步 */
-export function restartSync() {
+export function stopSync() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   if (ws) {
     ws.onclose = null;
     try {
@@ -170,7 +201,68 @@ export function restartSync() {
     }
     ws = null;
   }
-  retryDelay = 1000;
+  useAppStore().online = false;
   started = false;
-  void startSync();
+  replayed = false;
+}
+
+export function setSyncEnabled(enabled: boolean) {
+  localStorage.setItem(SYNC_ENABLED_KEY, String(enabled));
+  if (enabled) {
+    retryDelay = 1000;
+    void startSync();
+  }
+  else stopSync();
+}
+
+function currentState(): AppState {
+  const s = useAppStore();
+  return {
+    tasks: s.tasks,
+    subtasks: s.subtasks,
+    checkins: s.checkins,
+    timers: s.timers,
+    drills: s.drills,
+    formulaDrills: s.formulaDrills,
+    settings: s.settings,
+  };
+}
+
+export async function overwriteServerWithLocal() {
+  if (!isSyncEnabled()) throw new Error('sync disabled');
+  if (replacing) throw new Error('replace already in progress');
+  const store = useAppStore();
+  if (!store.online) throw new Error('server offline');
+  replacing = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (ws) {
+    ws.onclose = null;
+    try {
+      ws.close();
+    } catch {
+      /* noop */
+    }
+    ws = null;
+  }
+  store.online = false;
+  try {
+    const state = await replaceState(currentState());
+    queue = [];
+    persistQueue();
+    store.applySnapshot(state);
+    return state;
+  } finally {
+    replacing = false;
+    if (isSyncEnabled()) connect();
+  }
+}
+
+/** 修改 serverUrl 后调用：以新地址重新初始化同步 */
+export function restartSync() {
+  stopSync();
+  retryDelay = 1000;
+  if (isSyncEnabled()) void startSync();
 }

@@ -97,6 +97,11 @@ export interface AppState {
   settings: Settings;
 }
 
+export interface SnapshotMessage {
+  kind: 'snapshot';
+  state: AppState;
+}
+
 export interface ServerInfo {
   name: string;
   httpPort: number;
@@ -109,3 +114,5 @@ export interface SyncMessage {
   entity: SyncEntity;
   payload: any;
 }
+
+export type RemoteSyncMessage = SyncMessage | SnapshotMessage;

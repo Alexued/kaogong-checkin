@@ -35,6 +35,16 @@ export async function fetchState(): Promise<AppState> {
   return r.json();
 }
 
+export async function replaceState(state: AppState): Promise<AppState> {
+  const r = await fetch(httpBase() + '/api/state', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state),
+  });
+  if (!r.ok) throw new Error(`PUT /api/state ${r.status}`);
+  return r.json();
+}
+
 export async function fetchInfo(): Promise<ServerInfo> {
   const r = await fetch(httpBase() + '/api/info');
   if (!r.ok) throw new Error(`GET /api/info ${r.status}`);

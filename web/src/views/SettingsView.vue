@@ -24,6 +24,32 @@
       </div>
     </div>
 
+    <div class="section-title">上传同步</div>
+    <div class="card block">
+      <div class="sync-row">
+        <div>
+          <div class="sync-label">上传同步</div>
+          <div class="hint">{{ syncEnabled ? '开启后与服务器保持同步' : '已关闭，仅使用本地数据' }}</div>
+        </div>
+        <label class="switch" title="切换上传同步">
+          <input v-model="syncEnabled" type="checkbox" @change="toggleSync" />
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <button
+        v-if="syncEnabled"
+        class="btn overwrite-btn"
+        :disabled="!store.online || overwriting"
+        @click="overwriteLocal"
+      >
+        {{ overwriting ? '覆盖中…' : '用本地覆盖服务器' }}
+      </button>
+      <div v-if="syncEnabled && !store.online" class="sync-status">连接服务器后可执行覆盖</div>
+      <div v-if="syncMessage" class="sync-status" :class="{ bad: syncMessage.startsWith('失败') }">
+        {{ syncMessage }}
+      </div>
+    </div>
+
     <div class="section-title">版本更新</div>
     <div class="card block">
       <div class="row-end">
@@ -75,7 +101,13 @@ import { onMounted, ref } from 'vue';
 import QRCode from 'qrcode';
 import { useAppStore } from '../stores/app';
 import { fetchInfo, getServerUrl, setServerUrl } from '../api/client';
-import { restartSync } from '../api/sync';
+import { startDiscovery, stopDiscovery } from '../api/discover';
+import {
+  isSyncEnabled,
+  overwriteServerWithLocal,
+  restartSync,
+  setSyncEnabled,
+} from '../api/sync';
 import {
   APP_VERSION,
   compareVersions,
@@ -90,6 +122,9 @@ const store = useAppStore();
 const planEnd = ref(store.settings.planEndDate || '');
 const serverUrlInput = ref(getServerUrl());
 const info = ref<ServerInfo | null>(null);
+const syncEnabled = ref(isSyncEnabled());
+const overwriting = ref(false);
+const syncMessage = ref('');
 
 // ---------- 检查更新 ----------
 const checking = ref(false);
@@ -123,6 +158,32 @@ function savePlanEnd() {
   store.saveSettings({ planEndDate: planEnd.value || null });
 }
 
+async function toggleSync() {
+  syncMessage.value = '';
+  setSyncEnabled(syncEnabled.value);
+  if (syncEnabled.value) {
+    void startDiscovery();
+    await refreshInfo();
+  } else {
+    await stopDiscovery();
+    info.value = null;
+  }
+}
+
+async function overwriteLocal() {
+  if (!window.confirm('确定用本地完整数据覆盖服务器吗？服务器现有数据将被替换。')) return;
+  overwriting.value = true;
+  syncMessage.value = '';
+  try {
+    await overwriteServerWithLocal();
+    syncMessage.value = '已用本地数据覆盖服务器';
+  } catch {
+    syncMessage.value = '失败：覆盖服务器未完成，本地数据和队列已保留';
+  } finally {
+    overwriting.value = false;
+  }
+}
+
 function setTheme(theme: 'light' | 'dark') {
   store.saveSettings({ theme });
 }
@@ -132,12 +193,16 @@ function saveServerUrl() {
   restartSync();
 }
 
-onMounted(async () => {
+async function refreshInfo() {
   try {
     info.value = await fetchInfo();
   } catch {
     info.value = null;
   }
+}
+
+onMounted(async () => {
+  if (syncEnabled.value) await refreshInfo();
 });
 
 const qrJobs = new Map<HTMLCanvasElement, string>();
@@ -152,6 +217,76 @@ function setQrCanvas(el: Element | any, url: string) {
 <style scoped>
 .block {
   padding: 16px;
+}
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sync-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.switch-track {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  background: var(--text-3);
+  transition: background 180ms ease;
+}
+
+.switch-track::after {
+  content: '';
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 3px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 180ms ease;
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent-solid);
+}
+
+.switch input:checked + .switch-track::after {
+  transform: translateX(20px);
+}
+
+.overwrite-btn {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.sync-status {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.sync-status.bad {
+  color: var(--danger);
 }
 
 .field {

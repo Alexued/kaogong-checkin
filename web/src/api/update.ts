@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.2.1';
+export const APP_VERSION = '0.3.0';
 
 export interface ReleaseInfo {
   version: string;

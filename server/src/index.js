@@ -2,7 +2,7 @@
  * 考公打卡 本地服务器
  * - HTTP/WS 端口 8321，UDP 广播端口 8322（每秒广播 {name, httpPort}）
  * - 存储：data/data.json，原子写入（tmp + rename），写前备份 .bak，启动校验损坏则从 .bak 恢复
- * - REST：GET /api/state 全量快照；GET /api/info 本机局域网 IP + 端口
+ * - REST：GET /api/state 全量快照；PUT /api/state 本地完整覆盖；GET /api/info 本机局域网 IP + 端口
  * - WS /ws：接收 {kind:"upsert"|"delete", entity:"task"|"checkin"|"settings", payload}
  *   按 updatedAt last-write-wins 应用 → 落盘 → 广播给其他客户端
  * - 静态托管 ../web/dist（生产模式）
@@ -80,6 +80,22 @@ function loadData() {
 }
 
 const data = loadData();
+
+function isValidState(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    Array.isArray(value.tasks) &&
+    Array.isArray(value.subtasks) &&
+    Array.isArray(value.checkins) &&
+    Array.isArray(value.timers) &&
+    Array.isArray(value.drills) &&
+    Array.isArray(value.formulaDrills) &&
+    value.settings &&
+    typeof value.settings === 'object' &&
+    !Array.isArray(value.settings)
+  );
+}
 
 // ---------- 变更应用（last-write-wins，按 updatedAt 字符串比较） ----------
 function applyMessage(msg) {
@@ -163,6 +179,23 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/state', (req, res) => res.json(data));
+app.put('/api/state', (req, res) => {
+  if (!isValidState(req.body)) {
+    return res.status(400).json({ error: 'invalid state shape' });
+  }
+  const next = JSON.parse(JSON.stringify(req.body));
+  try {
+    saveData(next);
+    for (const key of ['tasks', 'subtasks', 'checkins', 'timers', 'drills', 'formulaDrills', 'settings']) {
+      data[key] = next[key];
+    }
+    broadcastSnapshot();
+    return res.json(data);
+  } catch (e) {
+    console.error('[store] full replace failed:', e.message);
+    return res.status(500).json({ error: 'failed to replace state' });
+  }
+});
 app.get('/api/info', (req, res) =>
   res.json({ name: os.hostname(), httpPort: HTTP_PORT, ips: lanAddresses() })
 );
@@ -178,6 +211,20 @@ const server = http.createServer(app);
 
 // ---------- WebSocket ----------
 const wss = new WebSocketServer({ server, path: '/ws' });
+
+function broadcastSnapshot() {
+  const out = JSON.stringify({ kind: 'snapshot', state: data });
+  for (const client of wss.clients) {
+    if (client.readyState === 1) {
+      try {
+        client.send(out);
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+}
+
 wss.on('connection', (ws) => {
   console.log('[ws] client connected, total:', wss.clients.size);
   ws.on('message', (raw) => {
