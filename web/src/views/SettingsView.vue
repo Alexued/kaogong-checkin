@@ -18,8 +18,9 @@
           type="button"
           class="heat-cell"
           :class="'lv' + cell.level"
+          :data-heat-date="cell.date"
           :aria-label="`${cell.date}，完成 ${cell.done}/${cell.total}`"
-          @click="goDay(cell.date)"
+          @click="goDay(cell.date, $event)"
         ></button>
       </div>
       <div class="legend">
@@ -88,7 +89,8 @@
           <span v-if="normalizedServerUrl === server.key" class="selected-label">当前</span>
         </button>
         <div v-if="!discoveredServers.length" class="empty-scan">
-          {{ scanning ? '正在重新扫描…' : '正在监听局域网广播…' }}
+          <PixelGrid v-if="scanning" preset="wave" label="正在扫描服务器" />
+          <span>{{ scanning ? '正在重新扫描…' : '正在监听局域网广播…' }}</span>
         </div>
 
         <label class="field manual-field">
@@ -178,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { getServerUrl, setServerUrl } from '../api/client';
@@ -212,6 +214,8 @@ import {
   setStartupAnimationEnabled,
 } from '../lib/localPreferences';
 import DatePickerSheet from '../components/DatePickerSheet.vue';
+import PixelGrid from '../components/PixelGrid.vue';
+import { runViewTransition } from '../lib/motion';
 
 const store = useAppStore();
 const router = useRouter();
@@ -364,8 +368,14 @@ async function cancelUpdate() {
   }
 }
 
-function goDay(date: string) {
-  void router.push(`/stats/day/${date}`);
+async function goDay(date: string, event: MouseEvent) {
+  const origin = event.currentTarget as HTMLElement | null;
+  if (origin) origin.style.viewTransitionName = 'day-detail-origin';
+  try {
+    await runViewTransition(async () => { await router.push(`/stats/day/${date}`); await nextTick(); });
+  } finally {
+    if (origin) origin.style.viewTransitionName = '';
+  }
 }
 
 function setPlanEnd(value: string) {
@@ -454,7 +464,8 @@ onUnmounted(() => {
 .metric strong { display: block; font-size: 19px; color: var(--accent-solid); white-space: nowrap; }
 .metric span { display: block; margin-top: 2px; font-size: 10px; color: var(--text-2); }
 .heat { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 14px; }
-.heat-cell { aspect-ratio: 1; min-width: 0; border: 0; border-radius: 4px; padding: 0; }
+.heat-cell { aspect-ratio: 1; min-width: 0; border: 0; border-radius: 4px; padding: 0; cursor: pointer; transition: transform 160ms cubic-bezier(.22,1,.36,1), filter 160ms ease; }
+.heat-cell:active { transform: scale(.82); filter: brightness(1.08); }
 .lv0 { background: var(--heat-0); } .lv1 { background: var(--heat-1); }
 .lv2 { background: var(--heat-2); } .lv3 { background: var(--heat-3); } .lv4 { background: var(--heat-4); }
 .legend { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 10px; font-size: 10px; color: var(--text-3); }
@@ -480,7 +491,7 @@ onUnmounted(() => {
 .server-option.selected .radio { border: 6px solid var(--accent-solid); }
 .server-copy { flex: 1; min-width: 0; }.server-copy strong, .server-copy small { display: block; }.server-copy small { margin-top: 3px; color: var(--text-3); }
 .selected-label { color: var(--accent-solid); font-size: 11px; font-weight: 700; }
-.empty-scan { padding: 15px 0; color: var(--text-3); font-size: 13px; text-align: center; }
+.empty-scan { padding: 15px 0; color: var(--text-3); font-size: 13px; display: flex; justify-content: center; align-items: center; gap: 10px; }
 .manual-field { display: block; margin-top: 10px; }.manual-field > span { display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-2); }
 .server-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }.server-actions .btn { padding-inline: 10px; }
 .sync-message { margin-top: 10px; color: var(--accent-solid); font-size: 12px; }.sync-message.bad, .up-msg.bad { color: var(--danger); }

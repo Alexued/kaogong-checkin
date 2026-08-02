@@ -42,8 +42,9 @@
         <div class="group-date">{{ g.date }}</div>
         <div v-for="r in g.records" :key="r.id" class="card record clickable" @click="detail = r">
           <div class="record-head">
-            <div>
+              <div>
               <span class="record-label">{{ r.label || '（无标签）' }}</span>
+              <span class="badge mode-badge">{{ r.mode === 'countdown' ? '倒计时' : '计时' }}</span>
               <span v-if="taskTitle(r.taskId)" class="badge">{{ taskTitle(r.taskId) }}</span>
             </div>
             <div class="record-right">
@@ -250,6 +251,13 @@ function barWidth(ms: number) {
   font-size: 15px;
   font-weight: 600;
   margin-right: 8px;
+}
+
+.mode-badge {
+  margin-right: 6px;
+  background: var(--bg-elev);
+  color: var(--text-2);
+  border: 1px solid var(--card-border);
 }
 
 .record-right {

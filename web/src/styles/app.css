@@ -28,6 +28,14 @@
   flex-direction: column;
 }
 
+.swipe-page-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
 /* 二级页容器（任务管理 / 计时历史 / 日期详情）：独立竖向滚动 */
 .page-layer {
   flex: 1 1 0;
@@ -152,16 +160,29 @@
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition:
-    opacity 200ms ease,
-    transform 200ms ease;
+    opacity 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .fade-slide-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(14px) scale(0.985);
 }
 .fade-slide-leave-to {
   opacity: 0;
+  transform: translateY(-6px) scale(0.99);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-page-content,
+  .fade-slide-enter-active,
+  .fade-slide-leave-active {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+::view-transition-group(day-detail-origin) { animation-duration:360ms; animation-timing-function:cubic-bezier(.22,1,.36,1); }
+::view-transition-old(day-detail-origin),::view-transition-new(day-detail-origin) { mix-blend-mode:normal; height:100%; overflow:clip; }
+@media (prefers-reduced-motion:reduce) { ::view-transition-group(day-detail-origin) { animation-duration:.01ms; } }
 
 /* 平板 / 桌面宽屏适配：内容列加宽居中 */
 @media (min-width: 768px) {

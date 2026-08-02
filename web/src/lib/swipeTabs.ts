@@ -18,6 +18,7 @@
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { MOTION } from './motion';
 
 export const TAB_PATHS = ['/', '/timer', '/drill', '/settings'];
 
@@ -27,7 +28,7 @@ const DIST_RATIO = 0.22; // 位移阈值：屏宽 22%（含速度投影，接近
 const VELOCITY = 0.3; // 速度阈值 px/ms
 const PROJECT_MS = 180; // 松手判定：按速度向前投影 180ms 的位移
 const IOS_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // iOS 系统页面切换曲线
-const ANIM_MS = 320; // 外部导航（点 Tab）固定时长
+const ANIM_MS = MOTION.page; // 外部导航（点 Tab）固定时长
 
 /** iOS 橡皮筋：位移越大阻力越大（非线性渐近屏宽上限） */
 function rubberBand(dx: number, dim: number): number {
@@ -55,7 +56,7 @@ export function useSwipeTabs() {
 
   const dragOffset = ref(0);
   const animating = ref(false); // 动画中（开过渡）
-  const animMs = ref(ANIM_MS); // 松手动画时长（按剩余位移/速度动态计算）
+  const animMs = ref<number>(ANIM_MS); // 松手动画时长（按剩余位移/速度动态计算）
   const vw = ref(window.innerWidth);
 
   const isTabPage = computed(() => TAB_PATHS.includes(route.path));
@@ -65,6 +66,19 @@ export function useSwipeTabs() {
     transform: `translateX(${-activeIndex.value * vw.value + dragOffset.value}px)`,
     transition: animating.value ? `transform ${animMs.value}ms ${IOS_CURVE}` : 'none',
   }));
+
+  function pageStyle(index: number) {
+    const distance = index - activeIndex.value + dragOffset.value / Math.max(1, vw.value);
+    const clamped = Math.max(-1, Math.min(1, distance));
+    const progress = Math.abs(clamped);
+    return {
+      opacity: String(1 - progress * 0.2),
+      transform: `translate3d(${clamped * 22}px, 0, 0) scale(${1 - progress * 0.028})`,
+      transition: animating.value
+        ? `transform ${animMs.value}ms ${MOTION.ease}, opacity ${animMs.value}ms ${MOTION.ease}`
+        : 'none',
+    };
+  }
 
   let startX = 0;
   let startY = 0;
@@ -203,5 +217,5 @@ export function useSwipeTabs() {
     window.removeEventListener('resize', onResize);
   });
 
-  return { trackStyle, isTabPage };
+  return { trackStyle, pageStyle, isTabPage };
 }

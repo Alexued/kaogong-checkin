@@ -59,6 +59,7 @@ export interface TimerRecord {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
+  mode?: 'stopwatch' | 'countdown';
 }
 
 export interface DrillRecord {

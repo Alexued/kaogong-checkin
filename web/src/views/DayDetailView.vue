@@ -1,5 +1,6 @@
 <template>
-  <div class="page">
+  <div class="page day-detail-page">
+    <button class="overview-back" type="button" @click="returnToOverview"><span aria-hidden="true">‹</span> 返回概览</button>
     <div class="day-nav">
       <button class="arrow" @click="go(-1)" aria-label="前一天">‹</button>
       <div class="day-title">
@@ -72,12 +73,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { generatePlan } from '../lib/plan';
 import { addDays, formatCn, formatTime, toLocalDateStr, weekdayCn } from '../lib/date';
 import { fmtDuration } from '../lib/stopwatch';
+import { runViewTransition } from '../lib/motion';
 
 const store = useAppStore();
 const route = useRoute();
@@ -87,6 +89,24 @@ const date = computed(() => String(route.params.date));
 
 function go(n: number) {
   router.push(`/stats/day/${addDays(date.value, n)}`);
+}
+
+async function returnToOverview() {
+  const targetDate = date.value;
+  const root = document.querySelector<HTMLElement>('.day-detail-page');
+  let destination: HTMLElement | null = null;
+  if (root) root.style.viewTransitionName = 'day-detail-origin';
+  try {
+    await runViewTransition(async () => {
+      await router.push('/settings');
+      await nextTick();
+      destination = document.querySelector<HTMLElement>(`[data-heat-date="${targetDate}"]`);
+      if (destination) destination.style.viewTransitionName = 'day-detail-origin';
+    });
+  } finally {
+    if (root) root.style.viewTransitionName = '';
+    if (destination) destination.style.viewTransitionName = '';
+  }
 }
 
 // ---------- 任务打卡 ----------
@@ -153,6 +173,10 @@ function rateClass(rate: number) {
 </script>
 
 <style scoped>
+.day-detail-page { animation: detail-fallback-in 300ms cubic-bezier(.22,1,.36,1) both; }
+.overview-back { min-height:40px; display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--accent-solid); font-size:14px; font-weight:700; padding:0 4px; }
+.overview-back span { font-size:24px; line-height:1; transition:transform 160ms cubic-bezier(.22,1,.36,1); }.overview-back:active span { transform:translateX(-3px); }
+@keyframes detail-fallback-in { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
 .day-nav {
   display: flex;
   align-items: center;
@@ -245,4 +269,5 @@ function rateClass(rate: number) {
 .mark.bad {
   color: var(--danger);
 }
+@media (prefers-reduced-motion: reduce) { .day-detail-page { animation:none; } }
 </style>

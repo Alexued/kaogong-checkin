@@ -1,7 +1,8 @@
 <template>
   <teleport to="body">
-    <div v-if="form" class="sheet-mask" @click.self="close">
-      <div class="sheet card">
+    <Transition name="editor-sheet">
+      <div v-if="form" class="sheet-mask" @click.self="close">
+        <div class="sheet card">
         <h2 class="sheet-title">{{ form.id ? '编辑任务' : '新建任务' }}</h2>
         <label class="field">
           <span>标题</span>
@@ -48,8 +49,9 @@
           <button class="btn ghost" @click="close">取消</button>
           <button class="btn" :disabled="!canSave" @click="save">保存</button>
         </div>
+        </div>
       </div>
-    </div>
+    </Transition>
     <DatePickerSheet
       v-if="form"
       v-model:open="datePickerOpen"
@@ -152,18 +154,33 @@ function save() {
   max-width: 640px;
   border-radius: 20px 20px 0 0;
   padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
-  animation: slide-up 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slide-up {
-  from {
-    transform: translateY(60px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.editor-sheet-enter-active,
+.editor-sheet-leave-active {
+  transition: background-color 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.editor-sheet-enter-active .sheet,
+.editor-sheet-leave-active .sheet {
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms ease;
+}
+
+.editor-sheet-enter-active .sheet {
+  transition-delay: 40ms;
+}
+
+.editor-sheet-enter-from,
+.editor-sheet-leave-to {
+  background-color: transparent;
+}
+
+.editor-sheet-enter-from .sheet,
+.editor-sheet-leave-to .sheet {
+  transform: translateY(72px) scale(0.985);
+  opacity: 0;
 }
 
 .sheet-title {
@@ -269,5 +286,15 @@ function save() {
 .btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-sheet-enter-active,
+  .editor-sheet-leave-active,
+  .editor-sheet-enter-active .sheet,
+  .editor-sheet-leave-active .sheet {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
 }
 </style>

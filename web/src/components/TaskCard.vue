@@ -116,6 +116,7 @@ const MOVE_CANCEL_PX = 10;
 const longPressActive = ref(false);
 let pressTimer: ReturnType<typeof setTimeout> | null = null;
 let revealTimer: ReturnType<typeof setTimeout> | null = null;
+let releaseTimer: ReturnType<typeof setTimeout> | null = null;
 let pointerId: number | null = null;
 let startX = 0;
 let startY = 0;
@@ -133,6 +134,10 @@ function clearRevealTimer() {
   if (revealTimer) {
     clearTimeout(revealTimer);
     revealTimer = null;
+  }
+  if (releaseTimer) {
+    clearTimeout(releaseTimer);
+    releaseTimer = null;
   }
 }
 
@@ -181,13 +186,16 @@ function onPointerDown(ev: PointerEvent) {
     armClickSuppression();
     longPressActive.value = true;
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(12);
-    // Let the lift state render before the editor sheet takes focus.
+    // Finish the card lift before establishing the editor overlay.
     revealTimer = setTimeout(() => {
       revealTimer = null;
       emit('edit', props.item);
-      longPressActive.value = false;
-      pointerId = null;
-    }, 90);
+      releaseTimer = setTimeout(() => {
+        releaseTimer = null;
+        longPressActive.value = false;
+        pointerId = null;
+      }, 140);
+    }, 220);
   }, LONG_PRESS_MS);
 }
 
@@ -247,7 +255,7 @@ function onCardClick(ev: MouseEvent) {
   user-select: none;
   -webkit-user-select: none;
   transition:
-    transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
     background-color 280ms ease,
     opacity 300ms ease;
 }
