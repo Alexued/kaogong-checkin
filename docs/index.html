@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="no-js" data-theme="sprint">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>考公打卡｜Android 学习计划、计时与背诵工具</title>
     <meta name="description" content="考公打卡是一款 Android 学习执行工具，覆盖每日任务、打卡进度、计时与倒计时、背诵训练、局域网同步和应用内更新。" />
-    <meta name="theme-color" content="#f7faf9" />
+    <meta name="theme-color" content="#101412" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="考公打卡" />
     <meta property="og:description" content="把每日计划、专注计时、背诵训练和本地同步放在一个 Android 应用里。" />
@@ -13,22 +13,74 @@
     <meta property="og:image" content="https://alexued.github.io/kaogong-checkin/assets/today.png" />
     <link rel="canonical" href="https://alexued.github.io/kaogong-checkin/" />
     <link rel="icon" type="image/png" href="assets/app-icon.png" />
+    <script>
+      (() => {
+        const themes = ['ancient', 'cyber', 'apple', 'terminal', 'government', 'sprint', 'bauhaus', 'stationery', 'blueprint', 'newspaper'];
+        let theme = 'sprint';
+        try {
+          const stored = window.localStorage.getItem('kaogong-theme');
+          if (themes.includes(stored)) theme = stored;
+        } catch {}
+        document.documentElement.className = 'js';
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="themes.css" />
     <script src="app.js" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <div class="page-progress" aria-hidden="true"><span id="scroll-progress"></span></div>
 
     <header class="site-header" aria-label="网站页眉">
-      <a class="brand" href="#top" aria-label="考公打卡首页">
-        <img src="assets/app-icon.png" width="40" height="40" alt="" />
-        <span>考公打卡</span>
-      </a>
-      <nav class="header-actions" aria-label="主要链接">
-        <a href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">查看源码</a>
-        <a class="header-download" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.5.1/kaogong-checkin-v0.5.1.apk">下载 v0.5.1</a>
-      </nav>
+      <div class="header-shell">
+        <a class="brand" href="#top" aria-label="考公打卡首页">
+          <img src="assets/app-icon.png" width="40" height="40" alt="" />
+          <span>考公打卡</span>
+        </a>
+        <nav class="header-actions" aria-label="主要链接">
+          <a class="source-link" href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">GitHub 源码</a>
+          <a class="header-download" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.5.1/kaogong-checkin-v0.5.1.apk">下载 0.5.1</a>
+        </nav>
+      </div>
     </header>
+
+    <nav class="theme-rail" aria-label="介绍页风格">
+      <div class="theme-rail-shell" role="radiogroup" aria-label="选择介绍页风格">
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="ancient">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">01</span><span>古风</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="cyber">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">02</span><span>赛博朋克</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="apple">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">03</span><span>苹果官网</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="terminal">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">04</span><span>终端炫酷</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="government">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">05</span><span>政府严肃</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="sprint">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">06</span><span>冲刺仪表</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="bauhaus">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">07</span><span>包豪斯海报</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="stationery">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">08</span><span>日系文具</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="blueprint">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">09</span><span>科研蓝图</span>
+        </button>
+        <button class="theme-option" type="button" role="radio" aria-checked="false" data-theme-option="newspaper">
+          <span class="theme-swatch" aria-hidden="true"></span><span class="theme-number">10</span><span>墨水报刊</span>
+        </button>
+      </div>
+      <p class="theme-status" id="theme-status" aria-live="polite"></p>
+    </nav>
 
     <main id="main-content">
       <section class="hero" id="top" aria-labelledby="hero-title">
@@ -37,123 +89,168 @@
           src="assets/countdown.png"
           width="1080"
           height="2356"
-          alt="考公打卡的倒计时页面，显示时长设置和开始按钮"
+          alt="考公打卡倒计时页面，显示时长设置和开始按钮"
         />
-        <div class="hero-content" data-reveal>
-          <p class="eyebrow">Android 学习执行工具</p>
-          <h1 id="hero-title">考公打卡</h1>
-          <p class="hero-copy">把今天要做的题、要背的内容和要投入的时间放在一起。每天打开就知道从哪里开始，完成后留下可追踪的记录。</p>
-          <a class="primary-download" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.5.1/kaogong-checkin-v0.5.1.apk">
-            下载 Android APK
-          </a>
-          <a class="release-link" href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.5.1" target="_blank" rel="noreferrer">查看 v0.5.1 发布说明</a>
-          <dl class="release-facts" aria-label="安装包信息">
-            <div><dt>版本</dt><dd>0.5.1</dd></div>
-            <div><dt>大小</dt><dd>4.18 MiB</dd></div>
-            <div><dt>平台</dt><dd>Android 7+</dd></div>
-          </dl>
+        <div class="hero-rule hero-rule-vertical" aria-hidden="true"></div>
+        <div class="hero-rule hero-rule-horizontal" aria-hidden="true"></div>
+        <div class="hero-readout" aria-hidden="true">
+          <span>05:01</span>
+          <small>FOCUS / EXECUTE / REPEAT</small>
+        </div>
+
+        <div class="hero-shell">
+          <div class="hero-content">
+            <p class="hero-kicker reveal-delay-1" data-reveal><span aria-hidden="true"></span>ANDROID 学习执行工具</p>
+            <h1 id="hero-title" class="reveal-delay-2" data-reveal><span>考公</span><span>打卡</span></h1>
+            <p class="hero-copy reveal-delay-3" data-reveal>把今天要做的题、要背的内容和要投入的时间放在一起。打开应用，直接进入今天的执行节奏。</p>
+            <div class="hero-action reveal-delay-4" data-reveal>
+              <a class="primary-download" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.5.1/kaogong-checkin-v0.5.1.apk">
+                <span>下载 Android APK</span>
+                <small>4.18 MiB</small>
+              </a>
+              <a class="release-link" href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.5.1" target="_blank" rel="noreferrer">查看 v0.5.1 发布说明</a>
+            </div>
+            <dl class="release-facts reveal-delay-5" data-reveal aria-label="安装包信息">
+              <div><dt>VERSION</dt><dd>0.5.1</dd></div>
+              <div><dt>PLATFORM</dt><dd>Android 7+</dd></div>
+              <div><dt>DELIVERY</dt><dd>GitHub Release</dd></div>
+            </dl>
+          </div>
         </div>
       </section>
 
-      <section class="rhythm" aria-label="核心能力">
-        <div><strong>每天落地</strong><span>任务、子任务与逾期结转</span></div>
-        <div><strong>控制节奏</strong><span>计时、倒计时与历史记录</span></div>
-        <div><strong>本地可控</strong><span>离线保存与局域网同步</span></div>
+      <section class="capability-band" aria-label="核心能力">
+        <div class="capability-grid">
+          <div class="capability-item">
+            <span class="capability-index">01</span>
+            <div><strong>每天落地</strong><span>任务、子任务与逾期结转</span></div>
+          </div>
+          <div class="capability-item">
+            <span class="capability-index">02</span>
+            <div><strong>控制节奏</strong><span>计时、倒计时与历史记录</span></div>
+          </div>
+          <div class="capability-item">
+            <span class="capability-index">03</span>
+            <div><strong>本地可控</strong><span>离线保存与局域网同步</span></div>
+          </div>
+        </div>
       </section>
 
-      <section class="stories" aria-labelledby="stories-title">
-        <div class="section-intro" data-reveal>
-          <p class="section-index">真实使用界面</p>
-          <h2 id="stories-title">学习过程不靠记忆维持</h2>
-          <p>应用围绕一天的执行顺序组织，不把任务、计时和训练拆成互不相关的工具。</p>
+      <section class="story-intro" aria-labelledby="stories-title">
+        <div class="section-shell">
+          <p class="section-label" data-reveal><span>04</span> REAL WORKFLOW</p>
+          <div class="intro-grid">
+            <h2 id="stories-title" data-reveal>学习过程<br />不靠记忆维持</h2>
+            <p data-reveal>计划、计时、训练与同步围绕同一天的执行顺序组织。每次打开，都能看到下一步该做什么。</p>
+          </div>
         </div>
+      </section>
 
-        <article class="story">
-          <div class="story-copy" data-reveal>
-            <span class="story-number">01</span>
-            <h3>打开就是今天</h3>
-            <p>按日期生成每日计划，已完成项目留在原位，未完成项目继续可见。进度和任务顺序在同一屏完成判断。</p>
-            <ul>
-              <li>每日任务与截止任务并行</li>
-              <li>子任务拆解和顺序调整</li>
-              <li>日历标记与连续完成统计</li>
-            </ul>
+      <section class="workflows" aria-label="应用工作流">
+        <article class="workflow workflow-light workflow-mint">
+          <span class="workflow-ghost" aria-hidden="true">01</span>
+          <div class="workflow-inner">
+            <div class="workflow-copy" data-reveal>
+              <p class="workflow-label"><span>01</span> TODAY / PLAN</p>
+              <h3>打开就是今天</h3>
+              <p>按日期生成每日计划，完成项留在原位，未完成项继续可见。进度和任务顺序在同一屏完成判断。</p>
+              <ul>
+                <li>每日任务与截止任务并行</li>
+                <li>子任务拆解和顺序调整</li>
+                <li>日历标记与连续完成统计</li>
+              </ul>
+            </div>
+            <figure class="workflow-media" data-reveal>
+              <div class="media-frame"><img src="assets/today.png" width="1080" height="2356" loading="lazy" alt="今日计划、完成进度和任务列表" /></div>
+              <figcaption><span>TODAY VIEW</span> 今日计划与完成进度</figcaption>
+            </figure>
           </div>
-          <figure class="story-media" data-reveal>
-            <img src="assets/today.png" width="1080" height="2356" loading="lazy" alt="今日计划、完成进度和任务列表" />
-            <figcaption>今日计划与完成进度</figcaption>
-          </figure>
         </article>
 
-        <article class="story story-reverse">
-          <div class="story-copy" data-reveal>
-            <span class="story-number">02</span>
-            <h3>给专注一个结束点</h3>
-            <p>正向计时适合自由学习，倒计时适合限定一轮练习。暂停、继续、提前结束和历史记录都保留在同一流程里。</p>
-            <ul>
-              <li>5、15、25 分钟快速预设</li>
-              <li>自定义分钟与秒数</li>
-              <li>完成反馈和计时历史</li>
-            </ul>
+        <article class="workflow workflow-dark workflow-yellow workflow-reverse">
+          <span class="workflow-ghost" aria-hidden="true">02</span>
+          <div class="workflow-inner">
+            <div class="workflow-copy" data-reveal>
+              <p class="workflow-label"><span>02</span> TIMER / FOCUS</p>
+              <h3>给专注一个结束点</h3>
+              <p>正向计时适合自由学习，倒计时适合限定一轮练习。暂停、继续、提前结束和历史记录留在同一流程。</p>
+              <ul>
+                <li>5、15、25 分钟快速预设</li>
+                <li>自定义分钟与秒数</li>
+                <li>完成反馈和计时历史</li>
+              </ul>
+            </div>
+            <figure class="workflow-media" data-reveal>
+              <div class="media-frame"><img src="assets/countdown.png" width="1080" height="2356" loading="lazy" alt="倒计时页面，包含时长预设和开始按钮" /></div>
+              <figcaption><span>COUNTDOWN</span> 计时与倒计时模式</figcaption>
+            </figure>
           </div>
-          <figure class="story-media" data-reveal>
-            <img src="assets/countdown.png" width="1080" height="2356" loading="lazy" alt="倒计时页面，包含时长预设和开始按钮" />
-            <figcaption>计时与倒计时模式</figcaption>
-          </figure>
         </article>
 
-        <article class="story">
-          <div class="story-copy" data-reveal>
-            <span class="story-number">03</span>
-            <h3>把速算资料变成训练</h3>
-            <p>百化分与公式对照表可以直接阅读，也可以隐藏答案进入默写。练习记录会保留正确率，方便回到薄弱项。</p>
-            <ul>
-              <li>百化分和公式对照</li>
-              <li>完整背诵与随机抽取</li>
-              <li>默写模式与历史正确率</li>
-            </ul>
+        <article class="workflow workflow-light workflow-coral">
+          <span class="workflow-ghost" aria-hidden="true">03</span>
+          <div class="workflow-inner">
+            <div class="workflow-copy" data-reveal>
+              <p class="workflow-label"><span>03</span> DRILL / RECALL</p>
+              <h3>把速算资料变成训练</h3>
+              <p>百化分与公式对照表可以直接阅读，也可以隐藏答案进入默写。练习记录保留正确率，方便回到薄弱项。</p>
+              <ul>
+                <li>百化分和公式对照</li>
+                <li>完整背诵与随机抽取</li>
+                <li>默写模式与历史正确率</li>
+              </ul>
+            </div>
+            <figure class="workflow-media" data-reveal>
+              <div class="media-frame"><img src="assets/drill.png" width="1080" height="2356" loading="lazy" alt="资料分析百化分对照表和默写模式入口" /></div>
+              <figcaption><span>MEMORY DRILL</span> 资料分析背诵训练</figcaption>
+            </figure>
           </div>
-          <figure class="story-media" data-reveal>
-            <img src="assets/drill.png" width="1080" height="2356" loading="lazy" alt="资料分析百化分对照表和默写模式入口" />
-            <figcaption>资料分析背诵训练</figcaption>
-          </figure>
         </article>
 
-        <article class="story story-reverse">
-          <div class="story-copy" data-reveal>
-            <span class="story-number">04</span>
-            <h3>数据留在自己的网络里</h3>
-            <p>手机可以离线使用，也可以连接电脑上的本地服务器同步。服务器自动发现、完整覆盖和局域网 APK 更新都由用户控制。</p>
-            <ul>
-              <li>本地持久化和离线队列</li>
-              <li>局域网服务器自动发现</li>
-              <li>应用内下载与 GitHub 回退</li>
-            </ul>
+        <article class="workflow workflow-dark workflow-mint workflow-reverse">
+          <span class="workflow-ghost" aria-hidden="true">04</span>
+          <div class="workflow-inner">
+            <div class="workflow-copy" data-reveal>
+              <p class="workflow-label"><span>04</span> LOCAL / CONTROL</p>
+              <h3>数据留在自己的网络里</h3>
+              <p>手机可以离线使用，也可以连接电脑上的本地服务器同步。服务器发现、完整覆盖和局域网 APK 更新都由用户控制。</p>
+              <ul>
+                <li>本地持久化和离线队列</li>
+                <li>局域网服务器自动发现</li>
+                <li>应用内下载与 GitHub 回退</li>
+              </ul>
+            </div>
+            <figure class="workflow-media" data-reveal>
+              <div class="media-frame"><img src="assets/settings-update.png" width="1080" height="2356" loading="lazy" alt="服务器连接、局域网扫描和版本更新设置" /></div>
+              <figcaption><span>LOCAL NETWORK</span> 局域网同步与版本更新</figcaption>
+            </figure>
           </div>
-          <figure class="story-media" data-reveal>
-            <img src="assets/settings-update.png" width="1080" height="2356" loading="lazy" alt="服务器连接、局域网扫描和版本更新设置" />
-            <figcaption>局域网同步与版本更新</figcaption>
-          </figure>
         </article>
       </section>
 
       <section class="download-section" id="download" aria-labelledby="download-title">
-        <div class="download-copy" data-reveal>
-          <p class="eyebrow">v0.5.1</p>
-          <h2 id="download-title">从今天的计划开始</h2>
-          <p>安装包由 GitHub Release 提供。首次安装时，Android 会要求确认“允许安装未知来源应用”。</p>
-          <a class="primary-download light" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.5.1/kaogong-checkin-v0.5.1.apk">下载 kaogong-checkin-v0.5.1.apk</a>
-        </div>
-        <div class="checksum" data-reveal>
-          <span>SHA-256</span>
-          <code id="checksum-value">C39DA4AA47DD6989CA0A571B913BD2D06D30751C19CE845F61B69FC582E18EA9</code>
-          <button id="copy-checksum" type="button" data-copy-target="checksum-value">复制校验值</button>
+        <div class="download-shell">
+          <div class="download-copy" data-reveal>
+            <p class="download-index">05 / GET THE BUILD</p>
+            <h2 id="download-title">从今天的<br />计划开始</h2>
+            <p>安装包由 GitHub Release 提供。首次安装时，Android 会要求确认允许安装未知来源应用。</p>
+            <a class="final-download" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.5.1/kaogong-checkin-v0.5.1.apk">
+              <span>下载 kaogong-checkin-v0.5.1.apk</span>
+              <small>Android 7+ · 4.18 MiB</small>
+            </a>
+            <a class="final-release-link" href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.5.1" target="_blank" rel="noreferrer">打开 GitHub 发布说明</a>
+          </div>
+          <div class="checksum" data-reveal>
+            <span class="checksum-label">SHA-256 / VERIFIED BUILD</span>
+            <code id="checksum-value">C39DA4AA47DD6989CA0A571B913BD2D06D30751C19CE845F61B69FC582E18EA9</code>
+            <button id="copy-checksum" type="button" data-copy-target="checksum-value">复制校验值</button>
+          </div>
         </div>
       </section>
     </main>
 
     <footer class="site-footer" id="privacy">
-      <div>
+      <div class="footer-brand">
         <strong>考公打卡</strong>
         <p>页面不使用 Cookie、统计脚本或广告。应用数据默认保存在用户设备和自建局域网服务器中。</p>
       </div>

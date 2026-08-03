@@ -4,25 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>页面不存在｜考公打卡</title>
-    <meta name="theme-color" content="#f7faf9" />
-    <link rel="icon" type="image/png" href="assets/app-icon.png" />
+    <meta name="theme-color" content="#101412" />
+    <link rel="icon" type="image/png" href="/kaogong-checkin/assets/app-icon.png" />
     <style>
-      :root { font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif; color: #17212a; background: #f7faf9; }
-      * { box-sizing: border-box; }
-      body { min-height: 100svh; margin: 0; display: grid; place-items: center; padding: 24px; }
-      main { width: min(560px, 100%); }
-      img { width: 64px; height: 64px; border-radius: 8px; }
-      p { color: #687582; line-height: 1.75; }
-      h1 { margin: 28px 0 10px; font-size: clamp(42px, 10vw, 72px); line-height: 1; }
-      a { min-height: 48px; display: inline-flex; align-items: center; margin-top: 18px; padding: 0 18px; border-radius: 8px; background: #1e9fa1; color: white; font-weight: 800; text-decoration: none; }
-      a:focus-visible { outline: 3px solid #66a9ff; outline-offset: 3px; }
+      :root { font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif; color: #f2f6ef; background: #101412; }
+      * { box-sizing: border-box; letter-spacing: 0; }
+      body { min-width: 320px; min-height: 100svh; margin: 0; overflow: hidden; background: #101412; }
+      body::before { content: ""; position: fixed; top: 0; right: 18%; bottom: 0; width: 1px; background: rgba(255,255,255,.15); }
+      body::after { content: ""; position: fixed; right: 0; bottom: 17%; left: 0; height: 1px; background: rgba(255,255,255,.15); }
+      main { position: relative; z-index: 1; width: min(1120px, calc(100% - 48px)); min-height: 100svh; margin: 0 auto; display: grid; align-content: center; padding: 72px 0; }
+      .brand { display: flex; align-items: center; gap: 12px; font-weight: 900; }
+      img { width: 48px; height: 48px; border-radius: 4px; outline: 1px solid rgba(255,255,255,.18); outline-offset: -1px; box-shadow: 5px 5px 0 #ff6c55; }
+      .code { margin: 44px 0 0; color: #e6f438; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 124px; font-weight: 900; line-height: .82; font-variant-numeric: tabular-nums; }
+      h1 { max-width: 8em; margin: 26px 0 14px; font-family: "Arial Black", "Microsoft YaHei", sans-serif; font-size: 56px; line-height: 1.08; }
+      p { max-width: 34em; margin: 0; color: #b7c0b8; font-size: 16px; line-height: 1.8; }
+      a { width: fit-content; min-height: 54px; display: inline-flex; align-items: center; margin-top: 28px; padding: 0 18px; border-radius: 2px; background: #e6f438; color: #101412; font-size: 14px; font-weight: 900; text-decoration: none; box-shadow: 7px 7px 0 #67d9c4; transition: transform 180ms cubic-bezier(.16,1,.3,1); }
+      a:active { transform: scale(.97); }
+      a:focus-visible { outline: 3px solid #ff6c55; outline-offset: 4px; }
+      @media (hover:hover) { a:hover { transform: translateY(-2px); } }
+      @media (max-width:520px) { main { width: calc(100% - 40px); padding: 52px 0; } .code { margin-top: 38px; font-size: 78px; } h1 { font-size: 40px; } p { font-size: 15px; } }
+      @media (prefers-reduced-motion:reduce) { * { transition-duration: .01ms !important; } }
     </style>
   </head>
   <body>
     <main>
-      <img src="assets/app-icon.png" width="64" height="64" alt="考公打卡图标" />
+      <div class="brand"><img src="/kaogong-checkin/assets/app-icon.png" width="48" height="48" alt="" /><span>考公打卡</span></div>
+      <p class="code" aria-hidden="true">404</p>
       <h1>这里没有计划</h1>
-      <p>这个地址不存在，返回介绍页可以查看应用功能和 Android 安装包。</p>
+      <p>这个地址不存在。返回介绍页，可以查看真实应用界面并下载 Android 安装包。</p>
       <a href="/kaogong-checkin/">返回考公打卡</a>
     </main>
   </body>

@@ -1,0 +1,831 @@
+/* Theme skins. Shared geometry and behavior remain in styles.css. */
+
+html[data-theme="ancient"] {
+  color-scheme: light;
+  --graphite: oklch(0.22 0.028 35);
+  --graphite-soft: oklch(0.3 0.03 35);
+  --graphite-line: oklch(0.42 0.03 35);
+  --paper: oklch(0.95 0.028 86);
+  --paper-step: oklch(0.9 0.035 86);
+  --ink: oklch(0.24 0.03 35);
+  --muted: oklch(0.48 0.035 35);
+  --light-muted: oklch(0.78 0.022 86);
+  --yellow: oklch(0.63 0.16 30);
+  --mint: oklch(0.62 0.09 220);
+  --coral: oklch(0.58 0.16 31);
+  --font-body: "Songti SC", "STSong", "SimSun", serif;
+  --font-display: "Kaiti SC", "STKaiti", "KaiTi", serif;
+  --font-data: "Songti SC", "STSong", serif;
+}
+
+html[data-theme="ancient"] .hero,
+html[data-theme="ancient"] .site-footer {
+  background: var(--graphite);
+}
+
+html[data-theme="ancient"] .hero::before {
+  background: rgba(32, 20, 14, 0.72);
+}
+
+html[data-theme="ancient"] .hero::after {
+  width: 40%;
+  border-left-color: rgba(224, 190, 136, 0.28);
+}
+
+html[data-theme="ancient"] .hero h1,
+html[data-theme="ancient"] .intro-grid h2,
+html[data-theme="ancient"] .workflow-copy h3,
+html[data-theme="ancient"] .download-copy h2 {
+  font-weight: 700;
+}
+
+html[data-theme="ancient"] .hero h1 {
+  font-size: 96px;
+  line-height: 0.96;
+}
+
+html[data-theme="ancient"] .hero-kicker,
+html[data-theme="ancient"] .section-label,
+html[data-theme="ancient"] .workflow-label,
+html[data-theme="ancient"] .download-index,
+html[data-theme="ancient"] .checksum-label {
+  font-family: var(--font-body);
+  letter-spacing: 0.08em;
+}
+
+html[data-theme="ancient"] .hero-kicker span {
+  width: 30px;
+  height: 1px;
+}
+
+html[data-theme="ancient"] .workflow {
+  border-top: 3px double color-mix(in oklch, var(--text) 30%, transparent);
+}
+
+html[data-theme="ancient"] .media-frame {
+  padding: 12px;
+  box-shadow: 12px 12px 0 var(--accent);
+}
+
+html[data-theme="ancient"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="ancient"] .download-section {
+  background: var(--paper-step);
+  box-shadow: inset 0 10px 0 var(--yellow);
+}
+
+html[data-theme="ancient"] .final-download {
+  background: var(--graphite);
+  color: var(--paper);
+}
+
+html[data-theme="cyber"] {
+  color-scheme: dark;
+  --graphite: oklch(0.13 0.025 250);
+  --graphite-soft: oklch(0.19 0.04 250);
+  --graphite-line: oklch(0.38 0.08 210);
+  --paper: oklch(0.19 0.035 245);
+  --paper-step: oklch(0.24 0.045 245);
+  --ink: oklch(0.95 0.02 190);
+  --muted: oklch(0.68 0.05 210);
+  --light-muted: oklch(0.78 0.08 205);
+  --yellow: oklch(0.86 0.17 195);
+  --mint: oklch(0.7 0.22 330);
+  --coral: oklch(0.86 0.18 105);
+  --font-body: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-display: "Bahnschrift", "Arial Narrow", "Microsoft YaHei", sans-serif;
+  --font-data: "Cascadia Mono", Consolas, monospace;
+}
+
+html[data-theme="cyber"] body {
+  background: var(--paper);
+}
+
+html[data-theme="cyber"] .hero::before {
+  background: rgba(5, 8, 15, 0.7);
+}
+
+html[data-theme="cyber"] .hero::after {
+  width: 32%;
+  border-left: 1px solid var(--yellow);
+  background: rgba(83, 243, 237, 0.06);
+}
+
+html[data-theme="cyber"] .hero-rule {
+  background: color-mix(in oklch, var(--yellow) 62%, transparent);
+}
+
+html[data-theme="cyber"] .hero h1,
+html[data-theme="cyber"] .intro-grid h2,
+html[data-theme="cyber"] .workflow-copy h3,
+html[data-theme="cyber"] .download-copy h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+html[data-theme="cyber"] .hero h1 {
+  font-size: 92px;
+  line-height: 0.9;
+}
+
+html[data-theme="cyber"] .workflow,
+html[data-theme="cyber"] .capability-band,
+html[data-theme="cyber"] .story-intro {
+  border-top-color: var(--graphite-line);
+}
+
+html[data-theme="cyber"] .media-frame {
+  padding: 7px;
+  border: 1px solid var(--yellow);
+  box-shadow: 14px 14px 0 var(--mint);
+}
+
+html[data-theme="cyber"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="cyber"] .download-section {
+  background: var(--graphite);
+  color: var(--ink);
+  box-shadow: inset 0 8px 0 var(--yellow);
+}
+
+html[data-theme="cyber"] .download-copy > p:not(.download-index),
+html[data-theme="cyber"] .final-release-link,
+html[data-theme="cyber"] .checksum-label {
+  color: var(--light-muted);
+}
+
+html[data-theme="cyber"] .final-download,
+html[data-theme="cyber"] .checksum button {
+  background: var(--yellow);
+  color: var(--graphite);
+  box-shadow: 8px 8px 0 var(--mint);
+}
+
+html[data-theme="apple"] {
+  color-scheme: light;
+  --graphite: oklch(0.11 0.005 260);
+  --graphite-soft: oklch(0.19 0.008 260);
+  --graphite-line: oklch(0.3 0.008 260);
+  --paper: oklch(0.99 0.002 260);
+  --paper-step: oklch(0.955 0.005 260);
+  --ink: oklch(0.15 0.008 260);
+  --muted: oklch(0.5 0.012 260);
+  --light-muted: oklch(0.78 0.008 260);
+  --yellow: oklch(0.62 0.19 250);
+  --mint: oklch(0.66 0.14 305);
+  --coral: oklch(0.68 0.16 42);
+  --font-body: -apple-system, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-display: -apple-system, "SF Pro Display", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-data: -apple-system, "SF Mono", "Cascadia Mono", monospace;
+}
+
+html[data-theme="apple"] .hero {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-theme="apple"] .hero::before {
+  background: rgba(255, 255, 255, 0.79);
+}
+
+html[data-theme="apple"] .hero::after {
+  border-left-color: rgba(15, 15, 18, 0.15);
+  background: rgba(20, 20, 24, 0.025);
+}
+
+html[data-theme="apple"] .hero-visual {
+  opacity: 0.22;
+  filter: saturate(0.7) contrast(1.02);
+}
+
+html[data-theme="apple"] .hero h1,
+html[data-theme="apple"] .hero-copy,
+html[data-theme="apple"] .release-facts dd {
+  color: var(--ink);
+}
+
+html[data-theme="apple"] .hero h1,
+html[data-theme="apple"] .intro-grid h2,
+html[data-theme="apple"] .workflow-copy h3,
+html[data-theme="apple"] .download-copy h2 {
+  font-weight: 600;
+}
+
+html[data-theme="apple"] .hero h1 {
+  font-size: 96px;
+  line-height: 0.94;
+}
+
+html[data-theme="apple"] .hero-kicker,
+html[data-theme="apple"] .release-facts dt,
+html[data-theme="apple"] .hero-readout,
+html[data-theme="apple"] .release-link {
+  color: var(--muted);
+}
+
+html[data-theme="apple"] .hero-rule {
+  background: rgba(15, 15, 18, 0.14);
+}
+
+html[data-theme="apple"] .primary-download {
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: none;
+}
+
+html[data-theme="apple"] .workflow-dark {
+  --surface: var(--graphite);
+  --text: var(--white);
+  --secondary: var(--light-muted);
+}
+
+html[data-theme="apple"] .media-frame {
+  padding: 12px;
+  border-radius: 24px;
+  background: var(--graphite);
+  box-shadow: 0 18px 46px rgba(10, 12, 18, 0.16);
+}
+
+html[data-theme="apple"] .media-frame img {
+  border-radius: 17px;
+}
+
+html[data-theme="apple"] .download-section {
+  background: var(--graphite);
+  color: var(--white);
+  box-shadow: none;
+}
+
+html[data-theme="apple"] .download-index,
+html[data-theme="apple"] .download-copy > p:not(.download-index),
+html[data-theme="apple"] .final-release-link,
+html[data-theme="apple"] .checksum-label {
+  color: var(--light-muted);
+}
+
+html[data-theme="apple"] .final-download,
+html[data-theme="apple"] .checksum button {
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+html[data-theme="terminal"] {
+  color-scheme: dark;
+  --graphite: oklch(0.11 0.025 145);
+  --graphite-soft: oklch(0.17 0.04 145);
+  --graphite-line: oklch(0.36 0.08 145);
+  --paper: oklch(0.15 0.03 145);
+  --paper-step: oklch(0.19 0.04 145);
+  --ink: oklch(0.88 0.16 145);
+  --muted: oklch(0.62 0.08 145);
+  --light-muted: oklch(0.74 0.1 145);
+  --yellow: oklch(0.82 0.18 145);
+  --mint: oklch(0.8 0.15 92);
+  --coral: oklch(0.68 0.18 28);
+  --font-body: "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+  --font-display: "Cascadia Mono", Consolas, monospace;
+  --font-data: "Cascadia Mono", Consolas, monospace;
+}
+
+html[data-theme="terminal"] body {
+  background: var(--paper);
+}
+
+html[data-theme="terminal"] .hero::before {
+  background: rgba(4, 12, 5, 0.75);
+}
+
+html[data-theme="terminal"] .hero h1,
+html[data-theme="terminal"] .intro-grid h2,
+html[data-theme="terminal"] .workflow-copy h3,
+html[data-theme="terminal"] .download-copy h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+html[data-theme="terminal"] .hero h1::before {
+  content: "> ";
+  color: var(--mint);
+}
+
+html[data-theme="terminal"] .hero-kicker::before {
+  content: "[READY] ";
+  color: var(--mint);
+}
+
+html[data-theme="terminal"] .hero-kicker span {
+  display: none;
+}
+
+html[data-theme="terminal"] .hero-copy,
+html[data-theme="terminal"] .workflow-copy > p,
+html[data-theme="terminal"] .download-copy > p:not(.download-index) {
+  line-height: 1.8;
+}
+
+html[data-theme="terminal"] .workflow,
+html[data-theme="terminal"] .capability-band,
+html[data-theme="terminal"] .story-intro {
+  border-top-color: var(--graphite-line);
+}
+
+html[data-theme="terminal"] .media-frame {
+  padding: 8px;
+  border: 1px solid var(--yellow);
+  background: var(--graphite-soft);
+  box-shadow: 10px 10px 0 var(--mint);
+}
+
+html[data-theme="terminal"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="terminal"] .download-section {
+  background: var(--graphite);
+  color: var(--ink);
+  box-shadow: inset 0 8px 0 var(--mint);
+}
+
+html[data-theme="terminal"] .download-index,
+html[data-theme="terminal"] .download-copy > p:not(.download-index),
+html[data-theme="terminal"] .final-release-link,
+html[data-theme="terminal"] .checksum-label {
+  color: var(--light-muted);
+}
+
+html[data-theme="terminal"] .final-download,
+html[data-theme="terminal"] .checksum button {
+  background: var(--yellow);
+  color: var(--graphite);
+  box-shadow: 8px 8px 0 var(--mint);
+}
+
+html[data-theme="government"] {
+  color-scheme: light;
+  --graphite: oklch(0.25 0.06 25);
+  --graphite-soft: oklch(0.31 0.07 25);
+  --graphite-line: oklch(0.47 0.06 25);
+  --paper: oklch(0.98 0.008 91);
+  --paper-step: oklch(0.93 0.018 91);
+  --ink: oklch(0.2 0.025 25);
+  --muted: oklch(0.48 0.03 25);
+  --light-muted: oklch(0.82 0.018 91);
+  --yellow: oklch(0.67 0.13 75);
+  --mint: oklch(0.62 0.1 160);
+  --coral: oklch(0.5 0.16 25);
+  --font-body: "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-display: "SimSun", "Songti SC", serif;
+  --font-data: "Microsoft YaHei", sans-serif;
+}
+
+html[data-theme="government"] .site-header {
+  border-bottom: 3px double var(--graphite-line);
+}
+
+html[data-theme="government"] .hero::before {
+  background: rgba(61, 25, 25, 0.8);
+}
+
+html[data-theme="government"] .hero::after {
+  width: 32%;
+  border-left-color: rgba(247, 231, 196, 0.33);
+}
+
+html[data-theme="government"] .hero h1,
+html[data-theme="government"] .intro-grid h2,
+html[data-theme="government"] .workflow-copy h3,
+html[data-theme="government"] .download-copy h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+html[data-theme="government"] .hero h1 {
+  font-size: 94px;
+}
+
+html[data-theme="government"] .workflow {
+  border-top: 3px double color-mix(in oklch, var(--text) 32%, transparent);
+}
+
+html[data-theme="government"] .media-frame {
+  padding: 10px;
+  border: 1px solid color-mix(in oklch, var(--text) 34%, transparent);
+  box-shadow: 10px 10px 0 var(--accent);
+}
+
+html[data-theme="government"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="government"] .download-section {
+  background: var(--graphite);
+  color: var(--white);
+  box-shadow: inset 0 10px 0 var(--yellow);
+}
+
+html[data-theme="government"] .download-index,
+html[data-theme="government"] .download-copy > p:not(.download-index),
+html[data-theme="government"] .final-release-link,
+html[data-theme="government"] .checksum-label {
+  color: var(--light-muted);
+}
+
+html[data-theme="government"] .final-download,
+html[data-theme="government"] .checksum button {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 8px 8px 0 var(--yellow);
+}
+
+html[data-theme="bauhaus"] {
+  color-scheme: light;
+  --graphite: oklch(0.16 0.01 70);
+  --graphite-soft: oklch(0.24 0.015 70);
+  --graphite-line: oklch(0.38 0.02 70);
+  --paper: oklch(0.97 0.015 95);
+  --paper-step: oklch(0.91 0.02 95);
+  --ink: oklch(0.17 0.012 70);
+  --muted: oklch(0.48 0.025 70);
+  --light-muted: oklch(0.8 0.012 95);
+  --yellow: oklch(0.83 0.18 93);
+  --mint: oklch(0.59 0.18 255);
+  --coral: oklch(0.59 0.2 28);
+  --font-body: "Trebuchet MS", "Microsoft YaHei", sans-serif;
+  --font-display: "Arial Black", "Microsoft YaHei", sans-serif;
+  --font-data: Bahnschrift, "Arial Narrow", sans-serif;
+}
+
+html[data-theme="bauhaus"] .hero {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-theme="bauhaus"] .hero::before {
+  background: rgba(248, 243, 224, 0.83);
+}
+
+html[data-theme="bauhaus"] .hero::after {
+  width: 28%;
+  border-left: 8px solid var(--yellow);
+  background: var(--mint);
+}
+
+html[data-theme="bauhaus"] .hero h1,
+html[data-theme="bauhaus"] .hero-copy,
+html[data-theme="bauhaus"] .release-facts dd {
+  color: var(--ink);
+}
+
+html[data-theme="bauhaus"] .hero-rule {
+  background: var(--ink);
+}
+
+html[data-theme="bauhaus"] .hero-readout {
+  color: var(--coral);
+}
+
+html[data-theme="bauhaus"] .hero-kicker,
+html[data-theme="bauhaus"] .release-facts dt,
+html[data-theme="bauhaus"] .release-link {
+  color: var(--muted);
+}
+
+html[data-theme="bauhaus"] .workflow {
+  border-top: 8px solid var(--accent);
+}
+
+html[data-theme="bauhaus"] .media-frame {
+  padding: 12px;
+  background: var(--paper);
+  box-shadow: 14px 14px 0 var(--accent);
+}
+
+html[data-theme="bauhaus"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="bauhaus"] .download-section {
+  background: var(--yellow);
+  box-shadow: inset 0 10px 0 var(--coral);
+}
+
+html[data-theme="bauhaus"] .final-download,
+html[data-theme="bauhaus"] .checksum button {
+  background: var(--graphite);
+  color: var(--paper);
+  box-shadow: 8px 8px 0 var(--mint);
+}
+
+html[data-theme="stationery"] {
+  color-scheme: light;
+  --graphite: oklch(0.2 0.04 250);
+  --graphite-soft: oklch(0.27 0.05 250);
+  --graphite-line: oklch(0.42 0.04 250);
+  --paper: oklch(0.985 0.008 170);
+  --paper-step: oklch(0.94 0.018 170);
+  --ink: oklch(0.22 0.035 250);
+  --muted: oklch(0.5 0.03 250);
+  --light-muted: oklch(0.8 0.02 170);
+  --yellow: oklch(0.64 0.15 255);
+  --mint: oklch(0.72 0.13 155);
+  --coral: oklch(0.65 0.19 32);
+  --font-body: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Microsoft YaHei", sans-serif;
+  --font-display: "Yu Gothic", "PingFang SC", sans-serif;
+  --font-data: Bahnschrift, "Arial Narrow", sans-serif;
+}
+
+html[data-theme="stationery"] .hero {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-theme="stationery"] .hero::before {
+  background: rgba(248, 252, 249, 0.84);
+}
+
+html[data-theme="stationery"] .hero::after {
+  width: 23%;
+  border-left-color: color-mix(in oklch, var(--yellow) 55%, transparent);
+}
+
+html[data-theme="stationery"] .hero h1,
+html[data-theme="stationery"] .hero-copy,
+html[data-theme="stationery"] .release-facts dd {
+  color: var(--ink);
+}
+
+html[data-theme="stationery"] .hero-readout {
+  color: var(--yellow);
+  opacity: 0.16;
+}
+
+html[data-theme="stationery"] .hero-rule {
+  background: color-mix(in oklch, var(--ink) 22%, transparent);
+}
+
+html[data-theme="stationery"] .hero-kicker,
+html[data-theme="stationery"] .release-facts dt,
+html[data-theme="stationery"] .release-link {
+  color: var(--muted);
+}
+
+html[data-theme="stationery"] .workflow {
+  border-top: 1px dashed color-mix(in oklch, var(--text) 30%, transparent);
+}
+
+html[data-theme="stationery"] .media-frame {
+  padding: 9px;
+  border: 1px solid var(--graphite);
+  box-shadow: 9px 9px 0 var(--mint);
+}
+
+html[data-theme="stationery"] .media-frame img {
+  border-radius: 2px;
+}
+
+html[data-theme="stationery"] .download-section {
+  background: var(--yellow);
+  box-shadow: inset 0 8px 0 var(--coral);
+}
+
+html[data-theme="stationery"] .final-download,
+html[data-theme="stationery"] .checksum button {
+  background: var(--graphite);
+  color: var(--paper);
+  box-shadow: 7px 7px 0 var(--mint);
+}
+
+html[data-theme="blueprint"] {
+  color-scheme: light;
+  --graphite: oklch(0.2 0.08 255);
+  --graphite-soft: oklch(0.29 0.09 255);
+  --graphite-line: oklch(0.47 0.08 255);
+  --paper: oklch(0.975 0.012 101);
+  --paper-step: oklch(0.92 0.02 101);
+  --ink: oklch(0.22 0.07 255);
+  --muted: oklch(0.48 0.05 255);
+  --light-muted: oklch(0.79 0.03 101);
+  --yellow: oklch(0.72 0.16 65);
+  --mint: oklch(0.68 0.14 150);
+  --coral: oklch(0.64 0.18 250);
+  --font-body: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-display: Bahnschrift, "Arial Narrow", "Microsoft YaHei", sans-serif;
+  --font-data: "Cascadia Mono", Consolas, monospace;
+}
+
+html[data-theme="blueprint"] .hero {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-theme="blueprint"] .hero::before {
+  background: rgba(247, 245, 233, 0.84);
+}
+
+html[data-theme="blueprint"] .hero::after {
+  width: 34%;
+  border-left-color: color-mix(in oklch, var(--ink) 42%, transparent);
+}
+
+html[data-theme="blueprint"] .hero h1,
+html[data-theme="blueprint"] .hero-copy,
+html[data-theme="blueprint"] .release-facts dd {
+  color: var(--ink);
+}
+
+html[data-theme="blueprint"] .hero-rule {
+  background: color-mix(in oklch, var(--ink) 45%, transparent);
+}
+
+html[data-theme="blueprint"] .hero-kicker,
+html[data-theme="blueprint"] .release-facts dt,
+html[data-theme="blueprint"] .release-link {
+  color: var(--muted);
+}
+
+html[data-theme="blueprint"] .hero-kicker span {
+  background: var(--coral);
+}
+
+html[data-theme="blueprint"] .workflow {
+  border-top: 1px dashed color-mix(in oklch, var(--text) 38%, transparent);
+}
+
+html[data-theme="blueprint"] .media-frame {
+  padding: 10px;
+  border: 1px dashed var(--accent);
+  box-shadow: 12px 12px 0 var(--yellow);
+}
+
+html[data-theme="blueprint"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="blueprint"] .download-section {
+  background: var(--graphite);
+  color: var(--white);
+  box-shadow: inset 0 10px 0 var(--yellow);
+}
+
+html[data-theme="blueprint"] .download-index,
+html[data-theme="blueprint"] .download-copy > p:not(.download-index),
+html[data-theme="blueprint"] .final-release-link,
+html[data-theme="blueprint"] .checksum-label {
+  color: var(--light-muted);
+}
+
+html[data-theme="blueprint"] .final-download,
+html[data-theme="blueprint"] .checksum button {
+  background: var(--yellow);
+  color: var(--graphite);
+  box-shadow: 8px 8px 0 var(--mint);
+}
+
+html[data-theme="newspaper"] {
+  color-scheme: light;
+  --graphite: oklch(0.13 0.008 70);
+  --graphite-soft: oklch(0.23 0.012 70);
+  --graphite-line: oklch(0.37 0.012 70);
+  --paper: oklch(0.965 0.012 88);
+  --paper-step: oklch(0.9 0.018 88);
+  --ink: oklch(0.16 0.009 70);
+  --muted: oklch(0.47 0.012 70);
+  --light-muted: oklch(0.79 0.012 88);
+  --yellow: oklch(0.53 0.12 250);
+  --mint: oklch(0.55 0.02 70);
+  --coral: oklch(0.55 0.16 28);
+  --font-body: "Arial", "Microsoft YaHei", sans-serif;
+  --font-display: "Songti SC", "STSong", "SimSun", serif;
+  --font-data: "Arial Narrow", Bahnschrift, sans-serif;
+}
+
+html[data-theme="newspaper"] .hero {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+html[data-theme="newspaper"] .hero::before {
+  background: rgba(245, 240, 223, 0.86);
+}
+
+html[data-theme="newspaper"] .hero::after {
+  width: 33%;
+  border-left-color: color-mix(in oklch, var(--ink) 40%, transparent);
+  background: rgba(20, 20, 20, 0.03);
+}
+
+html[data-theme="newspaper"] .hero-visual {
+  opacity: 0.18;
+  filter: grayscale(1) contrast(1.1);
+}
+
+html[data-theme="newspaper"] .hero h1,
+html[data-theme="newspaper"] .hero-copy,
+html[data-theme="newspaper"] .release-facts dd {
+  color: var(--ink);
+}
+
+html[data-theme="newspaper"] .hero h1,
+html[data-theme="newspaper"] .intro-grid h2,
+html[data-theme="newspaper"] .workflow-copy h3,
+html[data-theme="newspaper"] .download-copy h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+html[data-theme="newspaper"] .hero h1 {
+  font-size: 98px;
+  line-height: 0.92;
+}
+
+html[data-theme="newspaper"] .hero-rule {
+  background: color-mix(in oklch, var(--ink) 42%, transparent);
+}
+
+html[data-theme="newspaper"] .hero-kicker,
+html[data-theme="newspaper"] .release-facts dt,
+html[data-theme="newspaper"] .release-link {
+  color: var(--muted);
+}
+
+html[data-theme="newspaper"] .workflow {
+  border-top: 3px double color-mix(in oklch, var(--text) 36%, transparent);
+}
+
+html[data-theme="newspaper"] .media-frame {
+  padding: 6px;
+  background: var(--graphite);
+  box-shadow: none;
+}
+
+html[data-theme="newspaper"] .media-frame img {
+  border-radius: 0;
+}
+
+html[data-theme="newspaper"] .workflow-media figcaption {
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in oklch, var(--text) 28%, transparent);
+}
+
+html[data-theme="newspaper"] .download-section {
+  background: var(--graphite);
+  color: var(--white);
+  box-shadow: inset 0 8px 0 var(--coral);
+}
+
+html[data-theme="newspaper"] .download-index,
+html[data-theme="newspaper"] .download-copy > p:not(.download-index),
+html[data-theme="newspaper"] .final-release-link,
+html[data-theme="newspaper"] .checksum-label {
+  color: var(--light-muted);
+}
+
+html[data-theme="newspaper"] .final-download,
+html[data-theme="newspaper"] .checksum button {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 8px 8px 0 var(--coral);
+}
+
+/* Light skins need a dark-readable hero copy layer while retaining the product image. */
+html[data-theme="ancient"] .hero h1,
+html[data-theme="government"] .hero h1,
+html[data-theme="newspaper"] .hero h1,
+html[data-theme="apple"] .hero h1,
+html[data-theme="bauhaus"] .hero h1,
+html[data-theme="stationery"] .hero h1,
+html[data-theme="blueprint"] .hero h1 {
+  text-shadow: none;
+}
+
+@media (max-width: 860px) {
+  html[data-theme="apple"] .hero h1,
+  html[data-theme="ancient"] .hero h1,
+  html[data-theme="government"] .hero h1,
+  html[data-theme="newspaper"] .hero h1 {
+    font-size: 78px;
+  }
+}
+
+@media (max-width: 520px) {
+  html[data-theme="apple"] .hero h1,
+  html[data-theme="ancient"] .hero h1,
+  html[data-theme="government"] .hero h1,
+  html[data-theme="newspaper"] .hero h1 {
+    font-size: 62px;
+  }
+
+  html[data-theme="terminal"] .hero h1,
+  html[data-theme="cyber"] .hero h1 {
+    font-size: 58px;
+  }
+}
