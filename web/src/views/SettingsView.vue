@@ -195,7 +195,7 @@
             </span>
           </div>
         </div>
-        <div v-if="downloadStatus.status === 'queued' || downloadStatus.status === 'downloading' || downloadStatus.status === 'paused'" class="progress-line" aria-hidden="true">
+        <div v-if="shouldRetainActiveAppUpdateSource(downloadStatus.status)" class="progress-line" aria-hidden="true">
           <span :style="{ width: `${downloadPercent >= 0 ? downloadPercent : 0}%` }"></span>
         </div>
         <div class="download-actions">
@@ -206,7 +206,7 @@
             @click="installUpdate"
           >安装更新</button>
           <button
-            v-if="downloadStatus.status === 'queued' || downloadStatus.status === 'downloading' || downloadStatus.status === 'paused'"
+            v-if="shouldRetainActiveAppUpdateSource(downloadStatus.status)"
             class="btn ghost"
             type="button"
             @click="cancelUpdate"
@@ -285,6 +285,7 @@ import {
   getAppUpdateStatus,
   hasActiveAppUpdateStopFailure,
   installAppUpdate,
+  shouldRetainActiveAppUpdateSource,
   startAppUpdateDownload,
   subscribeActiveAppUpdateStopFailure,
   subscribeAppUpdateProgress,
@@ -292,7 +293,11 @@ import {
   type ReleaseInfo,
 } from '../api/update';
 import { UpdateCoordinator } from '../api/update-coordinator';
-import { advertisedApkFingerprint, automaticUpdateFingerprint } from '../api/update-automation';
+import {
+  advertisedApkFingerprint,
+  automaticUpdateFingerprint,
+  canAutomaticallyCheckUpdates,
+} from '../api/update-automation';
 import { completionForDate } from '../lib/completion';
 import { addDays, formatCn, todayStr } from '../lib/date';
 import { streakDays, totalDone } from '../lib/stats';
@@ -393,9 +398,7 @@ let lastDownloadBytes = 0;
 
 const downloadBusy = computed(() =>
   downloadStarting.value
-  || downloadStatus.value?.status === 'queued'
-  || downloadStatus.value?.status === 'downloading'
-  || downloadStatus.value?.status === 'paused',
+  || Boolean(downloadStatus.value && shouldRetainActiveAppUpdateSource(downloadStatus.value.status)),
 );
 const downloadStarted = computed(() => !!downloadStatus.value && downloadStatus.value.status !== 'idle' && downloadStatus.value.status !== 'cancelled');
 const downloadFailed = computed(() => downloadStatus.value?.status === 'failed' || downloadStatus.value?.status === 'not_found');
@@ -418,6 +421,7 @@ const downloadStatusLabel = computed(() => {
     case 'downloaded': return '下载完成';
     case 'failed': return '下载失败';
     case 'not_found': return '下载文件不存在';
+    case 'unknown': return '正在读取下载状态';
     case 'cancelled': return '下载已取消';
     default: return '';
   }
@@ -430,7 +434,7 @@ function applyRelease(release: ReleaseInfo) {
 
 const updateCoordinator = new UpdateCoordinator<ReleaseInfo>({
   debounceMs: 400,
-  canCheckAutomatically: () => true,
+  canCheckAutomatically: () => canAutomaticallyCheckUpdates(isSyncEnabled(), getServerUrl()),
   automaticFingerprint: () => automaticUpdateFingerprint(
     isSyncEnabled(),
     getServerUrl(),
@@ -469,7 +473,7 @@ function applyDownloadStatus(status: AppUpdateDownloadStatus) {
     lastDownloadBytes = status.bytesDownloaded;
     armDownloadStallTimer();
   }
-  if (!['queued', 'downloading', 'paused'].includes(status.status)) {
+  if (!shouldRetainActiveAppUpdateSource(status.status)) {
     clearActiveAppUpdateSource();
     clearDownloadStallTimer();
   }
@@ -479,6 +483,8 @@ function applyDownloadStatus(status: AppUpdateDownloadStatus) {
   } else if (status.status === 'not_found') {
     downloadMessage.value = '更新文件已失效，请重新下载';
     void prepareGithubFallback();
+  } else if (status.status === 'unknown') {
+    downloadMessage.value = '暂时无法读取下载状态，正在自动重试';
   } else if (status.status !== 'downloaded') {
     downloadMessage.value = hasActiveAppUpdateStopFailure() && getActiveAppUpdateSource() === 'lan'
       ? '局域网下载停止失败，已保留当前进度'

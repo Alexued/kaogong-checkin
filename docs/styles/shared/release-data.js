@@ -2,18 +2,18 @@
   'use strict';
 
   const release = Object.freeze({
-    version: '0.7.0',
+    version: '0.7.1',
     android: {
-      fileName: 'kaogong-checkin-v0.7.0.apk',
-      url: 'https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk',
+      fileName: 'kaogong-checkin-v0.7.1.apk',
+      url: 'https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk',
       size: '3.27 MiB',
-      sha256: '2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A',
+      sha256: '8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689',
     },
     windows: {
-      fileName: 'kaogong-checkin-windows-x64-setup-v0.7.0.exe',
-      url: 'https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe',
+      fileName: 'kaogong-checkin-windows-x64-setup-v0.7.1.exe',
+      url: 'https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-windows-x64-setup-v0.7.1.exe',
       size: '91.38 MiB',
-      sha256: 'BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18',
+      sha256: 'DECAD4791F4A93609E04D89CEE026F41E5FBFE4FDE380D51FEF84A73D45FE474',
     },
   });
 

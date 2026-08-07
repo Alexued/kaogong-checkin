@@ -11,7 +11,7 @@ import { isSyncEnabled } from './sync-preference';
 export { compareVersions } from './update-selection';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.7.0';
+export const APP_VERSION = '0.7.1';
 
 export interface ReleaseInfo {
   version: string;
@@ -110,6 +110,8 @@ export interface AppUpdateDownloadStatus {
   fileName?: string;
   reason?: number;
   localUri?: string;
+  removed?: boolean;
+  preserved?: boolean;
 }
 
 interface NativeAppUpdatePlugin {
@@ -160,6 +162,21 @@ function rememberActiveAppUpdateStopFailure(failed: boolean) {
 
 function rememberActiveAppUpdateSource(source: ReleaseInfo['source']) {
   localStorage.setItem(ACTIVE_UPDATE_SOURCE_KEY, source);
+}
+
+export function shouldRetainActiveAppUpdateSource(status: AppUpdateDownloadStatus['status']): boolean {
+  return ['queued', 'downloading', 'paused', 'unknown'].includes(status);
+}
+
+function acceptLanCancellation(status: AppUpdateDownloadStatus | undefined): AppUpdateDownloadStatus | undefined {
+  if (status?.status === 'cancelled' && status.removed === false) {
+    throw new Error('The LAN update download was not removed');
+  }
+  if (!status || ['cancelled', 'idle', 'downloaded', 'not_found'].includes(status.status)) {
+    clearActiveAppUpdateSource();
+    return status;
+  }
+  throw new Error(`The LAN update download is still ${status.status}`);
 }
 
 /** 比较语义化版本号：a > b 返回正数，相等 0，a < b 负数（忽略 v 前缀） */
@@ -263,17 +280,14 @@ export async function startAppUpdateDownload(
   rememberActiveAppUpdateStopFailure(false);
   cancelLanWhenStarted = false;
   const nativeStart = NativeAppUpdate.startDownload({ url, fileName });
-  let operation: Promise<AppUpdateDownloadStatus>;
+  let operation: Promise<AppUpdateDownloadStatus> | null = null;
   operation = (async () => {
     try {
       let status = await nativeStart;
       if (source === 'lan' && cancelLanWhenStarted) {
-        const cancelled = await NativeAppUpdate.cancelDownload(
+        const cancelled = acceptLanCancellation(await NativeAppUpdate.cancelDownload(
           status.downloadId == null ? undefined : { downloadId: status.downloadId },
-        );
-        if (!cancelled || cancelled.status === 'cancelled' || cancelled.status === 'idle') {
-          clearActiveAppUpdateSource();
-        }
+        ));
         if (cancelled) status = cancelled;
       }
       return status;
@@ -295,8 +309,12 @@ export function installAppUpdate(downloadId?: number | null) {
   return NativeAppUpdate.installDownloadedApk(downloadId == null ? undefined : { downloadId });
 }
 
-export function cancelAppUpdate(downloadId?: number | null): Promise<AppUpdateDownloadStatus | undefined> {
-  return NativeAppUpdate.cancelDownload(downloadId == null ? undefined : { downloadId });
+export async function cancelAppUpdate(downloadId?: number | null): Promise<AppUpdateDownloadStatus | undefined> {
+  const status = await NativeAppUpdate.cancelDownload(downloadId == null ? undefined : { downloadId });
+  if (status?.status === 'cancelled' && status.removed === false) {
+    throw new Error('The app update download was not removed');
+  }
+  return status;
 }
 
 export async function cancelActiveLanAppUpdate(downloadId?: number | null): Promise<boolean> {
@@ -312,8 +330,7 @@ export async function cancelActiveLanAppUpdate(downloadId?: number | null): Prom
         // The initial cancellation can race native startup. Retry once against DownloadManager.
       }
     }
-    const status = await cancelAppUpdate(downloadId);
-    if (!status || status.status === 'cancelled' || status.status === 'idle') clearActiveAppUpdateSource();
+    acceptLanCancellation(await cancelAppUpdate(downloadId));
     rememberActiveAppUpdateStopFailure(false);
     return true;
   } catch (error) {

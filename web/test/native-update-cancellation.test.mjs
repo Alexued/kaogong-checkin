@@ -67,6 +67,14 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+async function waitForNativeCalls(method, count, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs;
+  while (nativeCalls.filter((call) => call.method === method).length < count) {
+    if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${method}`);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 test.beforeEach(() => {
   values.clear();
   nativeCalls.length = 0;
@@ -147,6 +155,88 @@ test('a failed LAN cancellation is persisted for UI recovery', async () => {
   assert.equal(update.hasActiveAppUpdateStopFailure(), true);
 });
 
+test('sync shutdown automatically retries a failed LAN cancellation', async () => {
+  values.set(SYNC_ENABLED_KEY, 'true');
+  startHandler = async () => status('queued', 74);
+  let attempts = 0;
+  cancelHandler = async () => {
+    attempts += 1;
+    if (attempts < 3) throw new Error('DownloadManager temporarily unavailable');
+    return status('cancelled', 74);
+  };
+
+  await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+  await computerSync.setComputerSyncEnabled(false);
+
+  assert.equal(attempts, 3);
+  assert.equal(update.getActiveAppUpdateSource(), null);
+  assert.equal(update.hasActiveAppUpdateStopFailure(), false);
+});
+
+test('re-enabling sync cancels an old LAN cancellation retry before a new download starts', async () => {
+  values.set(SYNC_ENABLED_KEY, 'true');
+  startHandler = async () => status('queued', 75);
+  cancelHandler = async () => { throw new Error('DownloadManager temporarily unavailable'); };
+
+  await update.startAppUpdateDownload('http://computer/old.apk', 'old.apk', 'lan');
+  const disabling = computerSync.setComputerSyncEnabled(false);
+  await waitForNativeCalls('cancelDownload', 1);
+
+  values.set('serverUrl', 'computer.test:8321');
+  globalThis.fetch = async (url) => new Response(JSON.stringify(String(url).endsWith('/api/info')
+    ? { serverId: '', pairingRequired: false, protocolVersion: 2 }
+    : {
+        tasks: [], subtasks: [], checkins: [], timers: [], drills: [], formulaDrills: [],
+        settings: { planEndDate: null, theme: 'light', markDate: null },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  globalThis.WebSocket = class FakeWebSocket {
+    static OPEN = 1;
+    readyState = 0;
+    onopen = null;
+    onmessage = null;
+    onclose = null;
+    onerror = null;
+    send() {}
+    close() { this.readyState = 3; }
+  };
+
+  const enabling = computerSync.setComputerSyncEnabled(true);
+  await Promise.all([disabling, enabling]);
+  assert.equal(update.hasActiveAppUpdateStopFailure(), true);
+
+  update.clearActiveAppUpdateSource();
+  startHandler = async () => status('queued', 76);
+  await update.startAppUpdateDownload('http://computer/new.apk', 'new.apk', 'lan');
+  await new Promise((resolve) => setTimeout(resolve, 350));
+
+  assert.equal(nativeCalls.filter((call) => call.method === 'cancelDownload').length, 1);
+  assert.equal(update.getActiveAppUpdateSource(), 'lan');
+
+  cancelHandler = async () => status('cancelled', 76);
+  await computerSync.setComputerSyncEnabled(false);
+});
+
+test('a native removed=false response does not report LAN cancellation success', async () => {
+  startHandler = async () => status('queued', 74);
+  cancelHandler = async () => ({ ...status('cancelled', 74), removed: false });
+
+  await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+  await assert.rejects(
+    update.cancelActiveLanAppUpdate(74),
+    /was not removed/,
+  );
+
+  assert.equal(update.getActiveAppUpdateSource(), 'lan');
+  assert.equal(update.hasActiveAppUpdateStopFailure(), true);
+});
+
+test('an unknown native status retains active download ownership', () => {
+  assert.equal(update.shouldRetainActiveAppUpdateSource('unknown'), true);
+  assert.equal(update.shouldRetainActiveAppUpdateSource('downloading'), true);
+  assert.equal(update.shouldRetainActiveAppUpdateSource('not_found'), false);
+  assert.equal(update.shouldRetainActiveAppUpdateSource('failed'), false);
+});
+
 test('stop failure subscribers receive late cancellation failures', async () => {
   const failures = [];
   const unsubscribe = update.subscribeActiveAppUpdateStopFailure((failed) => failures.push(failed));
@@ -172,4 +262,16 @@ test('an empty native cancel response clears a stale persisted LAN source on sta
 
   assert.equal(nativeCalls.filter((call) => call.method === 'cancelDownload').length, 1);
   assert.equal(update.getActiveAppUpdateSource(), null);
+});
+
+test('a completed LAN download is preserved while startup clears its active source', async () => {
+  values.set(SYNC_ENABLED_KEY, 'false');
+  values.set('kgc-active-update-source', 'lan');
+  cancelHandler = async () => ({ ...status('downloaded', 75), preserved: true });
+
+  await computerSync.initializeComputerSync();
+
+  assert.equal(nativeCalls.filter((call) => call.method === 'cancelDownload').length, 1);
+  assert.equal(update.getActiveAppUpdateSource(), null);
+  assert.equal(update.hasActiveAppUpdateStopFailure(), false);
 });

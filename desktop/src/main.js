@@ -54,7 +54,7 @@ let desktopState = {
   launchAtLogin: false,
   launchAtLoginAvailable: false,
   isPackaged: false,
-  appVersion: '0.7.0',
+  appVersion: '0.7.1',
   dataDirectory: '',
   resources: { server: false, web: false, apk: false },
   logs: [],

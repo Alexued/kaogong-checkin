@@ -24,7 +24,7 @@
     steps.forEach((step, index) => {
       timers.push(window.setTimeout(() => {
         steps.forEach((item, itemIndex) => item.classList.toggle('is-active', itemIndex === index));
-        output.textContent = index === steps.length - 1 ? '发现局域网更新 v0.7.0，等待用户确认下载' : `步骤 ${String(index + 1).padStart(2, '0')} 已完成`;
+        output.textContent = index === steps.length - 1 ? '发现局域网更新 v0.7.1，等待用户确认下载' : `步骤 ${String(index + 1).padStart(2, '0')} 已完成`;
         if (index === steps.length - 1) run.disabled = false;
       }, reducedMotion.matches ? 0 : index * 520));
     });

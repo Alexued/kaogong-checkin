@@ -2949,6 +2949,10 @@ code,
     transition-duration: 0.01ms !important;
   }
 
+  body::after {
+    transition-duration: 80ms !important;
+  }
+
   [data-enter],
   .motion-ready [data-reveal],
   [data-scene-part] {

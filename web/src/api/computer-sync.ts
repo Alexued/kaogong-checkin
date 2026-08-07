@@ -13,6 +13,53 @@ import { cancelActiveLanAppUpdate, cancelLanUpdateRequests } from './update';
 let controlGeneration = 0;
 let controlChain: Promise<void> = Promise.resolve();
 let pairingAbortController: AbortController | null = null;
+const LAN_DOWNLOAD_CANCEL_RETRY_DELAYS_MS = [250, 500, 1000] as const;
+let lanDownloadCancellationGeneration = 0;
+let lanDownloadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let resolveLanDownloadRetryWait: ((ready: boolean) => void) | null = null;
+
+function beginLanDownloadCancellationRun(): number {
+  lanDownloadCancellationGeneration += 1;
+  if (lanDownloadRetryTimer) {
+    clearTimeout(lanDownloadRetryTimer);
+    lanDownloadRetryTimer = null;
+  }
+  if (resolveLanDownloadRetryWait) {
+    const resolve = resolveLanDownloadRetryWait;
+    resolveLanDownloadRetryWait = null;
+    resolve(false);
+  }
+  return lanDownloadCancellationGeneration;
+}
+
+function waitForLanDownloadCancellationRetry(delayMs: number, generation: number): Promise<boolean> {
+  if (generation !== lanDownloadCancellationGeneration || isSyncEnabled()) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    resolveLanDownloadRetryWait = resolve;
+    lanDownloadRetryTimer = setTimeout(() => {
+      lanDownloadRetryTimer = null;
+      if (resolveLanDownloadRetryWait === resolve) resolveLanDownloadRetryWait = null;
+      resolve(generation === lanDownloadCancellationGeneration && !isSyncEnabled());
+    }, delayMs);
+  });
+}
+
+async function cancelLanDownloadWhileDisabled(generation: number): Promise<void> {
+  for (let attempt = 0; attempt <= LAN_DOWNLOAD_CANCEL_RETRY_DELAYS_MS.length; attempt += 1) {
+    if (generation !== lanDownloadCancellationGeneration || isSyncEnabled()) return;
+    try {
+      await cancelActiveLanAppUpdate();
+      return;
+    } catch {
+      if (attempt === LAN_DOWNLOAD_CANCEL_RETRY_DELAYS_MS.length) return;
+      const ready = await waitForLanDownloadCancellationRetry(
+        LAN_DOWNLOAD_CANCEL_RETRY_DELAYS_MS[attempt],
+        generation,
+      );
+      if (!ready) return;
+    }
+  }
+}
 
 function serialize(operation: () => Promise<void>): Promise<void> {
   const result = controlChain.then(operation, operation);
@@ -28,12 +75,13 @@ async function startBoth(generation: number) {
 export function initializeComputerSync(): Promise<void> {
   initializeLocalState();
   const generation = ++controlGeneration;
+  const cancellationGeneration = beginLanDownloadCancellationRun();
   if (!isSyncEnabled()) {
     cancelLanUpdateRequests();
     stopSync();
     return Promise.all([
       stopDiscovery(),
-      cancelActiveLanAppUpdate().catch(() => false),
+      cancelLanDownloadWhileDisabled(cancellationGeneration),
     ]).then(() => {});
   }
   return serialize(() => startBoth(generation));
@@ -42,11 +90,12 @@ export function initializeComputerSync(): Promise<void> {
 export function setComputerSyncEnabled(enabled: boolean): Promise<void> {
   persistSyncEnabled(enabled);
   const generation = ++controlGeneration;
+  const cancellationGeneration = beginLanDownloadCancellationRun();
   // Invalidate HTTP/WS callbacks immediately; UDP cleanup completes in the serialized step.
   cancelLanUpdateRequests();
   const downloadCancellation = enabled
     ? Promise.resolve()
-    : cancelActiveLanAppUpdate().catch(() => {});
+    : cancelLanDownloadWhileDisabled(cancellationGeneration);
   pairingAbortController?.abort();
   pairingAbortController = null;
   stopSync();

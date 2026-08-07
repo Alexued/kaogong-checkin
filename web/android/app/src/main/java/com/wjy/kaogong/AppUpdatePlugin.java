@@ -91,18 +91,24 @@ public class AppUpdatePlugin extends Plugin {
 
         if (activeDownloadId != NO_DOWNLOAD_ID) {
             DownloadSnapshot current = querySnapshot(activeDownloadId);
-            if (current.status == DownloadManager.STATUS_PENDING
-                || current.status == DownloadManager.STATUS_RUNNING
-                || current.status == DownloadManager.STATUS_PAUSED) {
-                call.reject("An update download is already in progress", "DOWNLOAD_IN_PROGRESS", snapshotData(current));
-                return;
+            DownloadCancellationPolicy.StartAction startAction = DownloadCancellationPolicy.startAction(
+                current.querySucceeded,
+                current.state()
+            );
+            switch (startAction) {
+                case REJECT_IN_PROGRESS:
+                    call.reject("An update download is already in progress", "DOWNLOAD_IN_PROGRESS", snapshotData(current));
+                    return;
+                case REJECT_READY:
+                    call.reject("The downloaded update is ready to install", "DOWNLOAD_ALREADY_AVAILABLE", snapshotData(current));
+                    return;
+                case REJECT_STATUS_UNAVAILABLE:
+                    call.reject("Unable to inspect the existing update download", "DOWNLOAD_STATUS_UNAVAILABLE", snapshotData(current));
+                    return;
+                case CLEAR_REUSABLE_RECORD:
+                    clearDownloadRecord(true);
+                    break;
             }
-            if (current.status == DownloadManager.STATUS_SUCCESSFUL) {
-                call.reject("The downloaded update is ready to install", "DOWNLOAD_ALREADY_AVAILABLE", snapshotData(current));
-                return;
-            }
-            // Remove failed records and partial files before reusing the destination name.
-            clearDownloadRecord(true);
         }
 
         String fileName = sanitizeFileName(call.getString("fileName", DEFAULT_FILE_NAME));
@@ -222,8 +228,50 @@ public class AppUpdatePlugin extends Plugin {
             return;
         }
 
+        DownloadSnapshot snapshot = downloadManager == null
+            ? DownloadSnapshot.queryFailed(id)
+            : querySnapshot(id);
+        DownloadCancellationPolicy.Action action = DownloadCancellationPolicy.actionFor(
+            downloadManager != null,
+            snapshot.querySucceeded,
+            snapshot.state()
+        );
+        if (action == DownloadCancellationPolicy.Action.FAIL) {
+            String message = downloadManager == null
+                ? "Download service is unavailable"
+                : "Unable to inspect update download";
+            call.reject(message, "DOWNLOAD_CANCEL_FAILED");
+            return;
+        }
+        if (action == DownloadCancellationPolicy.Action.PRESERVE_COMPLETED) {
+            if (id == activeDownloadId) {
+                stopPolling();
+            }
+            JSObject result = snapshotData(snapshot);
+            result.put("preserved", true);
+            call.resolve(result);
+            return;
+        }
+        if (action == DownloadCancellationPolicy.Action.FORGET_MISSING) {
+            if (id == activeDownloadId) {
+                stopPolling();
+                clearDownloadRecord(false);
+            }
+            call.resolve(snapshotData(snapshot));
+            return;
+        }
         String cancelledFileName = activeFileName;
-        boolean removed = downloadManager != null && downloadManager.remove(id) > 0;
+        final boolean removed;
+        try {
+            removed = DownloadCancellationPolicy.removalSucceeded(downloadManager.remove(id));
+        } catch (IllegalArgumentException | SecurityException ex) {
+            call.reject("Unable to cancel update download", "DOWNLOAD_CANCEL_FAILED", ex);
+            return;
+        }
+        if (!removed) {
+            call.reject("Unable to cancel update download", "DOWNLOAD_CANCEL_FAILED");
+            return;
+        }
         if (id == activeDownloadId) {
             stopPolling();
             clearDownloadRecord(false);
@@ -347,8 +395,11 @@ public class AppUpdatePlugin extends Plugin {
     }
 
     private DownloadSnapshot querySnapshot(long id) {
-        if (downloadManager == null || id == NO_DOWNLOAD_ID) {
+        if (id == NO_DOWNLOAD_ID) {
             return DownloadSnapshot.notFound(id);
+        }
+        if (downloadManager == null) {
+            return DownloadSnapshot.queryFailed(id);
         }
 
         DownloadManager.Query query = new DownloadManager.Query().setFilterById(id);
@@ -363,9 +414,9 @@ public class AppUpdatePlugin extends Plugin {
             String localUri = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
             int percent = total > 0 ? (int) Math.min(100L, Math.round(bytes * 100.0d / total)) : -1;
             long speed = sampleSpeed(id, bytes);
-            return new DownloadSnapshot(id, status, bytes, total, percent, speed, reason, localUri);
+            return new DownloadSnapshot(id, status, bytes, total, percent, speed, reason, localUri, true);
         } catch (RuntimeException ex) {
-            return DownloadSnapshot.notFound(id);
+            return DownloadSnapshot.queryFailed(id);
         }
     }
 
@@ -510,9 +561,10 @@ public class AppUpdatePlugin extends Plugin {
         final long speedBytesPerSecond;
         final int reason;
         final String localUri;
+        final boolean querySucceeded;
 
         DownloadSnapshot(long id, int status, long bytesDownloaded, long totalBytes, int percent,
-                         long speedBytesPerSecond, int reason, String localUri) {
+                         long speedBytesPerSecond, int reason, String localUri, boolean querySucceeded) {
             this.id = id;
             this.status = status;
             this.bytesDownloaded = bytesDownloaded;
@@ -521,19 +573,26 @@ public class AppUpdatePlugin extends Plugin {
             this.speedBytesPerSecond = speedBytesPerSecond;
             this.reason = reason;
             this.localUri = localUri;
+            this.querySucceeded = querySucceeded;
         }
 
         static DownloadSnapshot notFound(long id) {
-            return new DownloadSnapshot(id, -1, 0L, -1L, -1, 0L, 0, null);
+            return new DownloadSnapshot(id, -1, 0L, -1L, -1, 0L, 0, null, true);
+        }
+
+        static DownloadSnapshot queryFailed(long id) {
+            return new DownloadSnapshot(id, -1, 0L, -1L, -1, 0L, 0, null, false);
         }
 
         boolean isTerminal() {
-            return status == DownloadManager.STATUS_SUCCESSFUL
-                || status == DownloadManager.STATUS_FAILED
-                || status == -1;
+            return DownloadCancellationPolicy.isTerminal(querySucceeded, rawState());
         }
 
         String state() {
+            return DownloadCancellationPolicy.publicState(querySucceeded, rawState());
+        }
+
+        private String rawState() {
             switch (status) {
                 case DownloadManager.STATUS_PENDING:
                     return "queued";

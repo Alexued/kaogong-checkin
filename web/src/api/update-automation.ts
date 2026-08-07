@@ -5,6 +5,10 @@ interface AdvertisedApk {
   apkVersion?: string;
 }
 
+export function canAutomaticallyCheckUpdates(syncEnabled: boolean, serverUrl: string): boolean {
+  return syncEnabled && serverUrl.trim().length > 0;
+}
+
 export function automaticUpdateFingerprint(
   syncEnabled: boolean,
   serverUrl: string,
@@ -12,8 +16,8 @@ export function automaticUpdateFingerprint(
   advertisedVersion = '',
 ): string {
   const normalizedServer = serverUrl.trim().toLowerCase();
-  const useLan = syncEnabled && normalizedServer.length > 0;
-  return `${useLan ? 'lan' : 'github'}|${useLan ? normalizedServer : ''}|${useLan ? advertisedVersion : ''}|${appVersion}`;
+  if (!canAutomaticallyCheckUpdates(syncEnabled, normalizedServer)) return '';
+  return `lan|${normalizedServer}|${advertisedVersion}|${appVersion}`;
 }
 
 export function advertisedApkFingerprint(server?: AdvertisedApk): string {
