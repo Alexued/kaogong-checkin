@@ -1,11 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-const { findLatestApk, parseApkFileName } = require('../src/update');
+const { findLatestApk, parseApkFileName, sha256File } = require('../src/update');
 
 async function waitForServer(url) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -59,6 +60,8 @@ test('LAN update API selects and downloads the highest valid APK', async (t) => 
   const selected = findLatestApk(updateDir);
   assert.equal(selected.fileName, 'kaogong-checkin-v0.12.0.apk');
   assert.equal(selected.version, '0.12.0');
+  assert.equal(selected.sha256, crypto.createHash('sha256').update('latest-apk').digest('hex'));
+  assert.equal(selected.applicationId, 'com.wjy.kaogong');
   assert.equal(parseApkFileName('kaogong-checkin-v01.2.3.apk'), null);
   assert.equal(parseApkFileName('KAOGONG-CHECKIN-v1.2.3.APK'), null);
 
@@ -72,6 +75,8 @@ test('LAN update API selects and downloads the highest valid APK', async (t) => 
   assert.equal(metadata.source, 'lan');
   assert.equal(metadata.fileName, 'kaogong-checkin-v0.12.0.apk');
   assert.equal(metadata.size, Buffer.byteLength('latest-apk'));
+  assert.equal(metadata.sha256, crypto.createHash('sha256').update('latest-apk').digest('hex'));
+  assert.equal(metadata.applicationId, 'com.wjy.kaogong');
   assert.equal(metadata.apkUrl, `${baseUrl}/updates/kaogong-checkin-v0.12.0.apk`);
 
   const downloadResponse = await fetch(metadata.apkUrl);
@@ -95,4 +100,17 @@ test('LAN update API returns 404 when no valid APK is available', async (t) => {
   const response = await fetch(`${baseUrl}/api/update/latest`);
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: 'no update APK available' });
+});
+
+test('the APK digest cache invalidates when the file changes', (t) => {
+  const updateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kaogong-hash-cache-'));
+  t.after(() => fs.rmSync(updateDir, { recursive: true, force: true }));
+  const filePath = path.join(updateDir, 'kaogong-checkin-v0.8.0.apk');
+  fs.writeFileSync(filePath, 'first');
+  const first = sha256File(filePath);
+  fs.writeFileSync(filePath, 'second-version');
+  const second = sha256File(filePath);
+
+  assert.notEqual(second, first);
+  assert.equal(second, crypto.createHash('sha256').update('second-version').digest('hex'));
 });

@@ -10,6 +10,13 @@ const express = require('express');
 const { WebSocketServer } = require('ws');
 
 const { findLatestApk } = require('./update');
+const {
+  STATE_SCHEMA_VERSION,
+  isValidV2State,
+  migrateStoredState,
+  normalizeCheckin,
+  normalizeTask,
+} = require('./stateSchema');
 
 const PROTOCOL_VERSION = 2;
 const DEFAULT_HTTP_PORT = 8321;
@@ -18,15 +25,6 @@ const DEFAULT_UDP_PORT = 8322;
 const DEFAULT_PAIR_RATE_LIMIT_MAX = 5;
 const DEFAULT_PAIR_RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_STORED_TOKENS = 64;
-
-const COLLECTIONS = [
-  'tasks',
-  'subtasks',
-  'checkins',
-  'timers',
-  'drills',
-  'formulaDrills',
-];
 
 const ENTITY_COLLECTION = {
   task: 'tasks',
@@ -39,6 +37,7 @@ const ENTITY_COLLECTION = {
 
 function defaultData() {
   return {
+    schemaVersion: STATE_SCHEMA_VERSION,
     tasks: [],
     subtasks: [],
     checkins: [],
@@ -56,38 +55,6 @@ function defaultData() {
 
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
-}
-
-function isValidState(value) {
-  return Boolean(
-    value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      COLLECTIONS.every((key) => Array.isArray(value[key])) &&
-      value.settings &&
-      typeof value.settings === 'object' &&
-      !Array.isArray(value.settings),
-  );
-}
-
-function normalizeStoredState(value) {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    !Array.isArray(value.tasks) ||
-    !Array.isArray(value.checkins)
-  ) {
-    throw new Error('invalid state shape');
-  }
-
-  const normalized = cloneJson(value);
-  for (const key of COLLECTIONS) {
-    if (!Array.isArray(normalized[key])) normalized[key] = [];
-  }
-  if (!normalized.settings || typeof normalized.settings !== 'object' || Array.isArray(normalized.settings)) {
-    normalized.settings = defaultData().settings;
-  }
-  return normalized;
 }
 
 function lanAddresses() {
@@ -153,6 +120,56 @@ function timingSafeTextEqual(left, right) {
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function ipv4ToInteger(address) {
+  const octets = String(address || '').split('.');
+  if (octets.length !== 4) return null;
+  let value = 0;
+  for (const octet of octets) {
+    if (!/^\d{1,3}$/.test(octet)) return null;
+    const part = Number(octet);
+    if (part < 0 || part > 255) return null;
+    value = ((value << 8) | part) >>> 0;
+  }
+  return value;
+}
+
+function integerToIpv4(value) {
+  return [24, 16, 8, 0].map((shift) => (value >>> shift) & 255).join('.');
+}
+
+function directedBroadcastAddress(address, netmask) {
+  const ip = ipv4ToInteger(address);
+  const mask = ipv4ToInteger(netmask);
+  if (ip === null || mask === null) return null;
+  return integerToIpv4(((ip & mask) | (~mask >>> 0)) >>> 0);
+}
+
+function collectUdpBroadcastAddresses(interfaces, fallback = '255.255.255.255') {
+  const targets = new Set();
+  for (const entries of Object.values(interfaces || {})) {
+    for (const entry of entries || []) {
+      const family = typeof entry.family === 'string' ? entry.family : Number(entry.family);
+      if ((family !== 'IPv4' && family !== 4) || entry.internal) continue;
+      const target = directedBroadcastAddress(entry.address, entry.netmask);
+      if (target) targets.add(target);
+    }
+  }
+  if (fallback) targets.add(fallback);
+  return [...targets];
+}
+
+function collectActiveIpv4InterfaceNames(interfaces) {
+  const names = [];
+  for (const [name, entries] of Object.entries(interfaces || {})) {
+    const active = (entries || []).some((entry) => {
+      const family = typeof entry.family === 'string' ? entry.family : Number(entry.family);
+      return (family === 'IPv4' || family === 4) && !entry.internal;
+    });
+    if (active) names.push(String(name).replace(/[\r\n\t]/g, ' ').slice(0, 48));
+  }
+  return names;
+}
+
 function createKgcServer(options = {}) {
   const httpHost = options.httpHost || '0.0.0.0';
   const requestedHttpPort = normalizePort(options.httpPort, DEFAULT_HTTP_PORT, 'httpPort');
@@ -196,7 +213,8 @@ function createKgcServer(options = {}) {
   const serverName = String(options.name || os.hostname());
   const allowLegacy = options.allowLegacy === true;
   const udpEnabled = options.udpEnabled !== false;
-  const udpBroadcastAddress = options.udpBroadcastAddress || '255.255.255.255';
+  const explicitUdpBroadcastAddress = options.udpBroadcastAddress || null;
+  const getNetworkInterfaces = options.getNetworkInterfaces || os.networkInterfaces;
   const getLanAddresses = options.getLanAddresses || lanAddresses;
   const logger = options.logger === undefined ? console : options.logger;
   const events = new EventEmitter();
@@ -267,12 +285,16 @@ function createKgcServer(options = {}) {
       return fresh;
     }
 
+    let stored;
     try {
-      return normalizeStoredState(JSON.parse(fs.readFileSync(dataFile, 'utf8')));
+      stored = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
     } catch (primaryError) {
       log('error', '[store] data.json corrupted, restoring from .bak:', primaryError.message);
       try {
-        const recovered = normalizeStoredState(JSON.parse(fs.readFileSync(backupFile, 'utf8')));
+        const recovered = migrateStoredState(
+          JSON.parse(fs.readFileSync(backupFile, 'utf8')),
+          defaultData().settings,
+        );
         writeJsonAtomic(dataFile, recovered);
         log('info', '[store] restored from data.json.bak');
         return recovered;
@@ -282,6 +304,15 @@ function createKgcServer(options = {}) {
         writeJsonAtomic(dataFile, fresh);
         return fresh;
       }
+    }
+
+    try {
+      const normalized = migrateStoredState(stored, defaultData().settings);
+      if (JSON.stringify(stored) !== JSON.stringify(normalized)) saveData(normalized);
+      return normalized;
+    } catch (migrationError) {
+      log('error', '[store] state schema migration failed; source preserved:', migrationError.message);
+      throw migrationError;
     }
   }
 
@@ -399,7 +430,7 @@ function createKgcServer(options = {}) {
         ? target.settings.updatedAt
         : '';
       if (currentUpdatedAt <= (payload.updatedAt || '')) {
-        target.settings = cloneJson(payload);
+        target.settings = { ...target.settings, ...cloneJson(payload) };
         return { recognized: true, applied: true };
       }
       return { recognized: true, applied: false };
@@ -413,12 +444,17 @@ function createKgcServer(options = {}) {
     const collection = target[collectionName];
     const index = collection.findIndex((item) => item.id === payload.id);
     if (kind === 'upsert') {
+      let next = index === -1
+        ? cloneJson(payload)
+        : { ...collection[index], ...cloneJson(payload) };
+      if (collectionName === 'tasks') next = normalizeTask(next);
+      if (collectionName === 'checkins') next = normalizeCheckin(next);
       if (index === -1) {
-        collection.push(cloneJson(payload));
+        collection.push(next);
         return { recognized: true, applied: true };
       }
       if ((collection[index].updatedAt || '') <= (payload.updatedAt || '')) {
-        collection[index] = cloneJson(payload);
+        collection[index] = next;
         return { recognized: true, applied: true };
       }
       return { recognized: true, applied: false };
@@ -518,10 +554,14 @@ function createKgcServer(options = {}) {
       ips: currentIps(),
       pairingRequired: !allowLegacy,
       protocolVersion: PROTOCOL_VERSION,
+      stateSchemaVersion: STATE_SCHEMA_VERSION,
+      minimumClientStateSchemaVersion: STATE_SCHEMA_VERSION,
       legacyMode: allowLegacy,
       apkAvailable: Boolean(apk),
       apkFileName: apk ? apk.fileName : null,
       apkVersion: apk ? apk.version : null,
+      apkSha256: apk ? apk.sha256 : null,
+      apkApplicationId: apk ? apk.applicationId : null,
     };
   }
 
@@ -585,6 +625,8 @@ function createKgcServer(options = {}) {
           serverId: ensureSecurityLoaded().serverId,
           token,
           protocolVersion: PROTOCOL_VERSION,
+          stateSchemaVersion: STATE_SCHEMA_VERSION,
+          minimumClientStateSchemaVersion: STATE_SCHEMA_VERSION,
         });
       } catch (error) {
         log('error', '[auth] failed to persist paired client:', error.message);
@@ -601,14 +643,22 @@ function createKgcServer(options = {}) {
     });
 
     app.put('/api/state', requireAuthentication, (request, response) => {
-      if (!isValidState(request.body)) {
+      if (!request.body || request.body.schemaVersion !== STATE_SCHEMA_VERSION) {
+        return response.status(409).json({
+          error: 'state schema version 2 is required for full replacement',
+          code: 'STATE_SCHEMA_VERSION_REQUIRED',
+          stateSchemaVersion: STATE_SCHEMA_VERSION,
+          minimumClientStateSchemaVersion: STATE_SCHEMA_VERSION,
+        });
+      }
+      if (!isValidV2State(request.body)) {
         return response.status(400).json({
           error: 'invalid state shape',
           code: 'INVALID_STATE',
         });
       }
 
-      const nextData = cloneJson(request.body);
+      const nextData = migrateStoredState(request.body, defaultData().settings);
       try {
         saveData(nextData);
         data = nextData;
@@ -639,6 +689,8 @@ function createKgcServer(options = {}) {
           source: 'lan',
           fileName: apk.fileName,
           size: apk.size,
+          sha256: apk.sha256,
+          applicationId: apk.applicationId,
         });
       } catch (error) {
         log('error', '[update] scan failed:', error.message);
@@ -726,6 +778,7 @@ function createKgcServer(options = {}) {
               applied: false,
               error: 'STATE_PERSIST_FAILED',
               protocolVersion: PROTOCOL_VERSION,
+              stateSchemaVersion: STATE_SCHEMA_VERSION,
             });
           }
           return;
@@ -738,6 +791,7 @@ function createKgcServer(options = {}) {
           clientMutationId: mutationId,
           applied: result.applied,
           protocolVersion: PROTOCOL_VERSION,
+          stateSchemaVersion: STATE_SCHEMA_VERSION,
         });
       }
     });
@@ -848,6 +902,8 @@ function createKgcServer(options = {}) {
       httpPort: actualHttpPort,
       pairingRequired: !allowLegacy,
       protocolVersion: PROTOCOL_VERSION,
+      stateSchemaVersion: STATE_SCHEMA_VERSION,
+      minimumClientStateSchemaVersion: STATE_SCHEMA_VERSION,
       apkAvailable: Boolean(apk),
       apkVersion: apk ? apk.version : null,
     }));
@@ -907,12 +963,24 @@ function createKgcServer(options = {}) {
 
     const send = () => {
       if (udpSocket !== socket) return;
+      let targets;
       try {
-        socket.send(udpPayload(), udpPort, udpBroadcastAddress, (error) => {
-          if (error) log('error', '[udp] send failed:', error.message);
-        });
+        targets = explicitUdpBroadcastAddress
+          ? [explicitUdpBroadcastAddress]
+          : collectUdpBroadcastAddresses(getNetworkInterfaces());
       } catch (error) {
-        log('error', '[udp] send failed:', error.message);
+        targets = ['255.255.255.255'];
+        log('error', '[udp] network interface enumeration failed; using global broadcast:', error.message);
+      }
+      const payload = udpPayload();
+      for (const target of targets) {
+        try {
+          socket.send(payload, udpPort, target, (error) => {
+            if (error) log('error', '[udp] send failed:', error.message);
+          });
+        } catch (error) {
+          log('error', '[udp] send failed:', error.message);
+        }
       }
     };
 
@@ -920,7 +988,22 @@ function createKgcServer(options = {}) {
     send();
     udpInterval = setInterval(send, udpIntervalMs);
     if (typeof udpInterval.unref === 'function') udpInterval.unref();
-    log('info', `[udp] broadcasting discovery to ${udpBroadcastAddress}:${udpPort}`);
+    let interfaceNames = [];
+    let targetCount = 1;
+    try {
+      const interfaces = getNetworkInterfaces();
+      interfaceNames = collectActiveIpv4InterfaceNames(interfaces);
+      targetCount = explicitUdpBroadcastAddress
+        ? 1
+        : collectUdpBroadcastAddresses(interfaces).length;
+    } catch {
+      /* send() already logs and falls back if enumeration remains unavailable. */
+    }
+    const interfaceLabel = interfaceNames.length ? interfaceNames.join(', ') : 'none detected';
+    log(
+      'info',
+      `[udp] broadcasting on ${targetCount} target(s), port ${udpPort}; interfaces: ${interfaceLabel}`,
+    );
   }
 
   async function closeUdp() {
@@ -1103,6 +1186,8 @@ function createKgcServer(options = {}) {
       apkFileName: apk ? apk.fileName : null,
       apkVersion: apk ? apk.version : null,
       apkSize: apk ? apk.size : null,
+      apkSha256: apk ? apk.sha256 : null,
+      apkApplicationId: apk ? apk.applicationId : null,
       apkDownloadUrl,
       dataDir,
       webDir,
@@ -1155,7 +1240,10 @@ function createKgcServer(options = {}) {
 
 module.exports = {
   PROTOCOL_VERSION,
+  collectActiveIpv4InterfaceNames,
+  collectUdpBroadcastAddresses,
   createKgcServer,
+  directedBroadcastAddress,
   findLatestApk,
-  isValidState,
+  isValidState: isValidV2State,
 };

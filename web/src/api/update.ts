@@ -11,7 +11,9 @@ import { isSyncEnabled } from './sync-preference';
 export { compareVersions } from './update-selection';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.7.1';
+export const APP_VERSION = '0.8.0';
+export const APPLICATION_ID = 'com.wjy.kaogong';
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 
 export interface ReleaseInfo {
   version: string;
@@ -22,6 +24,10 @@ export interface ReleaseInfo {
   notes: string;
   publishedAt: string;
   source: 'lan' | 'github';
+  fileName: string | null;
+  size: number | null;
+  sha256: string | null;
+  applicationId: string;
 }
 
 async function fetchWithTimeout(
@@ -74,19 +80,75 @@ export async function fetchReleaseHistory(limit = 10, signal?: AbortSignal): Pro
   }, 8000, signal ? [signal] : []);
   if (!r.ok) throw new Error(`GitHub API ${r.status}`);
   const releases = await r.json() as Array<Record<string, any>>;
-  return releases.filter((release) => !release.draft).map(parseRelease);
+  return Promise.all(releases.filter((release) => !release.draft).map((release) => parseRelease(release, signal)));
 }
 
-function parseRelease(release: Record<string, any>): ReleaseInfo {
-  const apk = (release.assets || []).find((asset: { name?: string }) => /\.apk$/i.test(asset?.name || ''));
+interface GitHubAsset {
+  name?: string;
+  browser_download_url?: string;
+  digest?: string | null;
+  size?: number;
+}
+
+export function normalizeSha256(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase().replace(/^sha256:/, '');
+  return SHA256_PATTERN.test(normalized) ? normalized : null;
+}
+
+async function manifestDigest(
+  release: Record<string, any>,
+  apk: GitHubAsset,
+  version: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  const manifestAsset = (release.assets || []).find(
+    (asset: GitHubAsset) => asset?.name === 'release-manifest.json' && asset.browser_download_url,
+  ) as GitHubAsset | undefined;
+  if (!manifestAsset?.browser_download_url || !apk.name) return null;
+  try {
+    const response = await fetchWithTimeout(manifestAsset.browser_download_url, {
+      headers: { Accept: 'application/json' },
+    }, 8000, signal ? [signal] : []);
+    if (!response.ok) return null;
+    const manifest = await response.json() as Record<string, unknown>;
+    const size = Number(manifest.size);
+    if (
+      manifest.version !== version
+      || manifest.fileName !== apk.name
+      || manifest.applicationId !== APPLICATION_ID
+      || !Number.isSafeInteger(size)
+      || size < 0
+      || (Number.isSafeInteger(apk.size) && size !== apk.size)
+    ) return null;
+    return normalizeSha256(manifest.sha256);
+  } catch (error) {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error ? signal.reason : abortError('Update check was cancelled');
+    }
+    return null;
+  }
+}
+
+async function parseRelease(release: Record<string, any>, signal?: AbortSignal): Promise<ReleaseInfo> {
+  const version = String(release.tag_name || '').replace(/^v/, '');
+  const expectedFileName = `kaogong-checkin-v${version}.apk`;
+  const apk = (release.assets || []).find(
+    (asset: GitHubAsset) => asset?.name === expectedFileName,
+  ) as GitHubAsset | undefined;
+  const sha256 = apk ? normalizeSha256(apk.digest) || await manifestDigest(release, apk, version, signal) : null;
   return {
-    version: String(release.tag_name || '').replace(/^v/, ''),
+    version,
     name: release.name || release.tag_name || '',
-    apkUrl: apk ? apk.browser_download_url : null,
+    apkUrl: apk?.browser_download_url || null,
     pageUrl: release.html_url,
     notes: release.body || '',
     publishedAt: release.published_at || '',
     source: 'github',
+    fileName: apk?.name || null,
+    size: Number.isSafeInteger(apk?.size) ? Number(apk?.size) : null,
+    sha256,
+    applicationId: APPLICATION_ID,
   };
 }
 
@@ -115,7 +177,7 @@ export interface AppUpdateDownloadStatus {
 }
 
 interface NativeAppUpdatePlugin {
-  startDownload(options: { url: string; fileName?: string }): Promise<AppUpdateDownloadStatus>;
+  startDownload(options: { url: string; fileName?: string; expectedSha256: string }): Promise<AppUpdateDownloadStatus>;
   getDownloadStatus(options?: { downloadId?: number | string }): Promise<AppUpdateDownloadStatus>;
   installDownloadedApk(options?: { downloadId?: number | string }): Promise<{
     downloadId: number | null;
@@ -185,7 +247,7 @@ export async function fetchLatestGitHubRelease(signal?: AbortSignal): Promise<Re
     headers: { Accept: 'application/vnd.github+json' },
   }, 8000, signal ? [signal] : []);
   if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-  return parseRelease(await r.json());
+  return parseRelease(await r.json(), signal);
 }
 
 function serverHttpBase(serverUrl: string): string {
@@ -209,7 +271,18 @@ export async function fetchLatestLanRelease(serverUrl = getServerUrl(), signal?:
     assertLanUpdateAllowed(signal);
     const version = release.version;
     const rawApkUrl = release.apkUrl;
-    if (!version || !/^\d+\.\d+\.\d+$/.test(version) || !rawApkUrl) {
+    const sha256 = normalizeSha256(release.sha256);
+    const expectedFileName = version ? `kaogong-checkin-v${version}.apk` : '';
+    if (
+      !version
+      || !/^\d+\.\d+\.\d+$/.test(version)
+      || !rawApkUrl
+      || !sha256
+      || release.applicationId !== APPLICATION_ID
+      || release.fileName !== expectedFileName
+      || !Number.isSafeInteger(release.size)
+      || Number(release.size) < 0
+    ) {
       throw new Error('LAN update API returned invalid metadata');
     }
     const apkUrl = new URL(rawApkUrl, `${baseUrl}/`).toString();
@@ -222,6 +295,10 @@ export async function fetchLatestLanRelease(serverUrl = getServerUrl(), signal?:
       notes: release.notes || '',
       publishedAt: release.publishedAt || '',
       source: 'lan',
+      fileName: expectedFileName,
+      size: Number(release.size),
+      sha256,
+      applicationId: APPLICATION_ID,
     };
   } finally {
     lanUpdateControllers.delete(controller);
@@ -272,14 +349,17 @@ export async function startAppUpdateDownload(
   url: string,
   fileName?: string,
   source: ReleaseInfo['source'] = 'github',
+  expectedSha256?: string | null,
 ): Promise<AppUpdateDownloadStatus> {
+  const normalizedSha256 = normalizeSha256(expectedSha256);
+  if (!normalizedSha256) throw new Error('A trusted SHA-256 digest is required for in-app updates');
   if (pendingNativeDownload || getActiveAppUpdateSource()) {
     throw new Error('An app update download is already active');
   }
   rememberActiveAppUpdateSource(source);
   rememberActiveAppUpdateStopFailure(false);
   cancelLanWhenStarted = false;
-  const nativeStart = NativeAppUpdate.startDownload({ url, fileName });
+  const nativeStart = NativeAppUpdate.startDownload({ url, fileName, expectedSha256: normalizedSha256 });
   let operation: Promise<AppUpdateDownloadStatus> | null = null;
   operation = (async () => {
     try {

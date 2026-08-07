@@ -45,6 +45,11 @@ const update = await vite.ssrLoadModule('/src/api/update.ts');
 const computerSync = await vite.ssrLoadModule('/src/api/computer-sync.ts');
 const { SYNC_ENABLED_KEY } = await vite.ssrLoadModule('/src/api/sync-preference.ts');
 setActivePinia(createPinia());
+const TEST_SHA256 = 'a'.repeat(64);
+
+function startAppUpdateDownload(url, fileName, source) {
+  return update.startAppUpdateDownload(url, fileName, source, TEST_SHA256);
+}
 
 function status(state, downloadId = 41) {
   return {
@@ -80,12 +85,24 @@ test.beforeEach(() => {
   nativeCalls.length = 0;
 });
 
+test('in-app downloads require and forward a trusted SHA-256 digest', async () => {
+  await assert.rejects(
+    update.startAppUpdateDownload('https://github.test/update.apk', 'update.apk', 'github'),
+    /trusted SHA-256 digest/,
+  );
+  assert.equal(nativeCalls.length, 0);
+
+  startHandler = async () => status('queued', 40);
+  await startAppUpdateDownload('https://github.test/update.apk', 'update.apk', 'github');
+  assert.equal(nativeCalls[0].options.expectedSha256, TEST_SHA256);
+});
+
 test('sync shutdown waits for a pending LAN download start and then cancels it', async () => {
   const pendingStart = deferred();
   startHandler = () => pendingStart.promise;
   cancelHandler = async () => status('cancelled');
 
-  const download = update.startAppUpdateDownload('http://computer/update.apk', 'update.apk', 'lan');
+  const download = startAppUpdateDownload('http://computer/update.apk', 'update.apk', 'lan');
   const cancellation = update.cancelActiveLanAppUpdate();
   await Promise.resolve();
   assert.equal(nativeCalls.filter((call) => call.method === 'cancelDownload').length, 0);
@@ -101,7 +118,7 @@ test('a failed pending cancellation retains the LAN source until a retry succeed
   startHandler = async () => status('queued', 52);
   cancelHandler = async () => { throw new Error('DownloadManager unavailable'); };
 
-  const download = update.startAppUpdateDownload('http://computer/update.apk', 'update.apk', 'lan');
+  const download = startAppUpdateDownload('http://computer/update.apk', 'update.apk', 'lan');
   const downloadFailure = assert.rejects(download, /DownloadManager unavailable/);
   await assert.rejects(update.cancelActiveLanAppUpdate(), /DownloadManager unavailable/);
   await downloadFailure;
@@ -118,9 +135,9 @@ test('a second native download cannot replace an operation waiting to be cancell
   startHandler = () => pendingStart.promise;
   cancelHandler = async () => status('cancelled', 63);
 
-  const first = update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+  const first = startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
   await assert.rejects(
-    update.startAppUpdateDownload('https://github.test/update.apk', 'github.apk', 'github'),
+    startAppUpdateDownload('https://github.test/update.apk', 'github.apk', 'github'),
     /already active/,
   );
   const cancellation = update.cancelActiveLanAppUpdate();
@@ -133,11 +150,11 @@ test('a queued LAN download keeps ownership when another download is requested',
   startHandler = async () => status('queued', 71);
 
   assert.equal(
-    (await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan')).status,
+    (await startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan')).status,
     'queued',
   );
   await assert.rejects(
-    update.startAppUpdateDownload('https://github.test/update.apk', 'github.apk', 'github'),
+    startAppUpdateDownload('https://github.test/update.apk', 'github.apk', 'github'),
     /already active/,
   );
   assert.equal(nativeCalls.filter((call) => call.method === 'startDownload').length, 1);
@@ -148,7 +165,7 @@ test('a failed LAN cancellation is persisted for UI recovery', async () => {
   startHandler = async () => status('queued', 72);
   cancelHandler = async () => { throw new Error('DownloadManager unavailable'); };
 
-  await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+  await startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
   await assert.rejects(update.cancelActiveLanAppUpdate(72), /DownloadManager unavailable/);
 
   assert.equal(update.getActiveAppUpdateSource(), 'lan');
@@ -165,7 +182,7 @@ test('sync shutdown automatically retries a failed LAN cancellation', async () =
     return status('cancelled', 74);
   };
 
-  await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+  await startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
   await computerSync.setComputerSyncEnabled(false);
 
   assert.equal(attempts, 3);
@@ -178,7 +195,7 @@ test('re-enabling sync cancels an old LAN cancellation retry before a new downlo
   startHandler = async () => status('queued', 75);
   cancelHandler = async () => { throw new Error('DownloadManager temporarily unavailable'); };
 
-  await update.startAppUpdateDownload('http://computer/old.apk', 'old.apk', 'lan');
+  await startAppUpdateDownload('http://computer/old.apk', 'old.apk', 'lan');
   const disabling = computerSync.setComputerSyncEnabled(false);
   await waitForNativeCalls('cancelDownload', 1);
 
@@ -206,7 +223,7 @@ test('re-enabling sync cancels an old LAN cancellation retry before a new downlo
 
   update.clearActiveAppUpdateSource();
   startHandler = async () => status('queued', 76);
-  await update.startAppUpdateDownload('http://computer/new.apk', 'new.apk', 'lan');
+  await startAppUpdateDownload('http://computer/new.apk', 'new.apk', 'lan');
   await new Promise((resolve) => setTimeout(resolve, 350));
 
   assert.equal(nativeCalls.filter((call) => call.method === 'cancelDownload').length, 1);
@@ -220,7 +237,7 @@ test('a native removed=false response does not report LAN cancellation success',
   startHandler = async () => status('queued', 74);
   cancelHandler = async () => ({ ...status('cancelled', 74), removed: false });
 
-  await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+  await startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
   await assert.rejects(
     update.cancelActiveLanAppUpdate(74),
     /was not removed/,
@@ -244,7 +261,7 @@ test('stop failure subscribers receive late cancellation failures', async () => 
     startHandler = async () => status('queued', 73);
     cancelHandler = async () => { throw new Error('DownloadManager unavailable'); };
 
-    await update.startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
+    await startAppUpdateDownload('http://computer/update.apk', 'lan.apk', 'lan');
     await assert.rejects(update.cancelActiveLanAppUpdate(73), /DownloadManager unavailable/);
   } finally {
     unsubscribe();

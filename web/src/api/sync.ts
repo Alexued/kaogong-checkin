@@ -6,6 +6,12 @@ import { SyncGeneration } from './sync-generation';
 import { isSyncEnabled, LOCAL_STATE_KEY } from './sync-preference';
 import { compactQueue, normalizeQueue, type QueuedSyncMessage } from './sync-queue';
 import type { AppState, RemoteSyncMessage, ServerInfo, SyncMessage } from '../types';
+import {
+  STATE_SCHEMA_VERSION,
+  V1_BACKUP_KEY,
+  migrateAppState,
+  parseAndMigrateAppState,
+} from '../lib/stateMigration';
 
 const QUEUE_KEY = 'kgc-queue';
 const ACK_PROTOCOL_VERSION = 2;
@@ -39,21 +45,28 @@ function loadQueue() {
   persistQueue();
 }
 
-function loadState(): AppState | null {
+function loadState(): { state: AppState | null; recoveryRequired: boolean } {
+  const raw = localStorage.getItem(LOCAL_STATE_KEY);
+  if (!raw) return { state: null, recoveryRequired: false };
   try {
-    const raw = localStorage.getItem(LOCAL_STATE_KEY);
-    if (!raw) return null;
-    const state = JSON.parse(raw) as AppState;
-    state.settings = Object.assign({ planEndDate: null, theme: 'light', markDate: null }, state.settings);
-    return state;
+    const migrated = parseAndMigrateAppState(raw);
+    if (migrated.needsV1Backup) {
+      if (localStorage.getItem(V1_BACKUP_KEY) === null) {
+        localStorage.setItem(V1_BACKUP_KEY, migrated.original);
+      }
+      localStorage.setItem(LOCAL_STATE_KEY, migrated.serialized);
+    }
+    return { state: migrated.state, recoveryRequired: false };
   } catch {
-    return null;
+    // Never schedule a blank-state write over a source that needs manual recovery.
+    return { state: null, recoveryRequired: true };
   }
 }
 
 function currentState(): AppState {
   const store = useAppStore();
   return {
+    schemaVersion: STATE_SCHEMA_VERSION,
     tasks: store.tasks,
     subtasks: store.subtasks,
     checkins: store.checkins,
@@ -97,7 +110,12 @@ export function initializeLocalState() {
   loadQueue();
   const store = useAppStore();
   const cached = loadState();
-  if (cached) store.applySnapshot(cached);
+  store.recoveryRequired = cached.recoveryRequired;
+  if (cached.state) store.applySnapshot(cached.state);
+  if (cached.recoveryRequired) {
+    store.loaded = true;
+    return;
+  }
   replayPendingLocally();
   store.loaded = true;
   store.pendingSyncCount = queue.length;
@@ -133,6 +151,10 @@ function updateServerStatus(info: ServerInfo) {
   store.syncServerName = info.name || '';
   store.syncPairingRequired = Boolean(info.pairingRequired);
   store.syncProtocolVersion = Number(info.protocolVersion || 1);
+  store.syncStateSchemaVersion = Number(info.stateSchemaVersion || 1);
+  const minimum = Number(info.minimumClientStateSchemaVersion || 1);
+  store.syncStateSchemaCompatible =
+    minimum <= STATE_SCHEMA_VERSION && store.syncStateSchemaVersion <= STATE_SCHEMA_VERSION;
 }
 
 function pairingIsMissing(info: ServerInfo): boolean {
@@ -141,7 +163,13 @@ function pairingIsMissing(info: ServerInfo): boolean {
 
 function applyServerSnapshot(state: AppState) {
   const store = useAppStore();
-  store.applySnapshot(state);
+  let migrated: AppState;
+  try {
+    migrated = migrateAppState(state);
+  } catch {
+    return;
+  }
+  store.applySnapshot(migrated);
   // Pending local writes always win over a snapshot until the server acknowledges them.
   replayPendingLocally();
   schedulePersistState();
@@ -288,6 +316,11 @@ async function refreshSnapshotAndConnect(generation: number) {
     rememberServerInfo(info);
     serverInfo = info;
     updateServerStatus(info);
+    if (!store.syncStateSchemaCompatible) {
+      store.online = false;
+      store.syncPhase = 'offline';
+      return;
+    }
     if (pairingIsMissing(info)) {
       store.online = false;
       store.syncPhase = 'pairing';

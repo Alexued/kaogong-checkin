@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
 const { selectCanonicalApk } = require('./apk-selection');
+const { version: DESKTOP_VERSION } = require('../package.json');
 
 const PRODUCT_NAME = '考公打卡电脑伴侣';
 const DATA_FOLDER_NAME = 'KaogongCheckin';
@@ -50,11 +51,21 @@ let desktopState = {
   pairingCode: '',
   protocolVersion: '',
   serverId: '',
-  apk: { available: false, fileName: '', version: '', size: 0, downloadUrl: '', qrDataUrl: '', error: '' },
+  apk: {
+    available: false,
+    fileName: '',
+    version: '',
+    size: 0,
+    sha256: '',
+    applicationId: '',
+    downloadUrl: '',
+    qrDataUrl: '',
+    error: '',
+  },
   launchAtLogin: false,
   launchAtLoginAvailable: false,
   isPackaged: false,
-  appVersion: '0.7.1',
+  appVersion: DESKTOP_VERSION,
   dataDirectory: '',
   resources: { server: false, web: false, apk: false },
   logs: [],
@@ -323,6 +334,8 @@ async function refreshDesktopState(rawStatus = null) {
       fileName: apkFile ? apkFile.fileName : '',
       version: apkFile ? apkFile.version : '',
       size: apkFile ? apkFile.size : 0,
+      sha256: apkFile ? apkFile.sha256 : '',
+      applicationId: apkFile ? apkFile.applicationId : '',
       downloadUrl,
       qrDataUrl,
       error: apkError,

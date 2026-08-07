@@ -22,6 +22,7 @@ const update = await vite.ssrLoadModule('/src/api/update.ts');
 const computerSync = await vite.ssrLoadModule('/src/api/computer-sync.ts');
 const { SYNC_ENABLED_KEY } = await vite.ssrLoadModule('/src/api/sync-preference.ts');
 setActivePinia(createPinia());
+const TEST_SHA256 = 'a'.repeat(64);
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -37,13 +38,90 @@ function githubRelease(version) {
     html_url: `https://github.test/v${version}`,
     body: 'notes',
     published_at: '2026-08-07T00:00:00Z',
-    assets: [{ name: `kaogong-checkin-v${version}.apk`, browser_download_url: `https://github.test/v${version}.apk` }],
+    assets: [{
+      name: `kaogong-checkin-v${version}.apk`,
+      browser_download_url: `https://github.test/v${version}.apk`,
+      digest: `sha256:${TEST_SHA256}`,
+      size: 1234,
+    }],
   };
 }
 
 function lanRelease(version, apkUrl = `/updates/kaogong-checkin-v${version}.apk`) {
-  return { version, apkUrl, pageUrl: apkUrl, name: `v${version}`, notes: 'local' };
+  return {
+    version,
+    apkUrl,
+    pageUrl: apkUrl,
+    name: `v${version}`,
+    notes: 'local',
+    sha256: TEST_SHA256,
+    applicationId: 'com.wjy.kaogong',
+    fileName: `kaogong-checkin-v${version}.apk`,
+    size: 1234,
+  };
 }
+
+test('GitHub update metadata prefers the APK asset digest', async () => {
+  values.set(SYNC_ENABLED_KEY, 'false');
+  let fetchCount = 0;
+  globalThis.fetch = async () => {
+    fetchCount += 1;
+    return jsonResponse(githubRelease('0.8.0'));
+  };
+
+  const release = await update.fetchLatestGitHubRelease();
+  assert.equal(release.sha256, TEST_SHA256);
+  assert.equal(release.applicationId, 'com.wjy.kaogong');
+  assert.equal(fetchCount, 1);
+});
+
+test('GitHub update metadata falls back to a matching release manifest', async () => {
+  values.set(SYNC_ENABLED_KEY, 'false');
+  const releaseJson = githubRelease('0.8.0');
+  delete releaseJson.assets[0].digest;
+  releaseJson.assets.push({
+    name: 'release-manifest.json',
+    browser_download_url: 'https://github.test/release-manifest.json',
+  });
+  globalThis.fetch = async (url) => String(url).endsWith('release-manifest.json')
+    ? jsonResponse({
+        version: '0.8.0',
+        fileName: 'kaogong-checkin-v0.8.0.apk',
+        size: 1234,
+        sha256: TEST_SHA256,
+        applicationId: 'com.wjy.kaogong',
+      })
+    : jsonResponse(releaseJson);
+
+  assert.equal((await update.fetchLatestGitHubRelease()).sha256, TEST_SHA256);
+});
+
+test('a mismatched release manifest cannot authorize an in-app download', async () => {
+  values.set(SYNC_ENABLED_KEY, 'false');
+  const releaseJson = githubRelease('0.8.0');
+  delete releaseJson.assets[0].digest;
+  releaseJson.assets.push({
+    name: 'release-manifest.json',
+    browser_download_url: 'https://github.test/release-manifest.json',
+  });
+  globalThis.fetch = async (url) => String(url).endsWith('release-manifest.json')
+    ? jsonResponse({
+        version: '0.8.0',
+        fileName: 'kaogong-checkin-v0.8.0.apk',
+        size: 1234,
+        sha256: TEST_SHA256,
+        applicationId: 'com.example.other',
+      })
+    : jsonResponse(releaseJson);
+
+  assert.equal((await update.fetchLatestGitHubRelease()).sha256, null);
+});
+
+test('invalid LAN integrity metadata is rejected', async () => {
+  values.set(SYNC_ENABLED_KEY, 'true');
+  globalThis.fetch = async () => jsonResponse({ ...lanRelease('0.8.0'), applicationId: 'com.example.other' });
+  await assert.rejects(update.fetchLatestLanRelease('192.168.1.8:8321'), /invalid metadata/);
+});
 
 test('disabled sync rejects direct LAN update and pairing calls without fetching', async () => {
   values.set(SYNC_ENABLED_KEY, 'false');

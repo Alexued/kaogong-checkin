@@ -8,7 +8,13 @@ const path = require('node:path');
 
 const WebSocket = require('ws');
 
-const { PROTOCOL_VERSION, createKgcServer } = require('../src/server');
+const {
+  PROTOCOL_VERSION,
+  collectActiveIpv4InterfaceNames,
+  collectUdpBroadcastAddresses,
+  createKgcServer,
+  directedBroadcastAddress,
+} = require('../src/server');
 
 const silentLogger = {
   info() {},
@@ -208,11 +214,12 @@ test('factory protects state, rate-limits pairing, persists tokens, and restarts
     headers: authHeaders(credentials.token, { 'Content-Type': 'application/json' }),
     body: JSON.stringify({ tasks: [] }),
   });
-  assert.equal(invalidState.status, 400);
-  assert.equal((await invalidState.json()).code, 'INVALID_STATE');
+  assert.equal(invalidState.status, 409);
+  assert.equal((await invalidState.json()).code, 'STATE_SCHEMA_VERSION_REQUIRED');
 
   const state = {
-    tasks: [{ id: 'task-1', title: '资料分析', updatedAt: '2026-08-05T00:00:00.000Z' }],
+    schemaVersion: 2,
+    tasks: [{ id: 'task-1', title: '资料分析', target: 20, unit: '题', updatedAt: '2026-08-05T00:00:00.000Z' }],
     subtasks: [],
     checkins: [],
     timers: [],
@@ -348,6 +355,7 @@ test('WebSocket authentication, mutation acknowledgements, replay, and revocatio
     clientMutationId: 'mutation-1',
     applied: true,
     protocolVersion: PROTOCOL_VERSION,
+    stateSchemaVersion: 2,
   });
 
   messagePromise = nextJsonMessage(socket);
@@ -446,6 +454,8 @@ test('HTTP port fallback and UDP discovery expose only public identity fields', 
     httpPort: status.httpPort,
     pairingRequired: true,
     protocolVersion: PROTOCOL_VERSION,
+    stateSchemaVersion: 2,
+    minimumClientStateSchemaVersion: 2,
     apkAvailable: true,
     apkVersion: '0.7.0',
   });
@@ -465,6 +475,41 @@ test('HTTP port fallback and UDP discovery expose only public identity fields', 
     releasedPortProbe.listen(status.httpPort, '127.0.0.1', resolve);
   });
   await new Promise((resolve) => releasedPortProbe.close(resolve));
+});
+
+test('directed UDP broadcast targets cover each active IPv4 network once', () => {
+  assert.equal(directedBroadcastAddress('192.168.7.14', '255.255.255.0'), '192.168.7.255');
+  assert.equal(directedBroadcastAddress('10.42.18.4', '255.255.0.0'), '10.42.255.255');
+  assert.equal(directedBroadcastAddress('invalid', '255.255.255.0'), null);
+
+  assert.deepEqual(
+    collectUdpBroadcastAddresses({
+      WiFi: [
+        { family: 'IPv4', internal: false, address: '192.168.7.14', netmask: '255.255.255.0' },
+        { family: 'IPv6', internal: false, address: 'fe80::1', netmask: 'ffff:ffff:ffff:ffff::' },
+      ],
+      Ethernet: [
+        { family: 4, internal: false, address: '10.42.18.4', netmask: '255.255.0.0' },
+        { family: 'IPv4', internal: true, address: '127.0.0.1', netmask: '255.0.0.0' },
+      ],
+      Duplicate: [
+        { family: 'IPv4', internal: false, address: '192.168.7.20', netmask: '255.255.255.0' },
+      ],
+    }),
+    ['192.168.7.255', '10.42.255.255', '255.255.255.255'],
+  );
+
+  assert.deepEqual(
+    collectActiveIpv4InterfaceNames({
+      'Wi-Fi\rspoofed': [
+        { family: 'IPv4', internal: false, address: '192.168.7.14', netmask: '255.255.255.0' },
+      ],
+      Loopback: [
+        { family: 'IPv4', internal: true, address: '127.0.0.1', netmask: '255.0.0.0' },
+      ],
+    }),
+    ['Wi-Fi spoofed'],
+  );
 });
 
 test('backup recovery and explicit legacy mode preserve old clients', async (t) => {

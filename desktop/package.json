@@ -1,7 +1,7 @@
 {
   "name": "kaogong-checkin-desktop",
   "productName": "考公打卡电脑伴侣",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "private": true,
   "description": "考公打卡 Windows 电脑同步伴侣",
   "main": "src/main.js",
@@ -9,8 +9,11 @@
     "start": "electron .",
     "check": "node --check src/main.js && node --check src/apk-selection.js && node --check src/preload.js && node --check src/renderer/renderer.js",
     "test": "node --test test/*.test.js",
-    "pack": "electron-builder --dir --win --x64",
-    "dist": "electron-builder --win nsis --x64"
+    "prepare:apk": "node ../scripts/prepare-desktop-apk.js",
+    "verify:apk": "node ../scripts/verify-desktop-apk.js",
+    "prepare:release": "npm run prepare:apk && npm run verify:apk",
+    "pack": "npm run prepare:release && electron-builder --dir --win --x64",
+    "dist": "npm run prepare:release && electron-builder --win nsis --x64"
   },
   "dependencies": {
     "express": "^4.21.2",

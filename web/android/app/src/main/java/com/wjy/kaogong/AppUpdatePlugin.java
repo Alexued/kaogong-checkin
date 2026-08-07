@@ -24,6 +24,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -41,6 +42,7 @@ public class AppUpdatePlugin extends Plugin {
     private static final String PREFS_NAME = "app_update";
     private static final String PREF_DOWNLOAD_ID = "download_id";
     private static final String PREF_FILE_NAME = "file_name";
+    private static final String PREF_EXPECTED_SHA256 = "expected_sha256";
     private static final String DEFAULT_FILE_NAME = "kaogong-checkin-update.apk";
     private static final String APK_MIME = "application/vnd.android.package-archive";
     private static final long NO_DOWNLOAD_ID = -1L;
@@ -53,9 +55,11 @@ public class AppUpdatePlugin extends Plugin {
     private SharedPreferences preferences;
     private BroadcastReceiver downloadReceiver;
     private ScheduledExecutorService pollExecutor;
+    private ExecutorService integrityExecutor;
     private ScheduledFuture<?> pollTask;
     private long activeDownloadId = NO_DOWNLOAD_ID;
     private String activeFileName = DEFAULT_FILE_NAME;
+    private String activeExpectedSha256 = "";
     private long speedSampleId = NO_DOWNLOAD_ID;
     private long speedSampleBytes = 0L;
     private long speedSampleTime = 0L;
@@ -70,6 +74,7 @@ public class AppUpdatePlugin extends Plugin {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         activeDownloadId = preferences.getLong(PREF_DOWNLOAD_ID, NO_DOWNLOAD_ID);
         activeFileName = preferences.getString(PREF_FILE_NAME, DEFAULT_FILE_NAME);
+        activeExpectedSha256 = preferences.getString(PREF_EXPECTED_SHA256, "");
         registerDownloadReceiver(context);
 
         if (activeDownloadId != NO_DOWNLOAD_ID) {
@@ -84,9 +89,20 @@ public class AppUpdatePlugin extends Plugin {
             call.reject("A valid http(s) update URL is required", "INVALID_URL");
             return;
         }
+        String expectedSha256 = ApkIntegrityVerifier.normalizeExpectedSha256(call.getString("expectedSha256"));
+        if (expectedSha256 == null) {
+            call.reject("A valid SHA-256 digest is required", "INVALID_DIGEST");
+            return;
+        }
         if (downloadManager == null) {
             call.reject("Download service is unavailable", "UNAVAILABLE");
             return;
+        }
+
+        if (activeDownloadId != NO_DOWNLOAD_ID) {
+            if (ApkIntegrityVerifier.normalizeExpectedSha256(activeExpectedSha256) == null) {
+                clearDownloadRecord(true);
+            }
         }
 
         if (activeDownloadId != NO_DOWNLOAD_ID) {
@@ -125,6 +141,7 @@ public class AppUpdatePlugin extends Plugin {
             long id = downloadManager.enqueue(request);
             activeDownloadId = id;
             activeFileName = fileName;
+            activeExpectedSha256 = expectedSha256;
             persistDownloadRecord();
             resetSpeedSample(id);
             startPolling(id);
@@ -173,7 +190,57 @@ public class AppUpdatePlugin extends Plugin {
 
         File apkFile = resolveDownloadedFile(snapshot);
         if (apkFile == null || !apkFile.isFile()) {
+            if (id == activeDownloadId) {
+                discardActiveDownload(null);
+            }
             call.reject("The downloaded APK file is missing", "APK_FILE_MISSING");
+            return;
+        }
+
+        String expectedSha256 = ApkIntegrityVerifier.normalizeExpectedSha256(activeExpectedSha256);
+        if (id != activeDownloadId || expectedSha256 == null) {
+            if (id == activeDownloadId) {
+                discardActiveDownload(apkFile);
+            }
+            call.reject("The downloaded APK has no trusted SHA-256 digest", "APK_DIGEST_MISSING");
+            return;
+        }
+
+        String verifiedFileName = activeFileName;
+        File downloadsDirectory = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        ensureIntegrityExecutor().execute(() -> {
+            ApkIntegrityCheck.Result verification = ApkIntegrityCheck.run(
+                apkFile,
+                expectedSha256,
+                () -> discardDownload(id, verifiedFileName, apkFile, downloadsDirectory)
+            );
+            mainHandler.post(() -> {
+                if (destroyed) return;
+                if (verification.status == ApkIntegrityCheck.Status.MISMATCH) {
+                    call.reject("The downloaded APK failed SHA-256 verification", "APK_DIGEST_MISMATCH");
+                    return;
+                }
+                if (verification.status == ApkIntegrityCheck.Status.ERROR) {
+                    call.reject(
+                        "Unable to verify the downloaded APK",
+                        "APK_DIGEST_CHECK_FAILED",
+                        verification.error
+                    );
+                    return;
+                }
+                openVerifiedInstaller(call, id, apkFile, expectedSha256);
+            });
+        });
+    }
+
+    private void openVerifiedInstaller(PluginCall call, long id, File apkFile, String expectedSha256) {
+        if (
+            destroyed
+            || id != activeDownloadId
+            || !expectedSha256.equals(activeExpectedSha256)
+            || !apkFile.isFile()
+        ) {
+            call.reject("The verified APK is no longer available", "APK_FILE_MISSING");
             return;
         }
 
@@ -301,6 +368,11 @@ public class AppUpdatePlugin extends Plugin {
         if (pollExecutor != null) {
             pollExecutor.shutdownNow();
             pollExecutor = null;
+        }
+        if (integrityExecutor != null) {
+            // Let already-submitted verification finish so failed downloads are still discarded.
+            integrityExecutor.shutdown();
+            integrityExecutor = null;
         }
         if (receiverRegistered && downloadReceiver != null) {
             try {
@@ -496,10 +568,15 @@ public class AppUpdatePlugin extends Plugin {
         preferences.edit()
             .putLong(PREF_DOWNLOAD_ID, activeDownloadId)
             .putString(PREF_FILE_NAME, activeFileName)
+            .putString(PREF_EXPECTED_SHA256, activeExpectedSha256)
             .apply();
     }
 
     private void clearDownloadRecord(boolean removeFromManager) {
+        clearDownloadRecord(removeFromManager, false);
+    }
+
+    private void clearDownloadRecord(boolean removeFromManager, boolean commitSynchronously) {
         long id = activeDownloadId;
         String fileName = activeFileName;
         if (removeFromManager && downloadManager != null && id != NO_DOWNLOAD_ID) {
@@ -517,10 +594,45 @@ public class AppUpdatePlugin extends Plugin {
         }
         activeDownloadId = NO_DOWNLOAD_ID;
         activeFileName = DEFAULT_FILE_NAME;
+        activeExpectedSha256 = "";
         if (preferences != null) {
-            preferences.edit().remove(PREF_DOWNLOAD_ID).remove(PREF_FILE_NAME).apply();
+            SharedPreferences.Editor editor = preferences.edit()
+                .remove(PREF_DOWNLOAD_ID)
+                .remove(PREF_FILE_NAME)
+                .remove(PREF_EXPECTED_SHA256);
+            if (commitSynchronously) editor.commit();
+            else editor.apply();
         }
         resetSpeedSample(NO_DOWNLOAD_ID);
+    }
+
+    private void discardActiveDownload(File knownFile) {
+        File downloadsDirectory = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        discardDownload(activeDownloadId, activeFileName, knownFile, downloadsDirectory);
+    }
+
+    private void discardDownload(long id, String fileName, File knownFile, File downloadsDirectory) {
+        boolean ownsActiveRecord = id == activeDownloadId;
+        if (ownsActiveRecord) stopPolling();
+        if (downloadManager != null && id != NO_DOWNLOAD_ID) {
+            try {
+                downloadManager.remove(id);
+            } catch (IllegalArgumentException | SecurityException ignored) {
+                // The file is deleted directly below even when DownloadManager is unavailable.
+            }
+        }
+        if (knownFile != null && knownFile.isFile()) {
+            //noinspection ResultOfMethodCallIgnored
+            knownFile.delete();
+        }
+        if (downloadsDirectory != null) {
+            File destination = new File(downloadsDirectory, fileName);
+            if (destination.isFile()) {
+                //noinspection ResultOfMethodCallIgnored
+                destination.delete();
+            }
+        }
+        if (ownsActiveRecord && id == activeDownloadId) clearDownloadRecord(false, true);
     }
 
     private void resetSpeedSample(long id) {
@@ -529,6 +641,17 @@ public class AppUpdatePlugin extends Plugin {
             speedSampleBytes = 0L;
             speedSampleTime = 0L;
         }
+    }
+
+    private ExecutorService ensureIntegrityExecutor() {
+        if (integrityExecutor == null || integrityExecutor.isShutdown()) {
+            integrityExecutor = Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "app-update-integrity");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+        return integrityExecutor;
     }
 
     private static boolean isHttpUrl(String url) {

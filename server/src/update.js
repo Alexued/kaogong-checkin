@@ -1,7 +1,10 @@
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const path = require('node:path');
+const { applicationId: APPLICATION_ID } = require('./version.json');
 
 const APK_FILE_PATTERN = /^kaogong-checkin-v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\.apk$/;
+const sha256Cache = new Map();
 
 function parseApkFileName(fileName) {
   const match = APK_FILE_PATTERN.exec(fileName);
@@ -21,6 +24,28 @@ function compareVersionParts(a, b) {
     if (difference) return difference;
   }
   return 0;
+}
+
+function sha256File(filePath, stat = fs.statSync(filePath)) {
+  const signature = `${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+  const cached = sha256Cache.get(filePath);
+  if (cached?.signature === signature) return cached.sha256;
+  const hash = crypto.createHash('sha256');
+  const descriptor = fs.openSync(filePath, 'r');
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+  try {
+    let bytesRead;
+    do {
+      bytesRead = fs.readSync(descriptor, buffer, 0, buffer.length, null);
+      if (bytesRead > 0) hash.update(buffer.subarray(0, bytesRead));
+    } while (bytesRead > 0);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  const sha256 = hash.digest('hex');
+  sha256Cache.set(filePath, { signature, sha256 });
+  if (sha256Cache.size > 32) sha256Cache.delete(sha256Cache.keys().next().value);
+  return sha256;
 }
 
 function findLatestApk(updateDir) {
@@ -45,6 +70,8 @@ function findLatestApk(updateDir) {
     ...latest,
     filePath,
     size: stat.size,
+    sha256: sha256File(filePath, stat),
+    applicationId: APPLICATION_ID,
     publishedAt: stat.mtime.toISOString(),
   };
 }
@@ -61,7 +88,9 @@ function resolveApkFile(updateDir, fileName) {
 }
 
 module.exports = {
+  APPLICATION_ID,
   findLatestApk,
   parseApkFileName,
   resolveApkFile,
+  sha256File,
 };

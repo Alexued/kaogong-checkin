@@ -17,6 +17,8 @@ test('desktop uses the exact APK selected by the running server', () => {
       apkFileName: 'kaogong-checkin-v2.4.6.apk',
       apkVersion: '2.4.6',
       apkSize: 2048,
+      apkSha256: 'a'.repeat(64),
+      apkApplicationId: 'com.wjy.kaogong',
     },
     () => {
       fallbackCalled = true;
@@ -28,6 +30,8 @@ test('desktop uses the exact APK selected by the running server', () => {
     fileName: 'kaogong-checkin-v2.4.6.apk',
     version: '2.4.6',
     size: 2048,
+    sha256: 'a'.repeat(64),
+    applicationId: 'com.wjy.kaogong',
   });
   assert.equal(fallbackCalled, false);
 });
@@ -47,6 +51,8 @@ test('desktop resource inspection uses the server semantic-version selector', (t
   const selected = selectCanonicalApk({}, () => findLatestApk(updateDir));
   assert.equal(selected.fileName, 'kaogong-checkin-v2.0.0.apk');
   assert.equal(selected.version, '2.0.0');
+  assert.match(selected.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(selected.applicationId, 'com.wjy.kaogong');
 });
 
 test('desktop preserves the server no-APK decision without rescanning', () => {

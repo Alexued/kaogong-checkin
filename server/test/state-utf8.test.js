@@ -43,7 +43,11 @@ test('full-state replacement preserves UTF-8 strings', async (t) => {
   await waitForServer(url);
 
   const state = {
-    tasks: [{ id: '任务一', title: '资料分析四十题', updatedAt: '2026-08-02T00:00:00.000Z' }],
+    schemaVersion: 2,
+    tasks: [{
+      id: '任务一', title: '资料分析四十题', target: 1, unit: '',
+      updatedAt: '2026-08-02T00:00:00.000Z',
+    }],
     subtasks: [{ id: '子任务一', taskId: '任务一', title: '第一套二十题', updatedAt: '2026-08-02T00:00:00.000Z' }],
     checkins: [],
     timers: [{ id: '计时一', label: '测试计时', updatedAt: '2026-08-02T00:00:00.000Z' }],

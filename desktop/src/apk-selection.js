@@ -8,6 +8,8 @@ function selectCanonicalApk(rawStatus, fallbackSelector) {
       fileName: String(status.apkFileName),
       version: String(status.apkVersion || ''),
       size: Number(status.apkSize) || 0,
+      sha256: String(status.apkSha256 || ''),
+      applicationId: String(status.apkApplicationId || ''),
     };
   }
 
