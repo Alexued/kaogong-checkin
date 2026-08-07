@@ -63,7 +63,7 @@
 
     <!-- 记录详情弹层 -->
     <teleport to="body">
-      <div v-if="detail" class="sheet-mask" @click.self="detail = null">
+      <div v-if="detail" class="sheet-mask" data-back-dismiss data-back-priority="100" @click.self="detail = null">
         <div
           v-motion
           class="sheet card"

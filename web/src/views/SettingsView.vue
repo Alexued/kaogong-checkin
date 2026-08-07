@@ -233,7 +233,7 @@
 
     <teleport to="body">
       <Transition name="history-sheet">
-        <div v-if="historyOpen" class="history-mask" @click.self="historyOpen = false">
+        <div v-if="historyOpen" class="history-mask" data-back-dismiss data-back-priority="120" @click.self="historyOpen = false">
           <div class="history-sheet card">
             <div class="history-head"><div><h2>历史版本</h2><p>最近发布的版本与更新说明</p></div><button type="button" aria-label="关闭" @click="historyOpen = false">×</button></div>
             <div v-if="historyLoading" class="history-state"><PixelGrid preset="wave" label="正在读取历史版本" /> 正在读取…</div>

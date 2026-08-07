@@ -1,6 +1,6 @@
 <template>
   <teleport to="body">
-    <div v-if="open" class="date-mask" @click.self="cancel">
+    <div v-if="open" class="date-mask" data-back-dismiss data-back-priority="180" @click.self="cancel">
       <section class="date-sheet card" role="dialog" aria-modal="true" :aria-label="title">
         <div class="date-head">
           <div>

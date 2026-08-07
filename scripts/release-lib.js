@@ -24,8 +24,16 @@ function readVersion() {
   if (!Number.isSafeInteger(value.versionCode) || value.versionCode < 1) {
     throw new Error('release/version.json must contain a positive integer versionCode');
   }
+  for (const field of ['stateSchemaVersion', 'syncProtocolVersion', 'backupFormatVersion']) {
+    if (!Number.isSafeInteger(value[field]) || value[field] < 1) {
+      throw new Error(`release/version.json must contain a positive integer ${field}`);
+    }
+  }
   if (!/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$/.test(value.applicationId || '')) {
     throw new Error('release/version.json must contain a valid applicationId');
+  }
+  if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value.releaseChannel || '')) {
+    throw new Error('release/version.json must contain a valid releaseChannel');
   }
   return value;
 }

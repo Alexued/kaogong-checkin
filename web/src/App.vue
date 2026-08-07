@@ -2,7 +2,13 @@
   <!-- 4 个 Tab 页常驻轨道，ViewPager 式滑动切换（只挂载一次，不卸载） -->
   <div v-show="!isSecondary" class="swipe-stage" :class="shellClass">
     <div class="swipe-track" :style="trackStyle">
-      <div v-for="(p, index) in tabPages" :key="p.path" class="swipe-page">
+      <div
+        v-for="(p, index) in tabPages"
+        :key="p.path"
+        class="swipe-page"
+        :inert="!isActiveRootPage(p.path)"
+        :aria-hidden="isActiveRootPage(p.path) ? undefined : 'true'"
+      >
         <div class="swipe-page-content" :style="pageStyle(index)">
           <component :is="p.component" />
         </div>
@@ -23,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import TabBar from './components/TabBar.vue';
 import LaunchIntro from './components/LaunchIntro.vue';
 import TodayView from './views/TodayView.vue';
@@ -33,7 +40,9 @@ import { useSwipeTabs, TAB_PATHS } from './lib/swipeTabs';
 import { shouldPlayStartupAnimation } from './lib/localPreferences';
 
 const { trackStyle, pageStyle, isTabPage } = useSwipeTabs();
+const route = useRoute();
 const isSecondary = computed(() => !isTabPage.value);
+const isActiveRootPage = (path: string) => isTabPage.value && route.path === path;
 const launchEnabled = shouldPlayStartupAnimation();
 const showLaunch = ref(launchEnabled);
 const shellPhase = ref<'pending' | 'entering' | 'ready'>(launchEnabled ? 'pending' : 'ready');

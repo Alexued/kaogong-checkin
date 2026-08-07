@@ -1,7 +1,7 @@
 <template>
   <teleport to="body">
     <Transition name="editor-sheet">
-      <div v-if="form" class="sheet-mask" @click.self="close">
+      <div v-if="form" class="sheet-mask" data-back-dismiss data-back-priority="100" @click.self="close">
         <div class="sheet card">
         <h2 class="sheet-title">{{ form.id ? '编辑任务' : '新建任务' }}</h2>
         <label class="field">

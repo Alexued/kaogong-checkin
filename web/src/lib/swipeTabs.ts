@@ -30,6 +30,16 @@ const PROJECT_MS = 180; // 松手判定：按速度向前投影 180ms 的位移
 const IOS_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // iOS 系统页面切换曲线
 const ANIM_MS = MOTION.page; // 外部导航（点 Tab）固定时长
 
+/** Whether a touch move can legally call preventDefault in this browser turn. */
+export function canPreventSwipeMove(event: Pick<TouchEvent, 'cancelable'>): boolean {
+  return event.cancelable;
+}
+
+/** Multi-touch must never be claimed by the single-finger tab pager. */
+export function shouldCancelSwipeForTouchCount(touchCount: number): boolean {
+  return touchCount !== 1;
+}
+
 /** iOS 橡皮筋：位移越大阻力越大（非线性渐近屏宽上限） */
 function rubberBand(dx: number, dim: number): number {
   const c = 0.55;
@@ -87,8 +97,36 @@ export function useSwipeTabs() {
   let pendingDragDx = 0;
   let dragFrame: number | null = null;
   let decided: 'none' | 'h' | 'v' = 'none';
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
   /** 内部发起的滑动导航（路由变化 watch 走瞬时归位分支） */
   let internalNav = false;
+
+  function clearSettleTimer() {
+    if (settleTimer !== null) {
+      clearTimeout(settleTimer);
+      settleTimer = null;
+    }
+  }
+
+  function resetPointerState() {
+    startX = 0;
+    startY = 0;
+    startT = 0;
+    lastRawDx = 0;
+    pendingDragDx = 0;
+    decided = 'none';
+  }
+
+  function cancelTouchGesture() {
+    if (dragFrame !== null) {
+      cancelAnimationFrame(dragFrame);
+      dragFrame = null;
+    }
+    clearSettleTimer();
+    resetPointerState();
+    dragOffset.value = 0;
+    animating.value = false;
+  }
 
   function applyDragOffset(dx: number) {
     const idx = activeIndex.value;
@@ -119,7 +157,7 @@ export function useSwipeTabs() {
   function onTouchStart(e: TouchEvent) {
     decided = 'none';
     // 非 Tab 根页 / 动画中 / 多点触控 / 落在横向滚动容器内：本轮不接管
-    if (!isTabPage.value || animating.value || e.touches.length !== 1) {
+    if (!isTabPage.value || animating.value || shouldCancelSwipeForTouchCount(e.touches.length)) {
       decided = 'v';
       return;
     }
@@ -137,6 +175,10 @@ export function useSwipeTabs() {
 
   function onTouchMove(e: TouchEvent) {
     if (decided === 'v' || animating.value) return;
+    if (shouldCancelSwipeForTouchCount(e.touches.length)) {
+      cancelTouchGesture();
+      return;
+    }
     const t = e.touches[0];
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
@@ -149,7 +191,7 @@ export function useSwipeTabs() {
       }
       decided = 'h';
     }
-    e.preventDefault();
+    if (canPreventSwipeMove(e)) e.preventDefault();
     lastRawDx = dx;
 
     // DOM/响应式写入按显示帧合并，避免高刷新率设备在同一帧重复合成整条轨道。
@@ -158,7 +200,7 @@ export function useSwipeTabs() {
 
   function onTouchEnd(e: TouchEvent) {
     if (decided !== 'h') {
-      decided = 'none';
+      resetPointerState();
       return;
     }
     decided = 'none';
@@ -187,17 +229,23 @@ export function useSwipeTabs() {
     if (target !== idx) {
       // 先滑满到目标页位置，动画结束后再换路由并瞬时归位（无跳变）
       dragOffset.value = (idx - target) * vw.value;
-      setTimeout(() => {
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
         internalNav = true;
         void router.push(TAB_PATHS[target]);
       }, animMs.value);
     } else {
       // 未过阈值：弹回原位
       dragOffset.value = 0;
-      setTimeout(() => {
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
         animating.value = false;
       }, animMs.value + 20);
     }
+  }
+
+  function onTouchCancel() {
+    cancelTouchGesture();
   }
 
   watch(
@@ -212,10 +260,12 @@ export function useSwipeTabs() {
         });
       } else if (isTabPage.value) {
         // 外部导航（点 TabBar）：轨道滑动过去
+        clearSettleTimer();
         animMs.value = ANIM_MS;
         animating.value = true;
         dragOffset.value = 0;
-        setTimeout(() => {
+        settleTimer = setTimeout(() => {
+          settleTimer = null;
           animating.value = false;
         }, ANIM_MS + 20);
       }
@@ -230,16 +280,16 @@ export function useSwipeTabs() {
     window.addEventListener('touchstart', onTouchStart, { passive: true });
     window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('touchend', onTouchEnd, { passive: true });
-    window.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', onTouchCancel, { passive: true });
     window.addEventListener('resize', onResize);
   });
 
   onUnmounted(() => {
-    if (dragFrame !== null) cancelAnimationFrame(dragFrame);
+    cancelTouchGesture();
     window.removeEventListener('touchstart', onTouchStart);
     window.removeEventListener('touchmove', onTouchMove);
     window.removeEventListener('touchend', onTouchEnd);
-    window.removeEventListener('touchcancel', onTouchEnd);
+    window.removeEventListener('touchcancel', onTouchCancel);
     window.removeEventListener('resize', onResize);
   });
 

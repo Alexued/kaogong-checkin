@@ -1,14 +1,15 @@
 <template>
-  <nav class="tabbar">
+  <nav class="tabbar" aria-label="主导航">
     <router-link
       v-for="t in tabs"
       :key="t.to"
       :to="t.to"
       class="tab"
       :class="{ active: isActive(t.to) }"
+      :aria-current="isActive(t.to) ? 'page' : undefined"
     >
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="t.icon" />
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="t.icon" />
       <span>{{ t.label }}</span>
     </router-link>
   </nav>

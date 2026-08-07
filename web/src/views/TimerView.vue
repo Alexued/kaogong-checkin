@@ -49,7 +49,7 @@
 
     <teleport to="body">
       <Transition name="timer-sheet">
-        <div v-if="finishing" class="sheet-mask" @click.self="finishing = false">
+        <div v-if="finishing" class="sheet-mask" data-back-dismiss data-back-priority="100" @click.self="finishing = false">
           <div class="sheet card">
             <div class="sheet-heading"><h2 class="sheet-title">保存{{ mode === 'countdown' ? '倒计时' : '计时' }}记录</h2><PixelGrid v-if="mode === 'countdown' && countdown.completed" preset="spiral" label="倒计时完成" /></div>
             <label class="field"><span>备注标签（如：资料分析 20 题）</span><input v-model="label" class="input" placeholder="这次在做什么？" /></label>

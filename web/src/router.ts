@@ -17,10 +17,15 @@ export const router = createRouter({
       path: '/timer/history',
       name: 'timer-history',
       component: TimerHistoryView,
-      meta: { parentPath: '/timer' },
+      meta: { parentPath: '/timer', rootTab: '/timer' },
     },
     { path: '/drill', name: 'drill', component: DrillView },
-    { path: '/tasks', name: 'tasks', component: TasksView, meta: { parentPath: '/' } },
+    {
+      path: '/tasks',
+      name: 'tasks',
+      component: TasksView,
+      meta: { parentPath: '/', rootTab: '/' },
+    },
     {
       path: '/stats',
       name: 'stats',

@@ -7,7 +7,7 @@ import App from './App.vue';
 import { router } from './router';
 import { useAppStore } from './stores/app';
 import { initializeComputerSync } from './api/computer-sync';
-import { resolveBackAction } from './lib/backNavigation';
+import { dismissTopBackLayer, resolveBackAction } from './lib/backNavigation';
 import './styles/theme.css';
 import './styles/app.css';
 
@@ -32,6 +32,9 @@ watch(
 // 安卓返回键/返回手势：二级页回明确父页，Tab 根页退到桌面。
 if (Capacitor.isNativePlatform()) {
   void CapApp.addListener('backButton', () => {
+    const dismissibleLayers = document.querySelectorAll<HTMLElement>('[data-back-dismiss]');
+    if (dismissTopBackLayer(dismissibleLayers)) return;
+
     const route = router.currentRoute.value;
     const action = resolveBackAction(route.path, route.meta.parentPath);
     if (action.type === 'minimize') {

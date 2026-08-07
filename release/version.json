@@ -1,5 +1,9 @@
 {
-  "version": "0.8.0",
-  "versionCode": 11,
-  "applicationId": "com.wjy.kaogong"
+  "version": "0.9.0",
+  "versionCode": 12,
+  "stateSchemaVersion": 3,
+  "syncProtocolVersion": 3,
+  "backupFormatVersion": 1,
+  "applicationId": "com.wjy.kaogong",
+  "releaseChannel": "internal-debug"
 }

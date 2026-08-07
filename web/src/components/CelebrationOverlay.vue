@@ -1,6 +1,6 @@
 <template>
   <teleport to="body">
-    <div v-if="show" class="mask" @click="$emit('close')">
+    <div v-if="show" class="mask" data-back-dismiss data-back-priority="200" @click="$emit('close')">
       <div
         v-motion
         class="card celebrate"
