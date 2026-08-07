@@ -7,6 +7,7 @@ import TasksView from './views/TasksView.vue';
 import StatsView from './views/StatsView.vue';
 import DayDetailView from './views/DayDetailView.vue';
 import SettingsView from './views/SettingsView.vue';
+import { resolveStatsDayNavigation, resolveUnknownRoute } from './lib/routeValidation';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -37,7 +38,9 @@ export const router = createRouter({
       name: 'day-detail',
       component: DayDetailView,
       meta: { parentPath: '/settings', rootTab: '/settings' },
+      beforeEnter: (to) => resolveStatsDayNavigation(to.params.date),
     },
     { path: '/settings', name: 'settings', component: SettingsView },
+    { path: '/:pathMatch(.*)*', redirect: resolveUnknownRoute },
   ],
 });

@@ -6,6 +6,8 @@ import { SyncGeneration } from './sync-generation';
 import { isSyncEnabled, LOCAL_STATE_KEY } from './sync-preference';
 import { compactQueue, normalizeQueue, type QueuedSyncMessage } from './sync-queue';
 import type { AppState, RemoteSyncMessage, ServerInfo, SyncMessage } from '../types';
+import { fromV3, toV3 } from '../domain/legacyAdapterV3';
+import { MigrationLockedError, RepositoryV3 } from '../storage/repositoryV3';
 import {
   STATE_SCHEMA_VERSION,
   V1_BACKUP_KEY,
@@ -33,6 +35,12 @@ let runAbortController: AbortController | null = null;
 let replaceAbortController: AbortController | null = null;
 let replacing = false;
 let serverInfo: ServerInfo | null = null;
+let v3Repository: RepositoryV3 | null = null;
+let v3Ready = false;
+let v3LoadPromise: Promise<void> | null = null;
+let v3PersistTimer: ReturnType<typeof setTimeout> | null = null;
+let v3PersistChain: Promise<void> = Promise.resolve();
+let localMutationEpoch = 0;
 
 function loadQueue() {
   if (queueLoaded) return;
@@ -87,6 +95,48 @@ function schedulePersistState() {
       /* A full storage area must not interrupt local app behavior. */
     }
   }, 300);
+  scheduleV3Persist();
+}
+
+function scheduleV3Persist() {
+  if (!v3Ready || !v3Repository) return;
+  if (v3PersistTimer) clearTimeout(v3PersistTimer);
+  v3PersistTimer = setTimeout(() => {
+    v3PersistTimer = null;
+    const snapshot = toV3(currentState());
+    v3PersistChain = v3PersistChain.then(async () => {
+      if (!v3Repository || useAppStore().recoveryRequired) return;
+      try {
+        await v3Repository.commit(snapshot);
+      } catch {
+        useAppStore().recoveryRequired = true;
+      }
+    });
+  }, 300);
+}
+
+async function initializeV3Persistence(): Promise<void> {
+  if (!v3LoadPromise) {
+    const hydrationEpoch = localMutationEpoch;
+    v3Repository = new RepositoryV3(localStorage);
+    v3LoadPromise = v3Repository.load().then(async (loaded) => {
+      const store = useAppStore();
+      if (localMutationEpoch === hydrationEpoch) {
+        store.applySnapshot(fromV3(loaded.record.envelope.state));
+      } else {
+        // A user action won the hydration race; commit it instead of overwriting it.
+        await v3Repository?.commit(toV3(currentState()));
+      }
+      v3Ready = true;
+      store.recoveryRequired = false;
+    }).catch((error) => {
+      const store = useAppStore();
+      store.recoveryRequired = error instanceof MigrationLockedError || Boolean(error);
+      v3Ready = false;
+      throw error;
+    });
+  }
+  try { await v3LoadPromise; } catch { /* The recovery banner owns the error path. */ }
 }
 
 function persistQueue() {
@@ -114,6 +164,7 @@ export function initializeLocalState() {
   if (cached.state) store.applySnapshot(cached.state);
   if (cached.recoveryRequired) {
     store.loaded = true;
+    void initializeV3Persistence();
     return;
   }
   replayPendingLocally();
@@ -124,12 +175,20 @@ export function initializeLocalState() {
     store.$subscribe(schedulePersistState);
   }
   schedulePersistState();
+  void initializeV3Persistence();
+}
+
+export async function initializeLocalStateAsync(): Promise<void> {
+  initializeLocalState();
+  await initializeV3Persistence();
 }
 
 export function enqueue(message: SyncMessage) {
+  localMutationEpoch += 1;
   loadQueue();
   queue = compactQueue(queue, message);
   persistQueue();
+  scheduleV3Persist();
   flushCurrentSocket();
 }
 
@@ -350,7 +409,7 @@ async function refreshSnapshotAndConnect(generation: number) {
 }
 
 export async function startSync() {
-  initializeLocalState();
+  await initializeLocalStateAsync();
   if (!isSyncEnabled() || started) return;
 
   started = true;

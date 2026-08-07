@@ -5,7 +5,7 @@ import {
   startDiscovery,
   stopDiscovery,
 } from './discover';
-import { initializeLocalState, startSync, stopSync } from './sync';
+import { initializeLocalStateAsync, startSync, stopSync } from './sync';
 import { isSyncEnabled, persistSyncEnabled } from './sync-preference';
 import { savePairingToken } from './pairing-storage';
 import { cancelActiveLanAppUpdate, cancelLanUpdateRequests } from './update';
@@ -72,19 +72,20 @@ async function startBoth(generation: number) {
   await Promise.all([startSync(), startDiscovery()]);
 }
 
-export function initializeComputerSync(): Promise<void> {
-  initializeLocalState();
+export async function initializeComputerSync(): Promise<void> {
+  await initializeLocalStateAsync();
   const generation = ++controlGeneration;
   const cancellationGeneration = beginLanDownloadCancellationRun();
   if (!isSyncEnabled()) {
     cancelLanUpdateRequests();
     stopSync();
-    return Promise.all([
+    await Promise.all([
       stopDiscovery(),
       cancelLanDownloadWhileDisabled(cancellationGeneration),
-    ]).then(() => {});
+    ]);
+    return;
   }
-  return serialize(() => startBoth(generation));
+  await serialize(() => startBoth(generation));
 }
 
 export function setComputerSyncEnabled(enabled: boolean): Promise<void> {
