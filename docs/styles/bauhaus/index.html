@@ -8,17 +8,18 @@
     <meta name="theme-color" content="#f1ead7" />
     <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
     <script>document.documentElement.className = 'js';</script>
-    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release2" />
     <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v071-release" />
     <link rel="stylesheet" href="style.css?v=20260807-v071-release" />
     <script src="../shared/release-data.js?v=20260807-v071-release" defer></script>
     <script src="../shared/style-switcher.js?v=20260807-v071-release" defer></script>
+    <script src="../shared/motion.js?v=20260807-motion-v2" defer></script>
     <script src="app.js?v=20260807-v071-release" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
 
-    <header class="poster-head" data-enter style="--enter-order:0">
+    <header class="poster-head" data-enter data-reveal style="--enter-order:0">
       <a href="../../" class="wordmark" aria-label="考公打卡 Apple 风格首页">
         <img src="../../assets/app-icon.png" width="38" height="38" alt="" />
         <span>考公打卡</span>
@@ -28,31 +29,31 @@
     </header>
 
     <main id="main-content">
-      <section class="opening-grid" aria-labelledby="opening-title">
-        <div class="opening-number" aria-hidden="true" data-enter style="--enter-order:1">07</div>
-        <div class="opening-title" data-enter style="--enter-order:2">
+      <section class="opening-grid" data-motion-scene aria-labelledby="opening-title">
+        <div class="opening-number" aria-hidden="true" data-enter data-reveal style="--enter-order:1">07</div>
+        <div class="opening-title" data-enter data-reveal style="--enter-order:2">
           <p>结构训练 / Structure first</p>
           <h1 id="opening-title">把备考<br />排成行动。</h1>
         </div>
-        <div class="red-plane" aria-hidden="true"></div>
-        <div class="blue-plane" aria-hidden="true"></div>
-        <div class="yellow-plane" aria-hidden="true"></div>
-        <div class="opening-note" data-enter style="--enter-order:3">
+        <div class="red-plane" data-reveal aria-hidden="true"></div>
+        <div class="blue-plane" data-reveal aria-hidden="true"></div>
+        <div class="yellow-plane" data-reveal aria-hidden="true"></div>
+        <div class="opening-note" data-enter data-reveal style="--enter-order:3">
           <strong>今日结构</strong>
           <span>4 项任务</span>
           <span>25 分钟一组</span>
           <a href="#training">开始排列 ↓</a>
         </div>
-        <p class="opening-copy" data-enter style="--enter-order:4">计划是骨架，计时是尺度，复盘让知识落在正确位置。所有记录先留在手机，电脑同步由你决定是否打开。</p>
+        <p class="opening-copy" data-enter data-reveal style="--enter-order:4">计划是骨架，计时是尺度，复盘让知识落在正确位置。所有记录先留在手机，电脑同步由你决定是否打开。</p>
       </section>
 
-      <section class="training-board" id="training" aria-labelledby="training-title">
-        <header class="section-heading">
+      <section class="training-board" id="training" data-motion-scene aria-labelledby="training-title">
+        <header class="section-heading" data-reveal>
           <span>01</span>
           <div><p>今日模块</p><h2 id="training-title">四块，依次归位。</h2></div>
           <p data-task-status aria-live="polite">已归位 2 块 / 共 4 块</p>
         </header>
-        <div class="module-matrix">
+        <div class="module-matrix" data-reveal>
           <button class="task-block task-red is-set" type="button" data-structure-task aria-pressed="true" style="--task-x:8px;--task-y:-7px">
             <span>06:40 / A</span><strong>晨读申论</strong><small>18 分钟 · 已归位</small><b aria-hidden="true">01</b>
           </button>
@@ -68,40 +69,40 @@
         </div>
       </section>
 
-      <section class="focus-measure" aria-labelledby="focus-title">
-        <div class="focus-label"><span>02</span><p>时间尺度</p></div>
-        <div class="focus-copy"><h2 id="focus-title">一次只量一件事。</h2><p>25 分钟内只保留当前题组。暂停不会清空进度，完成后再把下一块移进视线。</p></div>
+      <section class="focus-measure" data-motion-scene aria-labelledby="focus-title">
+        <div class="focus-label" data-reveal><span>02</span><p>时间尺度</p></div>
+        <div class="focus-copy" data-reveal><h2 id="focus-title">一次只量一件事。</h2><p>25 分钟内只保留当前题组。暂停不会清空进度，完成后再把下一块移进视线。</p></div>
         <div class="measure-rule" aria-hidden="true"><span>00</span><i></i><i></i><i></i><i></i><span>25</span></div>
-        <div class="focus-readout"><strong>25:00</strong><span>资料分析 / 准备开始</span></div>
+        <div class="focus-readout" data-reveal><strong>25:00</strong><span>资料分析 / 准备开始</span></div>
       </section>
 
-      <section class="windows-plate" aria-labelledby="windows-title">
-        <div class="windows-type"><span>03 / 桌面版面</span><h2 id="windows-title">手机执行，<br />电脑收整。</h2><p>Windows 伴侣只在同一局域网内接力。它保存本地副本，也把电脑里的新 APK 版本告诉手机。</p></div>
+      <section class="windows-plate" data-motion-scene aria-labelledby="windows-title">
+        <div class="windows-type" data-reveal><span>03 / 桌面版面</span><h2 id="windows-title">手机执行，<br />电脑收整。</h2><p>Windows 伴侣只在同一局域网内接力。它保存本地副本，也把电脑里的新 APK 版本告诉手机。</p></div>
         <div class="device-composition" aria-label="手机与 Windows 伴侣工作关系">
-          <div class="phone-block"><b>ANDROID</b><span>今日计划</span><strong>2 / 4</strong><small>本地记录</small></div>
+          <div class="phone-block" data-reveal><b>ANDROID</b><span>今日计划</span><strong>2 / 4</strong><small>本地记录</small></div>
           <div class="route-block" aria-hidden="true"><i></i><span>LAN</span><i></i></div>
-          <div class="desktop-block"><b>WINDOWS</b><span>本地备份</span><strong data-release="version">0.7.1</strong><small>版本匹配</small></div>
+          <div class="desktop-block" data-reveal><b>WINDOWS</b><span>本地备份</span><strong data-release="version">0.7.1</strong><small>版本匹配</small></div>
         </div>
       </section>
 
-      <section class="sync-plate" data-sync-root aria-labelledby="sync-title">
-        <div class="sync-index"><span>04</span><b>OPTIONAL</b></div>
-        <div class="sync-copy"><p>电脑同步</p><h2 id="sync-title">第二条线，默认不连接。</h2><p>关闭时不扫描、不配对、不请求局域网更新；本地任务和待同步记录继续保留。</p></div>
+      <section class="sync-plate" data-motion-scene data-sync-root aria-labelledby="sync-title">
+        <div class="sync-index" data-reveal><span>04</span><b>OPTIONAL</b></div>
+        <div class="sync-copy" data-reveal><p>电脑同步</p><h2 id="sync-title">第二条线，默认不连接。</h2><p>关闭时不扫描、不配对、不请求局域网更新；本地任务和待同步记录继续保留。</p></div>
         <button class="sync-switch" type="button" data-sync-toggle aria-pressed="false"><span data-sync-label>保持本地</span><i aria-hidden="true"></i></button>
-        <div class="sync-state" aria-live="polite"><strong data-sync-state>LOCAL</strong><span data-sync-detail>发现、连接与局域网版本检查均已停止</span></div>
+        <div class="sync-state" data-reveal aria-live="polite"><strong data-sync-state>LOCAL</strong><span data-sync-detail>发现、连接与局域网版本检查均已停止</span></div>
       </section>
 
-      <section class="release-plate" id="download" aria-labelledby="download-title">
-        <div class="release-mark"><span>05</span><p>发行版面</p></div>
-        <div class="release-title"><h2 id="download-title">两份工具，<br />一个版本。</h2><p>正式版 <strong>v<span data-release="version">0.7.1</span></strong></p></div>
-        <article class="release-android">
+      <section class="release-plate" id="download" data-motion-scene aria-labelledby="download-title">
+        <div class="release-mark" data-reveal><span>05</span><p>发行版面</p></div>
+        <div class="release-title" data-reveal><h2 id="download-title">两份工具，<br />一个版本。</h2><p>正式版 <strong>v<span data-release="version">0.7.1</span></strong></p></div>
+        <article class="release-android" data-reveal>
           <header><span>A</span><h3>Android</h3><small>Android 7+</small></header>
           <code class="release-file" data-release="android-file">kaogong-checkin-v0.7.1.apk</code>
           <p>大小 <b data-release="android-size">3.27 MiB</b></p>
           <a data-release-link="android" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk">下载 APK ↓</a>
           <small>SHA-256</small><code class="release-sha" data-release="android-sha">8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689</code>
         </article>
-        <article class="release-windows">
+        <article class="release-windows" data-reveal>
           <header><span>W</span><h3>Windows</h3><small>Windows 10/11 x64</small></header>
           <code class="release-file" data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.7.1.exe</code>
           <p>大小 <b data-release="windows-size">91.38 MiB</b></p>
@@ -111,7 +112,7 @@
       </section>
     </main>
 
-    <footer class="poster-foot"><span>考公打卡 / 结构训练</span><a href="https://github.com/Alexued/kaogong-checkin">GitHub 源码 ↗</a></footer>
+    <footer class="poster-foot" data-reveal><span>考公打卡 / 结构训练</span><a href="https://github.com/Alexued/kaogong-checkin">GitHub 源码 ↗</a></footer>
 
     <details class="style-switcher">
       <summary>风格 07 / 包豪斯</summary>

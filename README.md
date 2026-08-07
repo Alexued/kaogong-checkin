@@ -4,6 +4,8 @@
 
 产品介绍页：[https://alexued.github.io/kaogong-checkin/](https://alexued.github.io/kaogong-checkin/)
 
+测试报告：[报告目录](https://alexued.github.io/kaogong-checkin/reports/) · [v0.7.1 Android 真机验收](https://alexued.github.io/kaogong-checkin/reports/v0.7.1/adb-20260807T184457+0800/)
+
 ## 下载 v0.7.1
 
 | 平台 | 文件 | 大小 | 系统要求 | SHA-256 |

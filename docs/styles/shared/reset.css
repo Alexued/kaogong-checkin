@@ -21,12 +21,14 @@
 
 html {
   min-width: 320px;
+  overflow-x: clip;
   background: var(--page-bg, #f5f5f7);
   scroll-behavior: smooth;
 }
 
 body {
   min-width: 320px;
+  overflow-x: clip;
   margin: 0;
   background: var(--page-bg, #f5f5f7);
   color: var(--page-ink, #1d1d1f);
@@ -125,18 +127,20 @@ input:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.js [data-enter] {
+.motion-ready [data-enter]:not(.is-visible),
+.motion-ready [data-reveal]:not(.is-visible) {
   opacity: 0;
   transform: translateY(14px);
 }
 
-.js.style-ready [data-enter] {
+.motion-ready [data-enter].is-visible,
+.motion-ready [data-reveal].is-visible {
   opacity: 1;
   transform: translateY(0);
   transition:
     opacity var(--motion-scene) var(--motion-ease),
     transform var(--motion-scene) var(--motion-ease);
-  transition-delay: calc(var(--enter-order, 0) * 70ms);
+  transition-delay: calc(var(--reveal-index, var(--enter-order, 0)) * 70ms);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -150,8 +154,10 @@ input:focus-visible {
     --motion-scene: 0.01ms;
   }
 
-  .js [data-enter],
-  .js.style-ready [data-enter] {
+  .motion-ready [data-enter],
+  .motion-ready [data-reveal],
+  .motion-reduced [data-enter],
+  .motion-reduced [data-reveal] {
     opacity: 1;
     transform: none;
     transition: none;
@@ -159,5 +165,10 @@ input:focus-visible {
 
   body::after {
     transform: none;
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms;
   }
 }

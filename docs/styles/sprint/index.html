@@ -8,32 +8,33 @@
     <meta name="theme-color" content="#f3f1ea" />
     <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
     <script>document.documentElement.className = 'js';</script>
-    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release2" />
     <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v071-release" />
     <link rel="stylesheet" href="style.css?v=20260807-v071-release" />
     <script src="../shared/release-data.js?v=20260807-v071-release" defer></script>
     <script src="../shared/style-switcher.js?v=20260807-v071-release" defer></script>
+    <script src="../shared/motion.js?v=20260807-motion-v2" defer></script>
     <script src="app.js?v=20260807-v071-release" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
 
-    <header class="scoreboard" data-enter style="--enter-order:0">
+    <header class="scoreboard" data-enter data-reveal style="--enter-order:0">
       <a class="score-brand" href="../../"><img src="../../assets/app-icon.png" width="34" height="34" alt="" /><span>考公打卡</span></a>
       <div class="meet-status"><span>冲刺日 038</span><strong>今日赛程进行中</strong></div>
       <a class="quick-install" data-release-link="android" href="#downloads">获取 Android</a>
     </header>
 
     <main id="main-content">
-      <section class="opening" aria-labelledby="opening-title">
-        <div class="opening-copy" data-enter style="--enter-order:1">
+      <section class="opening" data-motion-scene aria-labelledby="opening-title">
+        <div class="opening-copy" data-enter data-reveal style="--enter-order:1">
           <p class="eyebrow">06 / 专注执行</p>
           <h1 id="opening-title">把今天跑完。</h1>
           <p>任务先排进赛程，计时负责起跑，背诵负责复盘。电脑只在你打开同步时接力。</p>
           <a class="start-link" href="#targets">查看今日赛程 <span aria-hidden="true">↓</span></a>
         </div>
 
-        <div class="live-board" data-enter style="--enter-order:2" aria-label="今日冲刺数据">
+        <div class="live-board" data-enter data-reveal style="--enter-order:2" aria-label="今日冲刺数据">
           <div class="primary-score"><span>完成率</span><strong data-sprint-score>50</strong><em>%</em></div>
           <dl>
             <div><dt>已完成</dt><dd><span data-sprint-done>2</span>/4</dd></div>
@@ -42,7 +43,7 @@
           </dl>
         </div>
 
-        <div class="timer-lane" data-enter style="--enter-order:3">
+        <div class="timer-lane" data-enter data-reveal style="--enter-order:3">
           <div class="lane-label"><span>当前项目</span><strong>资料分析 40 题</strong></div>
           <output data-sprint-timer aria-live="off">25:00</output>
           <div class="lane-actions">
@@ -53,55 +54,55 @@
         </div>
       </section>
 
-      <section class="targets" id="targets" aria-labelledby="targets-title">
-        <header>
+      <section class="targets" id="targets" data-motion-scene aria-labelledby="targets-title">
+        <header data-reveal>
           <p>赛段 01</p>
           <h2 id="targets-title">今天的四个目标</h2>
           <span>点击项目，成绩板立即更新</span>
         </header>
         <div class="target-list">
-          <button class="target is-done" type="button" data-sprint-task aria-pressed="true"><span>01</span><strong>判断推理巩固</strong><em>32′</em><small>已通过</small></button>
-          <button class="target is-done" type="button" data-sprint-task aria-pressed="true"><span>02</span><strong>申论晨读摘录</strong><em>18′</em><small>已通过</small></button>
-          <button class="target" type="button" data-sprint-task aria-pressed="false"><span>03</span><strong>资料分析 40 题</strong><em>50′</em><small>待执行</small></button>
-          <button class="target" type="button" data-sprint-task aria-pressed="false"><span>04</span><strong>常识错题复盘</strong><em>25′</em><small>待执行</small></button>
+          <button class="target is-done" type="button" data-sprint-task data-reveal aria-pressed="true"><span>01</span><strong>判断推理巩固</strong><em>32′</em><small>已通过</small></button>
+          <button class="target is-done" type="button" data-sprint-task data-reveal aria-pressed="true"><span>02</span><strong>申论晨读摘录</strong><em>18′</em><small>已通过</small></button>
+          <button class="target" type="button" data-sprint-task data-reveal aria-pressed="false"><span>03</span><strong>资料分析 40 题</strong><em>50′</em><small>待执行</small></button>
+          <button class="target" type="button" data-sprint-task data-reveal aria-pressed="false"><span>04</span><strong>常识错题复盘</strong><em>25′</em><small>待执行</small></button>
         </div>
       </section>
 
-      <section class="form-guide" aria-labelledby="form-title">
-        <div class="form-copy">
+      <section class="form-guide" data-motion-scene aria-labelledby="form-title">
+        <div class="form-copy" data-reveal>
           <p>赛段 02 / 记忆命中</p>
           <h2 id="form-title">每次想起来，都是一次得分。</h2>
           <p>先作答，再翻面。应用记录“记住了”和“再来一次”，让薄弱内容更早回到下一轮。</p>
         </div>
         <div class="accuracy-board" aria-label="背诵训练示例">
-          <div><span>基期量公式</span><i style="--value:.86"></i><strong>86%</strong></div>
-          <div><span>增长量比较</span><i style="--value:.64"></i><strong>64%</strong></div>
-          <div><span>公文写作结构</span><i style="--value:.72"></i><strong>72%</strong></div>
-          <p>下一轮优先：增长量比较</p>
+          <div data-reveal><span>基期量公式</span><i style="--value:.86"></i><strong>86%</strong></div>
+          <div data-reveal><span>增长量比较</span><i style="--value:.64"></i><strong>64%</strong></div>
+          <div data-reveal><span>公文写作结构</span><i style="--value:.72"></i><strong>72%</strong></div>
+          <p data-reveal>下一轮优先：增长量比较</p>
         </div>
       </section>
 
-      <section class="relay" aria-labelledby="relay-title" data-relay-root>
-        <div class="relay-head">
+      <section class="relay" data-motion-scene aria-labelledby="relay-title" data-relay-root>
+        <div class="relay-head" data-reveal>
           <p>赛段 03 / 电脑接力</p>
           <h2 id="relay-title">要不要交棒，由你决定。</h2>
         </div>
         <div class="relay-track">
-          <div class="relay-phone"><span>Android</span><strong>本地保存</strong><small>任务、计时、背诵</small></div>
+          <div class="relay-phone" data-reveal><span>Android</span><strong>本地保存</strong><small>任务、计时、背诵</small></div>
           <div class="relay-line" aria-hidden="true"><i></i></div>
-          <div class="relay-pc"><span>Windows</span><strong data-relay-state>未接力</strong><small data-relay-detail>不会扫描或连接电脑</small></div>
+          <div class="relay-pc" data-reveal><span>Windows</span><strong data-relay-state>未接力</strong><small data-relay-detail>不会扫描或连接电脑</small></div>
         </div>
         <button class="relay-switch" type="button" data-relay-toggle aria-pressed="false"><span></span><strong>电脑同步</strong><em data-relay-label>已关闭</em></button>
       </section>
 
-      <section class="finish" id="downloads" aria-labelledby="finish-title">
-        <div class="finish-title">
+      <section class="finish" id="downloads" data-motion-scene aria-labelledby="finish-title">
+        <div class="finish-title" data-reveal>
           <p>终点 / v<span data-release="version">0.7.1</span></p>
           <h2 id="finish-title">把工具带上场。</h2>
           <span>Android 完成每天的训练；Windows 标准安装程序负责局域网备份和手机安装，无需 Node.js。接力开启后只比较并提示新版本，下载与安装仍由你确认。</span>
         </div>
         <div class="download-lanes">
-          <article>
+          <article data-reveal>
             <p><span>A</span> 移动端</p>
             <h3>Android APK</h3>
             <dl><div><dt>系统</dt><dd>Android 7+</dd></div><div><dt>大小</dt><dd data-release="android-size">3.27 MiB</dd></div></dl>
@@ -109,7 +110,7 @@
             <a data-release-link="android" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk">下载 APK</a>
             <small>SHA-256</small><code class="release-sha" data-release="android-sha">8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689</code>
           </article>
-          <article>
+          <article data-reveal>
             <p><span>W</span> 电脑端</p>
             <h3>Windows 伴侣</h3>
             <dl><div><dt>系统</dt><dd>Windows 10/11 x64</dd></div><div><dt>大小</dt><dd data-release="windows-size">91.38 MiB</dd></div></dl>
@@ -121,7 +122,7 @@
       </section>
     </main>
 
-    <footer><span>考公打卡 · 冲刺仪表</span><a href="https://github.com/Alexued/kaogong-checkin">GitHub 源码</a></footer>
+    <footer data-reveal><span>考公打卡 · 冲刺仪表</span><a href="https://github.com/Alexued/kaogong-checkin">GitHub 源码</a></footer>
 
     <details class="style-switcher">
       <summary>风格 06 / 冲刺仪表</summary>

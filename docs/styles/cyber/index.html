@@ -20,7 +20,7 @@
     />
     <meta name="theme-color" content="#081116" />
     <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
-    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release2" />
     <link rel="stylesheet" href="style.css?v=20260807-v071-release" />
     <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v071-release" />
     <script>
@@ -28,9 +28,10 @@
     </script>
     <script src="../shared/release-data.js?v=20260807-v071-release" defer></script>
     <script src="../shared/style-switcher.js?v=20260807-v071-release" defer></script>
+    <script src="../shared/motion.js?v=20260807-motion-v2" defer></script>
     <script src="app.js?v=20260807-v071-release" defer></script>
   </head>
-  <body data-style="cyber">
+  <body data-style="cyber" data-style-transition="signal-slice">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
     <header class="cyber-header">
       <div class="header-inner">
@@ -49,13 +50,14 @@
       <section
         class="cyber-hero"
         aria-labelledby="hero-title"
+        data-motion-scene
         data-enter
         style="--enter-order: 0"
       >
-        <div class="hero-grid-label">
+        <div class="hero-grid-label" data-reveal style="--reveal-index: 0">
           <span>01</span><span>ENTRY / 07</span>
         </div>
-        <div class="hero-main">
+        <div class="hero-main" data-reveal style="--reveal-index: 1">
           <p class="system-label">夜行考场 · 私有学习节点</p>
           <h1 id="hero-title" style="letter-spacing: 0">
             把今天，<br /><strong>跑完。</strong>
@@ -69,7 +71,12 @@
             ><a class="cyber-text-link" href="#release">查看版本信号</a>
           </div>
         </div>
-        <div class="hero-readouts" aria-label="当前状态">
+        <div
+          class="hero-readouts"
+          aria-label="当前状态"
+          data-reveal
+          style="--reveal-index: 2"
+        >
           <div>
             <span>SESSION</span><strong>24:18</strong
             ><small>FOCUS REMAINING</small>
@@ -85,13 +92,17 @@
         </div>
       </section>
 
-      <section class="telemetry-band" aria-labelledby="telemetry-title">
-        <div class="section-tag">02 / TELEMETRY</div>
-        <div class="telemetry-heading">
+      <section
+        class="telemetry-band"
+        aria-labelledby="telemetry-title"
+        data-motion-scene
+      >
+        <div class="section-tag" data-reveal style="--reveal-index: 0">02 / TELEMETRY</div>
+        <div class="telemetry-heading" data-reveal style="--reveal-index: 1">
           <h2 id="telemetry-title">任务遥测</h2>
           <p>每一次勾选都只改变本地状态；连接电脑是可选的第二条通道。</p>
         </div>
-        <div class="telemetry-grid">
+        <div class="telemetry-grid" data-reveal style="--reveal-index: 2">
           <article class="telemetry-block">
             <span class="metric-label">TODAY / COMPLETION</span
             ><strong>50<span>%</span></strong>
@@ -117,8 +128,13 @@
         </div>
       </section>
 
-      <section class="radar-section" id="radar" aria-labelledby="radar-title">
-        <div class="radar-copy">
+      <section
+        class="radar-section"
+        id="radar"
+        aria-labelledby="radar-title"
+        data-motion-scene
+      >
+        <div class="radar-copy" data-reveal style="--reveal-index: 0">
           <div class="section-tag">03 / LAN RADAR</div>
           <h2 id="radar-title">附近的节点，<br /><em>由你决定。</em></h2>
           <p>
@@ -136,6 +152,8 @@
         <div
           class="radar-visual"
           data-radar-visual
+          data-reveal
+          style="--reveal-index: 1"
           aria-label="局域网雷达示意图"
         >
           <span class="radar-ring ring-one"></span
@@ -152,30 +170,34 @@
         </div>
       </section>
 
-      <section class="module-section" aria-labelledby="module-title">
-        <div class="module-intro">
+      <section
+        class="module-section"
+        aria-labelledby="module-title"
+        data-motion-scene
+      >
+        <div class="module-intro" data-reveal style="--reveal-index: 0">
           <div class="section-tag">04 / MODULES</div>
           <h2 id="module-title">今晚加载什么？</h2>
           <p>
             点击模块，把注意力聚焦在一条任务通道。页面不会自动播放任何动效。
           </p>
         </div>
-        <div class="module-stack">
-          <button class="module-row is-active" type="button" data-module="plan">
+        <div class="module-stack" data-reveal style="--reveal-index: 1">
+          <button class="module-row is-active" type="button" data-module="plan" aria-expanded="true">
             <span>01</span><strong>PLAN / 今日计划</strong
             ><small>4 tasks · 2 done</small><b aria-hidden="true">+</b>
           </button>
           <div class="module-panel is-open" data-module-panel="plan">
             <p>晨读申论范文 → 判断推理巩固 → 资料分析限时练 → 错题回看。</p>
           </div>
-          <button class="module-row" type="button" data-module="focus">
+          <button class="module-row" type="button" data-module="focus" aria-expanded="false">
             <span>02</span><strong>FOCUS / 专注计时</strong
             ><small>25:00 session</small><b aria-hidden="true">+</b>
           </button>
           <div class="module-panel" data-module-panel="focus">
             <p>25 分钟专注、5 分钟休息；计时状态保留在本机。</p>
           </div>
-          <button class="module-row" type="button" data-module="drill">
+          <button class="module-row" type="button" data-module="drill" aria-expanded="false">
             <span>03</span><strong>DRILL / 背诵训练</strong
             ><small>128 cards ready</small><b aria-hidden="true">+</b>
           </button>
@@ -189,8 +211,9 @@
         class="release-section"
         id="release"
         aria-labelledby="release-title"
+        data-motion-scene
       >
-        <div class="release-top">
+        <div class="release-top" data-reveal style="--reveal-index: 0">
           <div>
             <div class="section-tag">05 / UPDATE SIGNAL</div>
             <h2 id="release-title">版本信号</h2>
@@ -199,7 +222,7 @@
             >v<span data-release="version">0.7.1</span> / CURRENT</span
           >
         </div>
-        <div class="release-console">
+        <div class="release-console" data-reveal style="--reveal-index: 1">
           <p>
             <span class="prompt">$</span> kgc update --sources
             local-network,github
@@ -213,7 +236,7 @@
             [info] newer versions appear here before download
           </p>
         </div>
-        <div class="download-rail">
+        <div class="download-rail" data-reveal style="--reveal-index: 2">
           <a
             class="cyber-button cyber-button-primary"
             data-release-link="android"
@@ -228,7 +251,7 @@
             <small data-release="windows-size">91.38 MiB</small></a
           >
         </div>
-        <div class="hash-line">
+        <div class="hash-line" data-reveal style="--reveal-index: 3">
           <span>Android payload</span
           ><code class="release-file" data-release="android-file"
             >kaogong-checkin-v0.7.1.apk</code

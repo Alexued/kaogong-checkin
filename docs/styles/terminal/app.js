@@ -4,8 +4,17 @@
   const commands = [...document.querySelectorAll("[data-command]")];
   const panels = [...document.querySelectorAll("[data-command-panel]")];
   const activeCommand = document.querySelector("[data-active-command]");
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  const panelTimers = new WeakMap();
 
-  const selectCommand = (button, moveFocus = false) => {
+  const clearPanelTimer = (panel) => {
+    const timer = panelTimers.get(panel);
+    if (timer) window.clearTimeout(timer);
+  };
+
+  const selectCommand = (button, moveFocus = false, immediate = false) => {
     const command = button.dataset.command;
 
     commands.forEach((item) => {
@@ -16,8 +25,37 @@
 
     panels.forEach((panel) => {
       const selected = panel.dataset.commandPanel === command;
-      panel.classList.toggle("is-active", selected);
-      panel.hidden = !selected;
+      clearPanelTimer(panel);
+
+      if (selected) {
+        panel.hidden = false;
+        panel.classList.remove("is-exiting");
+        panel.classList.add("is-active");
+        if (!immediate && !reduceMotion) {
+          panel.classList.add("is-entering");
+          panelTimers.set(
+            panel,
+            window.setTimeout(() => panel.classList.remove("is-entering"), 380),
+          );
+        }
+        return;
+      }
+
+      panel.classList.remove("is-entering");
+      if (immediate || reduceMotion || !panel.classList.contains("is-active")) {
+        panel.classList.remove("is-active", "is-exiting");
+        panel.hidden = true;
+        return;
+      }
+
+      panel.classList.add("is-exiting");
+      panelTimers.set(
+        panel,
+        window.setTimeout(() => {
+          panel.classList.remove("is-active", "is-exiting");
+          panel.hidden = true;
+        }, 150),
+      );
     });
 
     if (activeCommand) activeCommand.textContent = `~/today $ kgc ${command}`;
@@ -40,12 +78,13 @@
     });
   });
 
-  if (commands.length) selectCommand(commands[0]);
+  if (commands.length) selectCommand(commands[0], false, true);
 
   const syncToggle = document.querySelector("[data-sync-toggle]");
   const syncIndicator = document.querySelector("[data-sync-indicator]");
   const syncDetail = document.querySelector("[data-sync-detail]");
   const syncResult = document.querySelector("[data-sync-result]");
+  const syncRoot = document.querySelector("[data-sync-root]");
 
   syncToggle?.addEventListener("click", () => {
     const enabled = syncToggle.getAttribute("aria-pressed") !== "true";
@@ -58,5 +97,11 @@
     syncResult.textContent = enabled
       ? "discovery started. local records remain unchanged."
       : "all network activity stopped. local records preserved.";
+    if (!reduceMotion && syncRoot) {
+      syncRoot.classList.remove("is-updating");
+      void syncRoot.offsetWidth;
+      syncRoot.classList.add("is-updating");
+      window.setTimeout(() => syncRoot.classList.remove("is-updating"), 300);
+    }
   });
 })();

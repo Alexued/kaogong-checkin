@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f4f2ec" />
+    <title>Android 真机验收运行账本 · v0.7.1</title>
+    <meta name="description" content="考公打卡 v0.7.1 Android 真机验收报告，包含升级、核心流程、同步、更新下载、生命周期、性能与已知问题。" />
+    <link rel="stylesheet" href="report.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到报告正文</a>
+
+    <header class="run-header">
+      <div class="report-shell">
+        <nav class="breadcrumb" aria-label="面包屑">
+          <a href="../../index.html">测试报告</a>
+          <span aria-hidden="true">/</span>
+          <span>v0.7.1</span>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">adb-20260807T184457+0800</span>
+        </nav>
+        <div class="run-heading">
+          <div>
+            <p class="kicker">Android device QA · Run ledger</p>
+            <h1>v0.7.1 真机验收</h1>
+            <p class="run-lede">完整真机运行已结束。核心业务、手动同步、更新下载与生命周期通过；当前保留一项高优先级返回导航失败、一项自动发现阻塞，以及两项体验关注。</p>
+          </div>
+          <div class="overall-status" aria-label="总体状态：已完成，有已知问题">
+            <span class="status status-fail">已完成，有已知问题</span>
+            <code>20260807T184457+0800</code>
+          </div>
+        </div>
+
+        <dl class="scoreboard" aria-label="当前用例统计">
+          <div><dt>通过</dt><dd class="score-pass">19</dd></div>
+          <div><dt>失败</dt><dd class="score-fail">1</dd></div>
+          <div><dt>阻塞</dt><dd class="score-blocked">1</dd></div>
+          <div><dt>关注</dt><dd class="score-warning">2</dd></div>
+        </dl>
+
+        <nav class="jump-list" aria-label="报告目录">
+          <a href="#conclusion">结论</a>
+          <a href="#findings">异常</a>
+          <a href="#cases">用例</a>
+          <a href="#evidence">证据</a>
+          <a href="#automation">自动化</a>
+          <a href="#follow-up">后续</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content" class="report-shell">
+      <section id="conclusion" class="report-section conclusion-section" aria-labelledby="conclusion-title">
+        <div class="section-heading">
+          <p>01 · Executive readout</p>
+          <h2 id="conclusion-title">最终结论</h2>
+        </div>
+        <div class="conclusion-grid">
+          <p class="conclusion-statement">本次运行已完成，但不能判定为完全通过。</p>
+          <div class="conclusion-copy">
+            <p>从 <strong>0.6.0（versionCode 8）</strong> 同签名覆盖升级到 <strong>0.7.1（versionCode 10）</strong> 后，升级前后业务状态摘要一致。任务、日历、打卡、计时、背诵、设置和同步总开关的主要路径均已获得真机结果。</p>
+            <p>设置页热力图的日详情返回行为破坏 Android 导航预期，应尽快修复并回归。UDP 自动发现仍需定位，但手动地址、配对、补传与服务端回流均正常。更新下载、取消、后台、锁屏、断网恢复和正式 APK 覆盖均已完成。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="report-section" aria-labelledby="identity-title">
+        <div class="section-heading">
+          <p>02 · Run identity</p>
+          <h2 id="identity-title">运行身份</h2>
+        </div>
+        <div class="split-ledger">
+          <div class="table-scroll" tabindex="0" aria-label="构建身份表，可横向滚动">
+            <table class="key-table">
+              <caption>构建与运行</caption>
+              <tbody>
+                <tr><th scope="row">运行 ID</th><td><code>20260807T184457+0800</code></td></tr>
+                <tr><th scope="row">开始时间</th><td><time datetime="2026-08-07T18:44:57+08:00">2026-08-07 18:44:57 CST</time></td></tr>
+                <tr><th scope="row">包名</th><td><code>com.wjy.kaogong</code></td></tr>
+                <tr><th scope="row">升级路径</th><td>0.6.0 (8) → 0.7.1 (10)</td></tr>
+                <tr><th scope="row">测试制品</th><td>可恢复 debug 包</td></tr>
+                <tr><th scope="row">源提交</th><td><code>65a075321e038685a8930bdbee464259ce046191</code></td></tr>
+                <tr><th scope="row">正式 APK SHA-256</th><td><code>8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689</code></td></tr>
+                <tr><th scope="row">正式包覆盖</th><td><span class="status status-pass">通过 · 非 debuggable</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-scroll" tabindex="0" aria-label="设备环境表，可横向滚动">
+            <table class="key-table">
+              <caption>Device A</caption>
+              <tbody>
+                <tr><th scope="row">设备</th><td>Mi 10 Ultra</td></tr>
+                <tr><th scope="row">Android</th><td>13 · API 33</td></tr>
+                <tr><th scope="row">分辨率</th><td>1080 × 2340</td></tr>
+                <tr><th scope="row">密度</th><td>440 dpi</td></tr>
+                <tr><th scope="row">ABI</th><td><code>arm64-v8a</code></td></tr>
+                <tr><th scope="row">同步初始值</th><td>关闭</td></tr>
+                <tr><th scope="row">初始主题</th><td>浅色</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="findings" class="report-section" aria-labelledby="findings-title">
+        <div class="section-heading">
+          <p>03 · Findings</p>
+          <h2 id="findings-title">已知问题与关注</h2>
+        </div>
+        <div class="finding-list">
+          <article class="finding finding-fail">
+            <div class="finding-meta">
+              <span class="status status-fail">失败 · 高优先级</span>
+              <code>BACK-001</code>
+            </div>
+            <h3>日详情的 Android 返回键直接退出应用</h3>
+            <p><strong>路径：</strong>设置 → 学习概览热力图 → 某日详情 → Android 返回键。</p>
+            <p><strong>实际：</strong>应用退到桌面。<strong>预期：</strong>返回设置页并保留原滚动位置与状态。</p>
+            <p class="finding-action">发布门槛：修复导航栈后，覆盖系统返回键、页面内返回入口和冷启动恢复的回归。</p>
+          </article>
+          <article class="finding finding-blocked">
+            <div class="finding-meta">
+              <span class="status status-blocked">阻塞 · 环境待定位</span>
+              <code>DISC-001</code>
+            </div>
+            <h3>局域网 UDP 自动发现未找到服务器</h3>
+            <p>两次扫描均返回 0 台服务器，其中一次为 6.5 秒完整重扫。相同环境下手动地址、配对、队列补传和服务端变更回流全部正常。</p>
+            <p class="finding-action">下一步：分别检查广播发送、8322 端口监听、防火墙与网络隔离条件；不要把手动连接成功误判为自动发现通过。</p>
+          </article>
+          <article class="finding finding-warning">
+            <div class="finding-meta">
+              <span class="status status-warning">关注 · 中优先级</span>
+              <code>ORIENT-001</code>
+            </div>
+            <h3>横屏新增任务按钮右侧被裁切</h3>
+            <p><strong>818 × 360 视口：</strong>按钮右边界为 825.09，超出约 7.09 CSS px。正文没有横向文案溢出，恢复 392 × 818 竖屏后布局正常。</p>
+            <p class="finding-action">下一步：按安全区和视口宽度约束悬浮按钮，再覆盖小高度横屏设备回归。</p>
+          </article>
+          <article class="finding finding-warning">
+            <div class="finding-meta">
+              <span class="status status-warning">关注 · 中优先级</span>
+              <code>PERF-001</code>
+            </div>
+            <h3>120 Hz 代表性交互的帧稳定性偏低</h3>
+            <p>433 帧中 153 帧被 <code>gfxinfo</code> 标记为 janky（35.33%）；P50/P90/P95/P99 为 13/18/19/22 ms，最长区间 26 ms。</p>
+            <p class="finding-action">没有超过 26 ms 的长帧或 missed-vsync 计数。建议针对 Tab 切换和快速滚动继续做主线程与合成层分析。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="cases" class="report-section" aria-labelledby="cases-title">
+        <div class="section-heading section-heading-wide">
+          <div><p>04 · Case ledger</p><h2 id="cases-title">真机用例账本</h2></div>
+          <p>状态为运行完成后的结果快照；“关注”表示功能可继续使用，但体验指标没有完全达到目标。</p>
+        </div>
+        <div class="table-scroll" tabindex="0" aria-label="真机用例表，可横向滚动">
+          <table class="case-table">
+            <thead>
+              <tr><th scope="col">状态</th><th scope="col">用例</th><th scope="col">覆盖与结果</th><th scope="col">证据</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>DATA-001</code><small>备份基线</small></td><td>停止应用后完成私有数据备份、哈希与摘要记录，升级前后状态摘要一致。</td><td>本地受限证据</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>UPGRADE-001</code><small>覆盖升级</small></td><td>同签名 <code>adb install -r</code> 从 0.6.0 (8) 升级到 0.7.1 (10)，业务基线与偏好保留。</td><td><a href="assets/APP-001-upgraded-home.png">APP-001</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>APP-001</code><small>启动</small></td><td>冷启动进入今日页，版本升级后主界面可用。</td><td><a href="assets/APP-001-upgraded-home.png">APP-001</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>NAV-001</code><small>根导航</small></td><td>四个 Tab 点击正常；计时与背诵之间左右滑动可达。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>TASK-001</code><small>任务</small></td><td>日常、截止、子任务新增；编辑、归档、恢复、排序与顺序恢复通过。</td><td><a href="assets/TASK-001-create-form.png">TASK-001</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>CAL-001</code><small>日历</small></td><td>月历展开、切换月份、选择日期与回到今天通过。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>CHECK-001</code><small>打卡</small></td><td>子任务与主任务完成、取消和 100% 完成反馈通过。</td><td><a href="assets/CHECK-003-celebration.png">CHECK-003</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>TIMER-001</code><small>正计时</small></td><td>开始、暂停、继续、打点、保存与关联任务通过；历史、详情、对比和软删除可用。</td><td><a href="assets/TIMER-002-saved.png">TIMER-002</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>TIMER-002</code><small>倒计时</small></td><td>1 秒倒计时完成与丢弃路径通过。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>DRILL-001</code><small>百化分</small></td><td>错误、重新入队、正确、50% 总结与清空记录通过。</td><td><a href="assets/DRILL-001-percent-summary.png">DRILL-001</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>DRILL-002</code><small>公式</small></td><td>翻面、没记住、重考、记住、50% 总结与退出确认通过。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>SET-001</code><small>设置</small></td><td>深浅主题、启动动画开关、计划结束日设置与清除通过。</td><td><a href="assets/SET-001-dark-theme.png">SET-001</a></td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>UPDATE-001</code><small>GitHub 检查</small></td><td>同步关闭时手动检查 GitHub 更新，正确显示最新版本。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>SYNC-001</code><small>关闭同步</small></td><td>关闭时本地创建、离线队列持久化；冷启动后开关、任务与队列仍保留。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>SYNC-002</code><small>手动同步</small></td><td>手动地址连接、配对、队列补传与服务端全量变更回流通过。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>SYNC-003</code><small>总开关边界</small></td><td>关闭时服务端未收到离线任务；重新开启后队列归零，服务端收到新增任务。</td><td>运行记录</td></tr>
+              <tr><td><span class="status status-fail">失败</span></td><td><code>BACK-001</code><small>二级页返回</small></td><td>热力图日详情按 Android 返回键后退到桌面，未返回设置页。</td><td>脱敏文字记录</td></tr>
+              <tr><td><span class="status status-blocked">阻塞</span></td><td><code>DISC-001</code><small>UDP 发现</small></td><td>两次扫描均为 0 台服务器；手动地址和后续同步链路正常。</td><td>脱敏文字记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>UPDATE-002</code><small>更新下载</small></td><td>隔离服务 APK 下载到 100%；不可达下载可取消并清理。恢复原始基线后，正式非调试 APK 覆盖安装成功。</td><td>脱敏文字记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>LIFE-001</code><small>生命周期</small></td><td>断网、后台、锁屏、根页返回和竖屏恢复通过，路由与数据保持。</td><td>脱敏文字记录</td></tr>
+              <tr><td><span class="status status-pass">通过</span></td><td><code>LOG-001</code><small>稳定性日志</small></td><td>未发现 FATAL EXCEPTION、SIGABRT/SIGSEGV 或 ANR；完整日志不公开。</td><td>脱敏文字记录</td></tr>
+              <tr><td><span class="status status-warning">关注</span></td><td><code>ORIENT-001</code><small>横屏布局</small></td><td>818 × 360 横屏下新增任务按钮右侧超出约 7.09 CSS px；恢复竖屏正常。</td><td>脱敏文字记录</td></tr>
+              <tr><td><span class="status status-warning">关注</span></td><td><code>PERF-001</code><small>渲染性能</small></td><td>433 帧中 35.33% janky；P99 22 ms，最长区间 26 ms，无 missed-vsync。</td><td>脱敏文字记录</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="evidence" class="report-section" aria-labelledby="evidence-title">
+        <div class="section-heading section-heading-wide">
+          <div><p>05 · Public evidence</p><h2 id="evidence-title">公开证据</h2></div>
+          <p>仅包含空状态或 <code>KG-QA-184457-*</code> 隔离数据。点击图片查看原图。</p>
+        </div>
+        <div class="evidence-grid">
+          <figure>
+            <a href="assets/APP-001-upgraded-home.png"><img src="assets/APP-001-upgraded-home.png" width="1080" height="2340" loading="lazy" alt="升级后打开今日页，页面为空状态" /></a>
+            <figcaption><code>APP-001</code><span>升级后首页</span></figcaption>
+          </figure>
+          <figure>
+            <a href="assets/TASK-001-create-form.png"><img src="assets/TASK-001-create-form.png" width="1080" height="2340" loading="lazy" alt="带有 KG-QA 测试任务与两个子任务的新建任务表单" /></a>
+            <figcaption><code>TASK-001</code><span>任务与子任务输入</span></figcaption>
+          </figure>
+          <figure>
+            <a href="assets/CHECK-003-celebration.png"><img src="assets/CHECK-003-celebration.png" width="1080" height="2340" loading="lazy" alt="两个测试任务完成后的百分百进度与完成反馈" /></a>
+            <figcaption><code>CHECK-003</code><span>100% 完成反馈</span></figcaption>
+          </figure>
+          <figure>
+            <a href="assets/TIMER-002-saved.png"><img src="assets/TIMER-002-saved.png" width="1080" height="2340" loading="lazy" alt="深色主题下的计时记录保存表单" /></a>
+            <figcaption><code>TIMER-002</code><span>计时记录保存</span></figcaption>
+          </figure>
+          <figure>
+            <a href="assets/DRILL-001-percent-summary.png"><img src="assets/DRILL-001-percent-summary.png" width="1080" height="2340" loading="lazy" alt="百化分训练百分之五十正确率总结" /></a>
+            <figcaption><code>DRILL-001</code><span>百化分训练总结</span></figcaption>
+          </figure>
+          <figure>
+            <a href="assets/SET-001-dark-theme.png"><img src="assets/SET-001-dark-theme.png" width="1080" height="2340" loading="lazy" alt="设置页深色主题和学习概览" /></a>
+            <figcaption><code>SET-001</code><span>深色主题</span></figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="automation" class="report-section" aria-labelledby="automation-title">
+        <div class="section-heading">
+          <p>06 · Automated baseline</p>
+          <h2 id="automation-title">自动化与构建基线</h2>
+        </div>
+        <div class="table-scroll" tabindex="0" aria-label="自动化结果表，可横向滚动">
+          <table class="automation-table">
+            <thead><tr><th scope="col">表面</th><th scope="col">结果</th><th scope="col">说明</th></tr></thead>
+            <tbody>
+              <tr><td>Web</td><td><span class="status status-pass">48 项通过</span></td><td>现有 Web 自动化全量通过。</td></tr>
+              <tr><td>Server</td><td><span class="status status-pass">9 项通过</span></td><td>服务端自动化全量通过。</td></tr>
+              <tr><td>Desktop</td><td><span class="status status-pass">3 项通过</span></td><td>桌面端测试与语法检查通过。</td></tr>
+              <tr><td>Android</td><td><span class="status status-pass">成功</span></td><td>单元测试与 Gradle 构建成功。</td></tr>
+              <tr><td>Web production</td><td><span class="status status-pass">成功</span></td><td>生产构建成功。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="follow-up" class="report-section" aria-labelledby="follow-up-title">
+        <div class="section-heading">
+          <p>07 · Follow-up</p>
+          <h2 id="follow-up-title">后续处理清单</h2>
+        </div>
+        <ol class="pending-list">
+          <li><code>BACK-001</code><span>修复热力图日详情的系统返回导航，并覆盖页面内返回与冷启动恢复。</span></li>
+          <li><code>DISC-001</code><span>定位 UDP 广播发送、8322 端口监听、防火墙和网络隔离条件。</span></li>
+          <li><code>ORIENT-001</code><span>按安全区和视口宽度约束横屏悬浮按钮。</span></li>
+          <li><code>PERF-001</code><span>分析 Tab 切换和快速滚动中的主线程占用与合成层成本。</span></li>
+        </ol>
+        <p class="gate-note"><strong>结果解释：</strong>运行已经完成，但存在已知失败和阻塞，因此本报告不等同于“全部通过”。</p>
+      </section>
+
+      <section class="report-section privacy-section" aria-labelledby="privacy-title">
+        <div class="section-heading">
+          <p>08 · Privacy boundary</p>
+          <h2 id="privacy-title">公开边界</h2>
+        </div>
+        <p>本报告已排除设备标识、网络标识、配对凭据、电脑账户信息、绝对文件位置、真实学习数据和完整日志。设备统一称为 <strong>Device A</strong>；敏感原始备份与服务数据只保留在本地受限目录。</p>
+      </section>
+    </main>
+
+    <footer class="report-footer">
+      <div class="report-shell">
+        <p>考公打卡 Android QA · v0.7.1 · 运行状态快照</p>
+        <nav aria-label="报告文件">
+          <a href="report.json">机器可读 JSON</a>
+          <a href="evidence-manifest.json">证据清单</a>
+          <a href="../../index.html">返回报告目录</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

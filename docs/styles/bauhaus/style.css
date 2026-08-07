@@ -151,6 +151,212 @@ main,
   font-weight: 900;
 }
 
+/* 包豪斯动效：正交装配、网格吸附与分块覆盖交接。 */
+.motion-ready .poster-head[data-reveal],
+.motion-ready .poster-foot[data-reveal],
+.motion-ready [data-motion-scene] [data-reveal] {
+  opacity: 0;
+  transform: translate3d(24px, 24px, 0) scale(0.965);
+  transition:
+    opacity 320ms ease,
+    transform 680ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--reveal-index, 0) * 58ms);
+}
+
+.motion-ready .poster-head[data-reveal] {
+  transform: translate3d(0, -18px, 0);
+}
+
+.motion-ready .poster-foot[data-reveal] {
+  transform: translate3d(-24px, 0, 0);
+}
+
+.motion-ready .poster-head[data-reveal].is-visible,
+.motion-ready .poster-foot[data-reveal].is-visible,
+.motion-ready [data-motion-scene] [data-reveal].is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.motion-ready main > [data-motion-scene] {
+  opacity: 0.54;
+  transform: translate3d(32px, 32px, 0) scale(0.988);
+  transform-origin: 20% 20%;
+  transition:
+    opacity 380ms ease,
+    transform 760ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.motion-ready main > [data-motion-scene].is-current {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.motion-ready main > [data-motion-scene].is-prev {
+  opacity: 0.7;
+  transform: translate3d(-20px, -20px, 0) scale(0.994);
+}
+
+.motion-ready main > [data-motion-scene].is-next {
+  opacity: 0.54;
+  transform: translate3d(32px, 32px, 0) scale(0.988);
+}
+
+.motion-ready .opening-grid .red-plane[data-reveal] {
+  transform: scaleX(0);
+  transform-origin: right;
+}
+
+.motion-ready .opening-grid .blue-plane[data-reveal] {
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+
+.motion-ready .opening-grid .yellow-plane[data-reveal] {
+  transform: scaleY(0);
+  transform-origin: top;
+}
+
+.motion-ready .opening-grid .red-plane[data-reveal].is-visible,
+.motion-ready .opening-grid .blue-plane[data-reveal].is-visible,
+.motion-ready .opening-grid .yellow-plane[data-reveal].is-visible {
+  transform: scale(1);
+}
+
+.opening-grid .red-plane { --reveal-index: 1; }
+.opening-grid .blue-plane { --reveal-index: 2; }
+.opening-grid .yellow-plane { --reveal-index: 3; }
+.opening-grid .opening-note { --reveal-index: 4; }
+.opening-grid .opening-copy { --reveal-index: 5; }
+
+.motion-ready .module-matrix[data-reveal] .task-block {
+  opacity: 0;
+  transform: translate3d(var(--task-x), var(--task-y), 0) scale(0.94);
+  transition:
+    opacity 300ms ease,
+    transform 680ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.motion-ready .module-matrix[data-reveal] .task-block:nth-child(1) { transform: translate3d(42px, -36px, 0) scale(0.94); }
+.motion-ready .module-matrix[data-reveal] .task-block:nth-child(2) { transform: translate3d(-38px, 32px, 0) scale(0.94); }
+.motion-ready .module-matrix[data-reveal] .task-block:nth-child(3) { transform: translate3d(40px, 35px, 0) scale(0.94); }
+.motion-ready .module-matrix[data-reveal] .task-block:nth-child(4) { transform: translate3d(-34px, -34px, 0) scale(0.94); }
+
+.motion-ready .module-matrix[data-reveal].is-visible .task-block {
+  opacity: 1;
+  transform: translate3d(var(--task-x), var(--task-y), 0) scale(1);
+}
+
+.motion-ready .module-matrix[data-reveal].is-visible .task-block.is-set {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.motion-ready .module-matrix[data-reveal].is-visible .task-block:nth-child(2) {
+  transition-delay: 70ms;
+}
+
+.motion-ready .module-matrix[data-reveal].is-visible .task-block:nth-child(3) {
+  transition-delay: 140ms;
+}
+
+.motion-ready .module-matrix[data-reveal].is-visible .task-block:nth-child(4) {
+  transition-delay: 210ms;
+}
+
+.motion-ready .measure-rule i {
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.motion-ready .focus-measure.is-current .measure-rule i {
+  transform: scaleY(1);
+}
+
+.motion-ready .focus-measure.is-current .measure-rule i:nth-of-type(2) { transition-delay: 55ms; }
+.motion-ready .focus-measure.is-current .measure-rule i:nth-of-type(3) { transition-delay: 110ms; }
+.motion-ready .focus-measure.is-current .measure-rule i:nth-of-type(4) { transition-delay: 165ms; }
+
+.motion-ready .route-block i {
+  transform: scaleX(0);
+  transition: transform 580ms cubic-bezier(0.16, 1, 0.3, 1) 180ms;
+}
+
+.motion-ready .windows-plate.is-current .route-block i {
+  transform: scaleX(1);
+}
+
+.release-mark,
+.release-title,
+.release-android,
+.release-windows {
+  position: relative;
+  overflow: hidden;
+}
+
+.release-mark::after,
+.release-title::after,
+.release-android::after,
+.release-windows::after {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  background: var(--line);
+  content: "";
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: right;
+}
+
+.release-title::after { background: var(--poster-blue); }
+.release-android::after { background: var(--poster-yellow); }
+.release-windows::after { background: var(--paper); }
+
+.motion-ready .release-plate [data-reveal]::after {
+  transform: scaleX(1);
+  transition: transform 640ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--reveal-index, 0) * 70ms + 120ms);
+}
+
+.motion-ready .release-plate [data-reveal].is-visible::after {
+  transform: scaleX(0);
+}
+
+.release-plate .release-mark { --reveal-index: 1; }
+.release-plate .release-title { --reveal-index: 2; }
+.release-plate .release-android { --reveal-index: 3; }
+.release-plate .release-windows { --reveal-index: 4; }
+
+.task-block.is-snapping {
+  animation: bauhaus-snap-in 420ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.task-block.is-releasing {
+  animation: bauhaus-snap-out 360ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sync-plate.is-routing .sync-state,
+.sync-plate.is-unrouting .sync-state {
+  animation: bauhaus-block-cover 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes bauhaus-snap-in {
+  0% { transform: translate3d(var(--task-x), var(--task-y), 0) scale(0.94); }
+  65% { transform: translate3d(0, 0, 0) scale(1.025); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes bauhaus-snap-out {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(var(--task-x), var(--task-y), 0) scale(1); }
+}
+
+@keyframes bauhaus-block-cover {
+  0% { opacity: 0.42; transform: scaleX(0.82); transform-origin: left; }
+  58% { opacity: 1; transform: scaleX(1.035); }
+  100% { transform: scaleX(1); }
+}
+
 .opening-copy {
   z-index: 3;
   grid-column: 1 / 5;
@@ -572,6 +778,14 @@ main,
   .task-block.is-set:hover {
     transform: translate(-3px, -3px);
   }
+
+  .motion-ready .module-matrix[data-reveal].is-visible .task-block:hover {
+    transform: translate(calc(var(--task-x) / 2), calc(var(--task-y) / 2));
+  }
+
+  .motion-ready .module-matrix[data-reveal].is-visible .task-block.is-set:hover {
+    transform: translate(-3px, -3px);
+  }
 }
 
 @media (max-width: 960px) {
@@ -833,6 +1047,36 @@ main,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .motion-ready .poster-head[data-reveal],
+  .motion-ready .poster-foot[data-reveal],
+  .motion-ready [data-motion-scene] [data-reveal],
+  .motion-ready main > [data-motion-scene],
+  .motion-ready main > [data-motion-scene].is-current,
+  .motion-ready main > [data-motion-scene].is-prev,
+  .motion-ready main > [data-motion-scene].is-next,
+  .motion-ready .opening-grid .red-plane[data-reveal],
+  .motion-ready .opening-grid .blue-plane[data-reveal],
+  .motion-ready .opening-grid .yellow-plane[data-reveal],
+  .motion-ready .module-matrix[data-reveal] .task-block,
+  .motion-ready .module-matrix[data-reveal].is-visible .task-block,
+  .motion-ready .measure-rule i,
+  .motion-ready .focus-measure.is-current .measure-rule i,
+  .motion-ready .route-block i,
+  .motion-ready .windows-plate.is-current .route-block i,
+  .motion-ready .release-plate [data-reveal]::after,
+  .motion-ready .release-plate [data-reveal].is-visible::after {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .task-block.is-snapping,
+  .task-block.is-releasing,
+  .sync-plate.is-routing .sync-state,
+  .sync-plate.is-unrouting .sync-state {
+    animation: none;
+  }
+
   .task-block,
   .task-block.is-set,
   .task-block:hover,

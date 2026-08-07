@@ -8,6 +8,7 @@
   const timerToggle = document.querySelector('[data-sprint-timer-toggle]');
   const timerReset = document.querySelector('[data-sprint-timer-reset]');
   const timerStatus = document.querySelector('[data-sprint-timer-status]');
+  const timerLane = document.querySelector('.timer-lane');
   const relay = document.querySelector('[data-relay-root]');
   const relayToggle = document.querySelector('[data-relay-toggle]');
   const relayState = document.querySelector('[data-relay-state]');
@@ -16,10 +17,19 @@
   let remaining = 25 * 60;
   let timerId = 0;
 
+  const pulse = (element, className, duration = 520) => {
+    if (!element) return;
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
+    window.setTimeout(() => element.classList.remove(className), duration);
+  };
+
   const updateScore = () => {
     const completed = tasks.filter((task) => task.getAttribute('aria-pressed') === 'true').length;
     done.textContent = String(completed);
     score.textContent = String(Math.round((completed / tasks.length) * 100));
+    pulse(score, 'is-scoring');
   };
 
   tasks.forEach((task) => task.addEventListener('click', () => {
@@ -27,6 +37,7 @@
     task.setAttribute('aria-pressed', String(next));
     task.classList.toggle('is-done', next);
     task.querySelector('small').textContent = next ? '已通过' : '待执行';
+    pulse(task, next ? 'is-crossing' : 'is-returning');
     updateScore();
   }));
 
@@ -42,6 +53,8 @@
     timerToggle.setAttribute('aria-pressed', 'false');
     timerToggle.textContent = remaining === 25 * 60 ? '开始计时' : '继续计时';
     timerStatus.textContent = status;
+    timerLane?.classList.remove('is-running');
+    timerLane?.classList.add('is-paused');
   };
 
   timerToggle?.addEventListener('click', () => {
@@ -52,6 +65,8 @@
     timerToggle.setAttribute('aria-pressed', 'true');
     timerToggle.textContent = '暂停计时';
     timerStatus.textContent = '正在执行';
+    timerLane?.classList.remove('is-paused');
+    timerLane?.classList.add('is-running');
     timerId = window.setInterval(() => {
       remaining = Math.max(0, remaining - 1);
       renderTimer();
@@ -63,6 +78,7 @@
     remaining = 25 * 60;
     stopTimer('等待起跑');
     renderTimer();
+    pulse(timerLane, 'is-resetting', 380);
   });
 
   relayToggle?.addEventListener('click', () => {
@@ -72,5 +88,6 @@
     relayState.textContent = enabled ? '等待配对' : '未接力';
     relayDetail.textContent = enabled ? '开始扫描可信局域网中的电脑' : '不会扫描或连接电脑';
     relayLabel.textContent = enabled ? '已开启' : '已关闭';
+    pulse(relay, enabled ? 'is-passing' : 'is-returning', 560);
   });
 })();

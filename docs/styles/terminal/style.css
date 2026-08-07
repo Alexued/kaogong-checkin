@@ -558,3 +558,147 @@ main {
     transition: none;
   }
 }
+
+/* Motion language: prompts print line by line and command changes clear the buffer. */
+.motion-ready body[data-style="terminal"] [data-motion-scene] {
+  opacity: 0.48;
+  transform: translate3d(0, 1.1rem, 0);
+  clip-path: inset(0 0 8% 0);
+  transition:
+    opacity 360ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 440ms cubic-bezier(0.16, 1, 0.3, 1),
+    clip-path 440ms steps(8, end);
+  will-change: transform, opacity;
+}
+
+.motion-ready body[data-style="terminal"] [data-motion-scene].is-prev {
+  opacity: 0.24;
+  transform: translate3d(0, -0.9rem, 0);
+  clip-path: inset(8% 0 0 0);
+}
+
+.motion-ready body[data-style="terminal"] [data-motion-scene].is-current {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  clip-path: inset(0 0 0 0);
+}
+
+.motion-ready body[data-style="terminal"] [data-reveal] {
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  transform: translate3d(0, 0.45rem, 0);
+  transition:
+    clip-path 520ms steps(10, end),
+    opacity 120ms linear,
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--reveal-index, 0) * 75ms);
+}
+
+.motion-ready body[data-style="terminal"] [data-reveal].is-visible {
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  transform: translate3d(0, 0, 0);
+}
+
+.command-pane.is-entering {
+  animation: terminal-buffer-in 300ms steps(8, end) both;
+}
+
+.command-pane.is-entering > * {
+  animation: terminal-line-print 320ms steps(8, end) both;
+}
+
+.command-pane.is-entering > :nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.command-pane.is-entering > :nth-child(3) {
+  animation-delay: 90ms;
+}
+
+.command-pane.is-entering > :nth-child(4) {
+  animation-delay: 135ms;
+}
+
+.command-pane.is-exiting {
+  pointer-events: none;
+  animation: terminal-buffer-clear 140ms steps(5, end) both;
+}
+
+.sync-readout.is-updating [data-sync-indicator],
+.sync-readout.is-updating + .result {
+  animation: terminal-state-write 280ms steps(4, end);
+}
+
+@keyframes terminal-buffer-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translate3d(0.65rem, 0, 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes terminal-line-print {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translate3d(0, 0.3rem, 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes terminal-buffer-clear {
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: translate3d(0, -0.45rem, 0);
+  }
+}
+
+@keyframes terminal-state-write {
+  0% {
+    opacity: 0.25;
+    transform: translate3d(0.5rem, 0, 0);
+  }
+  45% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-ready body[data-style="terminal"] [data-motion-scene],
+  .motion-ready body[data-style="terminal"] [data-reveal],
+  .motion-ready body[data-style="terminal"] [data-reveal].is-visible {
+    opacity: 1;
+    clip-path: none;
+    transform: none;
+    transition: none;
+    animation: none;
+  }
+
+  .command-pane.is-entering,
+  .command-pane.is-entering > *,
+  .command-pane.is-exiting,
+  .sync-readout.is-updating [data-sync-indicator],
+  .sync-readout.is-updating + .result {
+    animation: none;
+  }
+}

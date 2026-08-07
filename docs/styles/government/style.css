@@ -340,6 +340,210 @@ body {
 .document-footer a {
   color: var(--navy);
 }
+
+/* 公文动效：阅读顺序、表格划线、盖章确认与文件页交接。 */
+.motion-ready .document-masthead[data-reveal],
+.motion-ready .document-footer[data-reveal],
+.motion-ready .public-document [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 480ms cubic-bezier(0.25, 1, 0.5, 1),
+    transform 680ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--reveal-index, 0) * 54ms);
+}
+
+.motion-ready .document-masthead[data-reveal] {
+  transform: translate3d(0, -14px, 0);
+}
+
+.motion-ready .document-footer[data-reveal] {
+  transform: translate3d(0, 12px, 0);
+}
+
+.motion-ready .document-masthead[data-reveal].is-visible,
+.motion-ready .document-footer[data-reveal].is-visible,
+.motion-ready .public-document [data-reveal].is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.motion-ready .public-document > [data-motion-scene] {
+  position: relative;
+  opacity: 0.58;
+  transform: translate3d(0, 42px, 0) scale(0.988);
+  transform-origin: 50% 18%;
+  transition:
+    opacity 520ms cubic-bezier(0.25, 1, 0.5, 1),
+    transform 820ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 680ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.motion-ready .public-document > [data-motion-scene].is-current {
+  z-index: 2;
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.motion-ready .public-document > [data-motion-scene].is-prev {
+  opacity: 0.72;
+  transform: translate3d(0, -24px, 0) scale(0.994);
+}
+
+.motion-ready .public-document > [data-motion-scene].is-next {
+  opacity: 0.58;
+  transform: translate3d(0, 42px, 0) scale(0.988);
+}
+
+.document-title {
+  position: relative;
+}
+
+.document-title::after {
+  position: absolute;
+  right: clamp(0.25rem, 5vw, 3.5rem);
+  bottom: 2.1rem;
+  width: 4.6rem;
+  height: 4.6rem;
+  display: grid;
+  place-items: center;
+  border: 3px double #9d443d;
+  border-radius: 50%;
+  color: #9d443d;
+  content: "核定";
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0.26;
+  transform: rotate(-8deg);
+}
+
+.motion-ready .document-title::after {
+  opacity: 0;
+  transform: rotate(-8deg) scale(1.42);
+  transition:
+    opacity 180ms ease 460ms,
+    transform 520ms cubic-bezier(0.16, 1.45, 0.36, 1) 410ms;
+}
+
+.motion-ready .document-title.is-current::after {
+  opacity: 0.26;
+  transform: rotate(-8deg) scale(1);
+}
+
+.register-table > div[data-reveal] {
+  position: relative;
+  border-bottom-color: transparent;
+}
+
+.register-table > div[data-reveal]::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: var(--line);
+  content: "";
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+.motion-ready .register-table > div[data-reveal]::after {
+  transform: scaleX(0);
+  transition: transform 720ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--reveal-index, 0) * 54ms + 110ms);
+}
+
+.motion-ready .register-table > div[data-reveal].is-visible::after {
+  transform: scaleX(1);
+}
+
+.register-table > div:nth-child(1),
+.policy-lines > div:nth-child(1),
+.procedure > li:nth-child(1) {
+  --reveal-index: 1;
+}
+
+.register-table > div:nth-child(2),
+.policy-lines > div:nth-child(2),
+.procedure > li:nth-child(2),
+.attachments > .attachment-row:nth-of-type(1) {
+  --reveal-index: 2;
+}
+
+.register-table > div:nth-child(3),
+.policy-lines > div:nth-child(3),
+.procedure > li:nth-child(3),
+.attachments > .attachment-row:nth-of-type(2) {
+  --reveal-index: 3;
+}
+
+.register-table > div:nth-child(4) {
+  --reveal-index: 4;
+}
+
+.register-table > div:nth-child(5),
+.attachments > .disclaimer {
+  --reveal-index: 5;
+}
+
+.section-body table[data-reveal] tbody tr {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.motion-ready .section-body table[data-reveal] tbody tr {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  transition:
+    opacity 360ms ease,
+    transform 540ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.motion-ready .section-body table[data-reveal].is-visible tbody tr {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.motion-ready .section-body table[data-reveal].is-visible tbody tr:nth-child(2) {
+  transition-delay: 55ms;
+}
+
+.motion-ready .section-body table[data-reveal].is-visible tbody tr:nth-child(3) {
+  transition-delay: 110ms;
+}
+
+.motion-ready .section-body table[data-reveal].is-visible tbody tr:nth-child(4) {
+  transition-delay: 165ms;
+}
+
+.register-table button.is-copying {
+  transform: scale(0.96);
+}
+
+.register-table button.is-copied {
+  background: var(--navy);
+  color: var(--paper);
+  animation: government-stamp 440ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.register-table button.is-copy-error {
+  border-color: #9d443d;
+  color: #9d443d;
+  animation: government-file-shake 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes government-stamp {
+  0% { transform: scale(1.12); }
+  55% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+@keyframes government-file-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  35% { transform: translate3d(-4px, 0, 0); }
+  70% { transform: translate3d(4px, 0, 0); }
+}
 @media (max-width: 760px) {
   .masthead-inner {
     padding: 1rem 0;
@@ -409,8 +613,30 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .motion-ready .document-masthead[data-reveal],
+  .motion-ready .document-footer[data-reveal],
+  .motion-ready .public-document [data-reveal],
+  .motion-ready .public-document > [data-motion-scene],
+  .motion-ready .public-document > [data-motion-scene].is-current,
+  .motion-ready .public-document > [data-motion-scene].is-prev,
+  .motion-ready .public-document > [data-motion-scene].is-next,
+  .motion-ready .document-title::after,
+  .motion-ready .document-title.is-current::after,
+  .motion-ready .register-table > div[data-reveal]::after,
+  .motion-ready .section-body table[data-reveal] tbody tr,
+  .motion-ready .section-body table[data-reveal].is-visible tbody tr {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
   .register-table button,
   .attachment-row a {
     transition: none;
+  }
+
+  .register-table button.is-copied,
+  .register-table button.is-copy-error {
+    animation: none;
   }
 }

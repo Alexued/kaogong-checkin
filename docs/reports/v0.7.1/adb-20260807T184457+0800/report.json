@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0",
+  "report": {
+    "product": "考公打卡",
+    "version": "0.7.1",
+    "runId": "20260807T184457+0800",
+    "status": "complete_with_findings",
+    "startedAt": "2026-08-07T18:44:57+08:00",
+    "completedAt": "2026-08-07T19:48:07+08:00",
+    "sourceCommit": "65a075321e038685a8930bdbee464259ce046191"
+  },
+  "summary": {
+    "passed": 19,
+    "failed": 1,
+    "blocked": 1,
+    "warning": 2,
+    "pending": 0,
+    "conclusion": "真机运行已完成；核心业务、手动同步、更新下载与生命周期通过，存在一项高优先级返回导航失败、一项 UDP 自动发现阻塞，以及横屏裁切和 120 Hz 帧稳定性两项关注。"
+  },
+  "build": {
+    "packageName": "com.wjy.kaogong",
+    "fromVersionName": "0.6.0",
+    "fromVersionCode": 8,
+    "testedVersionName": "0.7.1",
+    "testedVersionCode": 10,
+    "testedArtifact": "recoverable-debug_then_release",
+    "finalApkSha256": "8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689",
+    "finalApkDebuggable": false,
+    "baselineRestoredBeforeReleaseInstall": true
+  },
+  "device": {
+    "label": "Device A",
+    "marketingName": "Mi 10 Ultra",
+    "androidVersion": "13",
+    "apiLevel": 33,
+    "resolution": "1080x2340",
+    "densityDpi": 440,
+    "abi": "arm64-v8a"
+  },
+  "automation": [
+    { "surface": "web", "status": "pass", "passed": 48 },
+    { "surface": "server", "status": "pass", "passed": 9 },
+    { "surface": "desktop", "status": "pass", "passed": 3, "syntaxCheck": "pass" },
+    { "surface": "android-unit-and-gradle", "status": "pass" },
+    { "surface": "web-production-build", "status": "pass" }
+  ],
+  "findings": [
+    {
+      "id": "BACK-001",
+      "severity": "high",
+      "status": "fail",
+      "title": "日详情的 Android 返回键直接退出应用",
+      "path": "设置 > 学习概览热力图 > 某日详情 > Android 返回键",
+      "expected": "返回设置页并保留原状态",
+      "actual": "应用退到桌面"
+    },
+    {
+      "id": "DISC-001",
+      "severity": "medium",
+      "status": "blocked",
+      "title": "局域网 UDP 自动发现未找到服务器",
+      "actual": "两次扫描均返回 0 台服务器，其中一次为 6.5 秒完整重扫",
+      "control": "手动地址、配对、补传和服务端回流正常"
+    },
+    {
+      "id": "ORIENT-001",
+      "severity": "medium",
+      "status": "warning",
+      "title": "横屏新增任务按钮右侧被裁切",
+      "actual": "818 x 360 CSS 视口中按钮右边界为 825.09，超出视口约 7.09 CSS px",
+      "control": "正文无横向溢出，恢复 392 x 818 竖屏后布局正常"
+    },
+    {
+      "id": "PERF-001",
+      "severity": "medium",
+      "status": "warning",
+      "title": "120 Hz 代表性交互的帧稳定性需要关注",
+      "actual": "433 帧中 153 帧被 gfxinfo 标记为 janky（35.33%），P99 22 ms，最长区间 26 ms",
+      "control": "没有超过 26 ms 的长帧，也没有 missed-vsync 计数"
+    }
+  ],
+  "cases": [
+    { "id": "DATA-001", "area": "备份基线", "status": "pass", "evidence": [] },
+    { "id": "UPGRADE-001", "area": "覆盖升级", "status": "pass", "evidence": ["assets/APP-001-upgraded-home.png"] },
+    { "id": "APP-001", "area": "启动", "status": "pass", "evidence": ["assets/APP-001-upgraded-home.png"] },
+    { "id": "NAV-001", "area": "根导航", "status": "pass", "evidence": [] },
+    { "id": "TASK-001", "area": "任务", "status": "pass", "evidence": ["assets/TASK-001-create-form.png"] },
+    { "id": "CAL-001", "area": "日历", "status": "pass", "evidence": [] },
+    { "id": "CHECK-001", "area": "打卡", "status": "pass", "evidence": ["assets/CHECK-003-celebration.png"] },
+    { "id": "TIMER-001", "area": "正计时", "status": "pass", "evidence": ["assets/TIMER-002-saved.png"] },
+    { "id": "TIMER-002", "area": "倒计时", "status": "pass", "evidence": [] },
+    { "id": "DRILL-001", "area": "百化分", "status": "pass", "evidence": ["assets/DRILL-001-percent-summary.png"] },
+    { "id": "DRILL-002", "area": "公式", "status": "pass", "evidence": [] },
+    { "id": "SET-001", "area": "设置", "status": "pass", "evidence": ["assets/SET-001-dark-theme.png"] },
+    { "id": "UPDATE-001", "area": "GitHub 更新检查", "status": "pass", "evidence": [] },
+    { "id": "SYNC-001", "area": "关闭同步", "status": "pass", "evidence": [] },
+    { "id": "SYNC-002", "area": "手动同步", "status": "pass", "evidence": [] },
+    { "id": "SYNC-003", "area": "总开关边界", "status": "pass", "evidence": [] },
+    { "id": "BACK-001", "area": "二级页返回", "status": "fail", "evidence": [] },
+    { "id": "DISC-001", "area": "UDP 发现", "status": "blocked", "evidence": [] },
+    { "id": "UPDATE-002", "area": "更新下载", "status": "pass", "evidence": [] },
+    { "id": "LIFE-001", "area": "生命周期", "status": "pass", "evidence": [] },
+    { "id": "LOG-001", "area": "稳定性日志", "status": "pass", "evidence": [] },
+    { "id": "ORIENT-001", "area": "横屏布局", "status": "warning", "evidence": [] },
+    { "id": "PERF-001", "area": "渲染性能", "status": "warning", "evidence": [] }
+  ],
+  "evidence": [
+    { "id": "APP-001", "path": "assets/APP-001-upgraded-home.png", "width": 1080, "height": 2340, "sha256": "46650A468E7AA494A64E1CDDBEDB7617114ADD6C6CC0EEC469A1DBEACEC399D9" },
+    { "id": "TASK-001", "path": "assets/TASK-001-create-form.png", "width": 1080, "height": 2340, "sha256": "4FAD6456774234E3961913B4D260DF7A29F0A6CCEB7A2EF2F129CAB11F868E79" },
+    { "id": "CHECK-003", "path": "assets/CHECK-003-celebration.png", "width": 1080, "height": 2340, "sha256": "4ED72BB98484513D18677149895C56C492E452C0F737786A53BE77F7FE0F1B5F" },
+    { "id": "TIMER-002", "path": "assets/TIMER-002-saved.png", "width": 1080, "height": 2340, "sha256": "D2012837C1FB4E0EF0A8A8442D490A9E24B2D8101431AC352B002431F4A2E65F" },
+    { "id": "DRILL-001", "path": "assets/DRILL-001-percent-summary.png", "width": 1080, "height": 2340, "sha256": "79819343D813390490C873A4D72E0F7119192FDCFBB43AAB7128650ADFA7A6B1" },
+    { "id": "SET-001", "path": "assets/SET-001-dark-theme.png", "width": 1080, "height": 2340, "sha256": "14938DB5C52CE796F8A8088F4F2D935BB58F44F04CBFF34F4C3B13C33897B5D0" }
+  ],
+  "privacy": {
+    "deviceLabel": "Device A",
+    "excludedCategories": [
+      "deviceIdentifiers",
+      "networkIdentifiers",
+      "pairingCredentials",
+      "computerAccountDetails",
+      "absoluteFilesystemLocations",
+      "realStudyData",
+      "completeDiagnosticLogs"
+    ]
+  }
+}

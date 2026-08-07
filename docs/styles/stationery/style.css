@@ -988,6 +988,121 @@ body {
   }
 }
 
+/* Paper movement: tabs press down, sheets slide along the binding, notes keep their stack direction. */
+.motion-ready .notebook::before {
+  transform: scaleY(0);
+  transform-origin: top;
+  animation: journal-binding-draw 560ms var(--motion-ease) 80ms forwards;
+}
+
+.motion-ready .journal-sheet {
+  position: relative;
+  transition:
+    opacity var(--motion-material) ease,
+    transform var(--motion-material) var(--motion-ease);
+  will-change: opacity, transform;
+}
+
+.motion-ready .journal-sheet.motion-scene.is-prev {
+  opacity: .58;
+  transform: translateX(-18px);
+}
+
+.motion-ready .journal-sheet.motion-scene.is-next {
+  opacity: .58;
+  transform: translateX(18px);
+}
+
+.motion-ready .journal-sheet.motion-scene.is-current,
+.motion-ready .journal-sheet.motion-scene.is-page-active {
+  opacity: 1;
+  transform: translateX(0) rotate(0);
+}
+
+.js .journal-sheet.is-page-leaving {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
+.motion-ready .notebook[data-page-direction="forward"] .journal-sheet.is-page-entering,
+.motion-ready .notebook[data-page-direction="backward"] .journal-sheet.is-page-leaving {
+  opacity: 0;
+  transform: translateX(28px) rotate(.25deg);
+}
+
+.motion-ready .notebook[data-page-direction="backward"] .journal-sheet.is-page-entering,
+.motion-ready .notebook[data-page-direction="forward"] .journal-sheet.is-page-leaving {
+  opacity: 0;
+  transform: translateX(-28px) rotate(-.25deg);
+}
+
+.motion-ready .journal-tabs [role="tab"][aria-selected="true"] {
+  box-shadow: inset 3px 0 rgba(43, 45, 49, .16);
+  transform: translateX(6px) scale(.975);
+}
+
+.motion-ready .time-entry[data-reveal]:not(.is-visible) {
+  opacity: 0;
+  transform: translateX(-14px);
+}
+
+.motion-ready .time-entry[data-reveal].is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.motion-ready .day-note[data-reveal]:not(.is-visible) {
+  opacity: 0;
+  transform: translate(14px, 10px) rotate(1deg);
+}
+
+.motion-ready .day-note[data-reveal].is-visible {
+  opacity: 1;
+  transform: translate(0, 0) rotate(-1deg);
+}
+
+.motion-ready .check-box::after {
+  clip-path: inset(0 100% 0 0);
+  transform: none;
+  transition:
+    clip-path 240ms var(--motion-ease),
+    opacity 120ms ease;
+}
+
+.motion-ready .time-entry input:checked + .check-box::after {
+  clip-path: inset(0 0 0 0);
+}
+
+.js .memory-note {
+  transition:
+    opacity var(--motion-material) ease,
+    transform var(--motion-material) var(--motion-ease);
+}
+
+.js .note-stage[data-note-direction="forward"] .memory-note.is-note-entering,
+.js .note-stage[data-note-direction="backward"] .memory-note.is-note-leaving {
+  opacity: 0;
+  transform: translateX(28px) rotate(1deg);
+}
+
+.js .note-stage[data-note-direction="backward"] .memory-note.is-note-entering,
+.js .note-stage[data-note-direction="forward"] .memory-note.is-note-leaving {
+  opacity: 0;
+  transform: translateX(-28px) rotate(-1deg);
+}
+
+.js .note-stage .memory-note.is-current {
+  opacity: 1;
+  transform: translateX(0) rotate(0);
+}
+
+@keyframes journal-binding-draw {
+  to { transform: scaleY(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .journal-tabs [role="tab"],
   .journal-tabs [role="tab"][aria-selected="true"],
@@ -1000,5 +1115,29 @@ body {
   .tool-label > a {
     transform: none;
     transition: none;
+  }
+
+  .notebook::before,
+  .journal-sheet,
+  .journal-sheet.is-page-entering,
+  .journal-sheet.is-page-leaving,
+  .time-entry,
+  .day-note,
+  .memory-note,
+  .memory-note.is-note-entering,
+  .memory-note.is-note-leaving {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .notebook::before {
+    transform: scaleY(1);
+  }
+
+  .check-box::after,
+  .time-entry input:checked + .check-box::after {
+    clip-path: none;
   }
 }

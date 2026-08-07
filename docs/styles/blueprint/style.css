@@ -14,4 +14,45 @@ body { overflow-x:hidden; }
 @media(hover:hover){.module button:hover,.lab-heading button:hover,.parts-list a:hover{transform:translateY(-2px)}}
 @media(max-width:900px){.system-sheet,.update-lab{grid-template-columns:1fr}.assembly{min-height:560px}.flow-output{grid-column:1;margin-top:18px}.module-register header,.control-boundary header,.parts-list header{grid-template-columns:1fr}.register-row{grid-template-columns:44px minmax(160px,.7fr) 1.3fr}.register-row em{display:none}.boundary-map{grid-template-columns:1fr}.boundary-map>p{grid-column:1}.breaker{min-height:150px}}
 @media(max-width:620px){.drawing-header dl div:not(:first-child){display:none}.drawing-header dl div{min-width:auto;border-left:0;padding:0}.system-sheet{padding-top:58px}.assembly{min-height:760px;grid-template-columns:1fr;align-content:center;gap:70px;padding-inline:28px}.bus{width:2px;height:70px;margin:0 auto}.bus span{bottom:auto;left:14px;top:50%;transform:translateY(-50%)}.bus i{right:-4px;top:auto;bottom:-4px}.callout{right:20px;bottom:18px;width:calc(100% - 40px)}.assembly::before{left:50%}.assembly::after{display:none}.register-row{grid-template-columns:34px 1fr;padding:20px 0}.register-row p{grid-column:2}.flow-diagram li{grid-template-columns:42px 1fr}.flow-diagram small{grid-column:2}.boundary-map ul{grid-template-columns:1fr}.hashes{grid-template-columns:1fr}footer{flex-direction:column;align-items:flex-start;justify-content:center;padding-block:20px 90px}}
-@media(prefers-reduced-motion:reduce){.flow-diagram li{transition:none}.flow-diagram li.is-active{transform:none}}
+/* Drafting movement: lines are drawn first, modules assemble second, annotations settle last. */
+.motion-ready [data-motion-scene].motion-scene{position:relative;opacity:.7;transform:translateY(18px);transition:opacity var(--motion-scene) ease,transform var(--motion-scene) var(--motion-ease);will-change:opacity,transform}
+.motion-ready [data-motion-scene].motion-scene.is-prev{opacity:.58;transform:translateY(-16px)}
+.motion-ready [data-motion-scene].motion-scene.is-current{opacity:1;transform:translateY(0)}
+.motion-ready [data-motion-scene].motion-scene.is-next{opacity:.7;transform:translateY(18px)}
+.motion-ready .assembly[data-enter]::before{transform:scaleY(0);transform-origin:top;transition:transform 620ms var(--motion-ease) 80ms}
+.motion-ready .assembly[data-enter]::after{transform:scaleX(0);transform-origin:left;transition:transform 620ms var(--motion-ease) 140ms}
+.motion-ready .assembly[data-enter].is-visible::before,.motion-ready .assembly[data-enter].is-visible::after{transform:scale(1)}
+.motion-ready .assembly[data-enter] .measure{opacity:0;transition:opacity 260ms ease 180ms}
+.motion-ready .assembly[data-enter].is-visible .measure{opacity:1}
+.motion-ready .assembly[data-enter] .measure::after{transform:scaleX(0);transform-origin:left;transition:transform 560ms var(--motion-ease) 180ms}
+.motion-ready .assembly[data-enter].is-visible .measure::after{transform:scaleX(1)}
+.motion-ready .assembly[data-enter] .bus{transform:scaleX(0);transform-origin:left;transition:transform 520ms var(--motion-ease) 260ms}
+.motion-ready .assembly[data-enter].is-visible .bus{transform:scaleX(1)}
+.motion-ready .assembly[data-enter] .module{opacity:0;transition:opacity 420ms ease,transform 560ms var(--motion-ease)}
+.motion-ready .assembly[data-enter] .module-phone{transform:translateX(-18px)}
+.motion-ready .assembly[data-enter] .module-desktop{transform:translateX(18px)}
+.motion-ready .assembly[data-enter].is-visible .module{opacity:1;transform:translateX(0)}
+.motion-ready .assembly[data-enter] .module-phone{transition-delay:300ms}
+.motion-ready .assembly[data-enter] .module-desktop{transition-delay:360ms}
+.motion-ready .assembly[data-enter] .callout{opacity:0;transform:translateY(8px);transition:opacity 300ms ease,transform 420ms var(--motion-ease);transition-delay:460ms}
+.motion-ready .assembly[data-enter].is-visible .callout{opacity:1;transform:translateY(0)}
+.motion-ready .assembly[data-enter].is-visible .callout.is-changing{opacity:0;transform:translateY(5px);transition-delay:0ms}
+.register-row{position:relative;border-top-color:transparent}
+.register-row::before{position:absolute;top:0;right:0;left:0;height:1px;background:var(--line);content:'';transform:scaleX(1);transform-origin:left}
+.motion-ready .register-row[data-reveal]:not(.is-visible)::before{transform:scaleX(0)}
+.motion-ready .register-row[data-reveal].is-visible::before{transform:scaleX(1);transition:transform 540ms var(--motion-ease);transition-delay:calc(var(--reveal-index,0) * 60ms)}
+.motion-ready .register-row[data-reveal]:not(.is-visible){opacity:0;transform:translateX(-14px)}
+.motion-ready .register-row[data-reveal].is-visible{opacity:1;transform:translateX(0)}
+.flow-diagram li.is-active{color:#fff;transform:none}
+.flow-diagram li.is-current-step{background:rgba(255,255,255,.06);transform:translateX(10px)}
+.flow-diagram li.is-active::after{background:var(--orange)}
+.motion-ready .flow-diagram li[data-reveal]:not(.is-visible){opacity:0;transform:translateX(-12px)}
+.motion-ready .flow-diagram li[data-reveal].is-visible{opacity:1;transform:translateX(0)}
+.motion-ready .flow-diagram li[data-reveal].is-visible.is-current-step{transform:translateX(10px)}
+.motion-ready .boundary-map .breaker[data-reveal]:not(.is-visible){opacity:0;transform:translateX(-16px)}
+.motion-ready .boundary-map ul[data-reveal]:not(.is-visible){opacity:0;transform:translateX(16px)}
+.motion-ready .boundary-map [data-reveal].is-visible{opacity:1;transform:translateX(0)}
+.motion-ready .parts-list .table-wrap[data-reveal]:not(.is-visible){opacity:0;clip-path:inset(0 100% 0 0);transform:none}
+.motion-ready .parts-list .table-wrap[data-reveal].is-visible{opacity:1;clip-path:inset(0 0 0 0);transform:none;transition:clip-path 720ms var(--motion-ease),opacity 220ms ease}
+@media(max-width:620px){.motion-ready .assembly[data-enter] .bus{transform:scaleY(0);transform-origin:top}.motion-ready .assembly[data-enter].is-visible .bus{transform:scaleY(1)}}
+@media(prefers-reduced-motion:reduce){.flow-diagram li,.callout,[data-motion-scene],.assembly::before,.assembly::after,.assembly .measure,.assembly .measure::after,.assembly .bus,.assembly .module,.assembly .callout,.register-row::before,.parts-list .table-wrap{opacity:1;transform:none;clip-path:none;transition:none}.flow-diagram li.is-active,.flow-diagram li.is-current-step{transform:none}}

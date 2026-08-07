@@ -8,12 +8,13 @@
     <meta name="theme-color" content="#f4f7f8" />
     <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
     <script>document.documentElement.className = 'js';</script>
-    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release2" />
     <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v071-release" />
     <link rel="stylesheet" href="style.css?v=20260807-v071-release" />
     <script src="../shared/release-data.js?v=20260807-v071-release" defer></script>
     <script src="../shared/style-switcher.js?v=20260807-v071-release" defer></script>
     <script src="app.js?v=20260807-v071-release" defer></script>
+    <script src="../shared/motion.js?v=20260807-motion-v2" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -23,7 +24,7 @@
     </header>
 
     <main id="main-content">
-      <section class="system-sheet" aria-labelledby="sheet-title">
+      <section class="system-sheet" aria-labelledby="sheet-title" data-motion-scene>
         <div class="sheet-copy" data-enter style="--enter-order:1">
           <p class="drawing-label">学习系统总装图 / revision 07</p>
           <h1 id="sheet-title">每天的任务，按模块运行。</h1>
@@ -51,49 +52,49 @@
         </div>
       </section>
 
-      <section class="module-register" aria-labelledby="register-title">
-        <header><p>表 01 / 功能模块</p><h2 id="register-title">输入、处理、输出</h2></header>
-        <div class="register-row"><span>01</span><div><small>输入</small><strong>今日任务</strong></div><p>任务、子任务和未完成结转进入同一日程。</p><em>LOCAL</em></div>
-        <div class="register-row"><span>02</span><div><small>处理</small><strong>25:00 专注</strong></div><p>开始、暂停与复位都在设备上完成，不依赖电脑。</p><em>TIMER</em></div>
-        <div class="register-row"><span>03</span><div><small>校验</small><strong>背诵训练</strong></div><p>先回忆再翻面，按照掌握程度安排下一轮。</p><em>MEMORY</em></div>
-        <div class="register-row"><span>04</span><div><small>可选输出</small><strong>电脑同步</strong></div><p>总开关关闭时，发现、连接、重连和局域网更新全部停止。</p><em>SWITCHED</em></div>
+      <section class="module-register" aria-labelledby="register-title" data-motion-scene>
+        <header data-reveal style="--reveal-index:0"><p>表 01 / 功能模块</p><h2 id="register-title">输入、处理、输出</h2></header>
+        <div class="register-row" data-reveal style="--reveal-index:1"><span>01</span><div><small>输入</small><strong>今日任务</strong></div><p>任务、子任务和未完成结转进入同一日程。</p><em>LOCAL</em></div>
+        <div class="register-row" data-reveal style="--reveal-index:2"><span>02</span><div><small>处理</small><strong>25:00 专注</strong></div><p>开始、暂停与复位都在设备上完成，不依赖电脑。</p><em>TIMER</em></div>
+        <div class="register-row" data-reveal style="--reveal-index:3"><span>03</span><div><small>校验</small><strong>背诵训练</strong></div><p>先回忆再翻面，按照掌握程度安排下一轮。</p><em>MEMORY</em></div>
+        <div class="register-row" data-reveal style="--reveal-index:4"><span>04</span><div><small>可选输出</small><strong>电脑同步</strong></div><p>总开关关闭时，发现、连接、重连和局域网更新全部停止。</p><em>SWITCHED</em></div>
       </section>
 
-      <section class="update-lab" id="update-flow" aria-labelledby="update-title" data-update-lab>
-        <div class="lab-heading">
+      <section class="update-lab" id="update-flow" aria-labelledby="update-title" data-update-lab data-motion-scene>
+        <div class="lab-heading" data-reveal style="--reveal-index:0">
           <p>流程 02 / 局域网版本检测</p>
           <h2 id="update-title">找到电脑，读取版本，显示更新。</h2>
           <p>只自动检查，不自动下载。每一步都有明确的输入和结果。</p>
           <button type="button" data-run-update>运行检测演示</button>
         </div>
         <ol class="flow-diagram">
-          <li data-flow-step><span>01</span><strong>发现服务器</strong><small>UDP 8322</small></li>
-          <li data-flow-step><span>02</span><strong>读取 APK 元数据</strong><small>/api/update/latest</small></li>
-          <li data-flow-step><span>03</span><strong>比较三段版本</strong><small>LAN ↔ GitHub ↔ 当前</small></li>
-          <li data-flow-step><span>04</span><strong>显示可用更新</strong><small>由用户确认下载</small></li>
+          <li data-flow-step data-reveal style="--reveal-index:1"><span>01</span><strong>发现服务器</strong><small>UDP 8322</small></li>
+          <li data-flow-step data-reveal style="--reveal-index:2"><span>02</span><strong>读取 APK 元数据</strong><small>/api/update/latest</small></li>
+          <li data-flow-step data-reveal style="--reveal-index:3"><span>03</span><strong>比较三段版本</strong><small>LAN ↔ GitHub ↔ 当前</small></li>
+          <li data-flow-step data-reveal style="--reveal-index:4"><span>04</span><strong>显示可用更新</strong><small>由用户确认下载</small></li>
         </ol>
-        <output class="flow-output" data-flow-output aria-live="polite">检测器待机</output>
+        <output class="flow-output" data-flow-output aria-live="polite" data-reveal style="--reveal-index:5">检测器待机</output>
       </section>
 
-      <section class="control-boundary" aria-labelledby="boundary-title">
-        <header><p>安全边界 03</p><h2 id="boundary-title">同步开关是总断路器。</h2></header>
+      <section class="control-boundary" aria-labelledby="boundary-title" data-motion-scene>
+        <header data-reveal style="--reveal-index:0"><p>安全边界 03</p><h2 id="boundary-title">同步开关是总断路器。</h2></header>
         <div class="boundary-map">
-          <div class="breaker"><span>电脑同步</span><strong>OFF</strong><i aria-hidden="true"></i></div>
-          <ul><li><span>REST</span><strong>停止</strong></li><li><span>WebSocket</span><strong>关闭</strong></li><li><span>UDP 发现</span><strong>停止</strong></li><li><span>LAN 更新</span><strong>取消</strong></li></ul>
-          <p>本地数据与待同步队列保留。重新开启后，新的连接代次才可以运行。</p>
+          <div class="breaker" data-reveal style="--reveal-index:1"><span>电脑同步</span><strong>OFF</strong><i aria-hidden="true"></i></div>
+          <ul data-reveal style="--reveal-index:2"><li><span>REST</span><strong>停止</strong></li><li><span>WebSocket</span><strong>关闭</strong></li><li><span>UDP 发现</span><strong>停止</strong></li><li><span>LAN 更新</span><strong>取消</strong></li></ul>
+          <p data-reveal style="--reveal-index:3">本地数据与待同步队列保留。重新开启后，新的连接代次才可以运行。</p>
         </div>
       </section>
 
-      <section class="parts-list" id="downloads" aria-labelledby="parts-title">
-        <header><p>材料清单 04</p><h2 id="parts-title">发布组件</h2></header>
-        <div class="table-wrap"><table>
+      <section class="parts-list" id="downloads" aria-labelledby="parts-title" data-motion-scene>
+        <header data-reveal style="--reveal-index:0"><p>材料清单 04</p><h2 id="parts-title">发布组件</h2></header>
+        <div class="table-wrap" data-reveal style="--reveal-index:1"><table>
           <thead><tr><th>编号</th><th>平台</th><th>文件</th><th>要求</th><th>大小</th><th>操作</th></tr></thead>
           <tbody>
             <tr><td>A-01</td><td>Android</td><td class="release-file" data-release="android-file">kaogong-checkin-v0.7.1.apk</td><td>Android 7+</td><td data-release="android-size">3.27 MiB</td><td><a data-release-link="android" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk">下载 APK</a></td></tr>
             <tr><td>W-02</td><td>Windows</td><td class="release-file" data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.7.1.exe</td><td>Windows 10/11 x64</td><td data-release="windows-size">91.38 MiB</td><td><a data-release-link="windows" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-windows-x64-setup-v0.7.1.exe">下载安装器</a></td></tr>
           </tbody>
         </table></div>
-        <dl class="hashes"><div><dt>Android SHA-256</dt><dd class="release-sha" data-release="android-sha">8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689</dd></div><div><dt>Windows SHA-256</dt><dd class="release-sha" data-release="windows-sha">DECAD4791F4A93609E04D89CEE026F41E5FBFE4FDE380D51FEF84A73D45FE474</dd></div></dl>
+        <dl class="hashes" data-reveal style="--reveal-index:2"><div><dt>Android SHA-256</dt><dd class="release-sha" data-release="android-sha">8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689</dd></div><div><dt>Windows SHA-256</dt><dd class="release-sha" data-release="windows-sha">DECAD4791F4A93609E04D89CEE026F41E5FBFE4FDE380D51FEF84A73D45FE474</dd></div></dl>
       </section>
     </main>
 

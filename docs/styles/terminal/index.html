@@ -23,14 +23,15 @@
     <script>
       document.documentElement.className = "js";
     </script>
-    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release2" />
     <link rel="stylesheet" href="style.css?v=20260807-v071-release" />
     <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v071-release" />
     <script src="../shared/release-data.js?v=20260807-v071-release" defer></script>
     <script src="../shared/style-switcher.js?v=20260807-v071-release" defer></script>
+    <script src="../shared/motion.js?v=20260807-motion-v2" defer></script>
     <script src="app.js?v=20260807-v071-release" defer></script>
   </head>
-  <body>
+  <body data-style="terminal" data-style-transition="terminal-clear">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
 
     <header class="terminal-bar">
@@ -48,32 +49,39 @@
       <section
         class="boot-session"
         aria-labelledby="terminal-title"
+        data-motion-scene
         data-enter
         style="--enter-order: 0"
       >
-        <div class="prompt-line">
+        <div class="prompt-line" data-reveal style="--reveal-index: 0">
           <span>candidate@kaogong</span><b>:</b><span>~/today</span><b>$</b> kgc
           status
         </div>
         <div class="status-output">
-          <p><span class="ok">OK</span> local database ready</p>
-          <p><span class="ok">OK</span> 2 of 4 tasks complete</p>
-          <p><span class="warn">OFF</span> computer sync disabled by user</p>
-          <p>
+          <p data-reveal style="--reveal-index: 1"><span class="ok">OK</span> local database ready</p>
+          <p data-reveal style="--reveal-index: 2"><span class="ok">OK</span> 2 of 4 tasks complete</p>
+          <p data-reveal style="--reveal-index: 3"><span class="warn">OFF</span> computer sync disabled by user</p>
+          <p data-reveal style="--reveal-index: 4">
             <span class="dim">INFO</span> release v<span data-release="version"
               >0.7.1</span
             >
           </p>
         </div>
-        <h1 id="terminal-title">今天不是一句口号，<br />是六条可执行命令。</h1>
+        <h1 id="terminal-title" data-reveal style="--reveal-index: 5">今天不是一句口号，<br />是六条可执行命令。</h1>
       </section>
 
-      <section class="command-session" aria-label="考公打卡命令会话">
+      <section
+        class="command-session"
+        aria-label="考公打卡命令会话"
+        data-motion-scene
+      >
         <aside
           class="command-menu"
           role="tablist"
           aria-label="选择命令"
           aria-orientation="vertical"
+          data-reveal
+          style="--reveal-index: 0"
         >
           <p>COMMANDS</p>
           <button
@@ -143,7 +151,7 @@
           </button>
         </aside>
 
-        <div class="command-workspace">
+        <div class="command-workspace" data-reveal style="--reveal-index: 1">
           <div class="workspace-titlebar">
             <span>kgc-console</span
             ><span data-active-command>~/today $ kgc plan</span>

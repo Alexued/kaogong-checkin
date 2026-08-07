@@ -1,4 +1,17 @@
 (() => {
+  "use strict";
+
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  const replayMotion = (element, className, duration = 420) => {
+    if (!element || reduceMotion) return;
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
+    window.setTimeout(() => element.classList.remove(className), duration);
+  };
+
   const lessons = [...document.querySelectorAll("[data-lesson-toggle]")];
   const status = document.querySelector("[data-lesson-status]");
   const refreshLessons = () => {
@@ -24,12 +37,15 @@
         button.getAttribute("aria-pressed") !== "true",
       );
       refreshLessons();
+      replayMotion(button.closest(".lesson"), "is-writing", 380);
+      replayMotion(status, "is-inking", 380);
     }),
   );
   const value = document.querySelector("[data-timer-value]");
   const statusLine = document.querySelector("[data-timer-status]");
   const toggle = document.querySelector("[data-timer-toggle]");
   const reset = document.querySelector("[data-timer-reset]");
+  const incenseTimer = document.querySelector("[data-incense-timer]");
   let seconds = 1500;
   let timer = 0;
   const render = () => {
@@ -45,10 +61,14 @@
       stop();
       toggle.textContent = "继续专注";
       if (statusLine) statusLine.textContent = "已暂停，准备好时继续。";
+      replayMotion(incenseTimer, "is-changing");
+      replayMotion(statusLine, "is-inking", 380);
       return;
     }
     toggle.textContent = "暂停专注";
     if (statusLine) statusLine.textContent = "专注进行中 · 其他事情稍后再做。";
+    replayMotion(incenseTimer, "is-changing");
+    replayMotion(statusLine, "is-inking", 380);
     timer = window.setInterval(() => {
       seconds = Math.max(0, seconds - 1);
       render();
@@ -56,6 +76,8 @@
         stop();
         toggle.textContent = "开始专注";
         if (statusLine) statusLine.textContent = "一炷香已毕，记下收获吧。";
+        replayMotion(incenseTimer, "is-changing");
+        replayMotion(statusLine, "is-inking", 380);
       }
     }, 1000);
   });
@@ -65,6 +87,8 @@
     render();
     if (toggle) toggle.textContent = "开始专注";
     if (statusLine) statusLine.textContent = "准备好时，点一下开始。";
+    replayMotion(incenseTimer, "is-changing");
+    replayMotion(statusLine, "is-inking", 380);
   });
   document
     .querySelector("[data-card-reveal]")
@@ -75,6 +99,7 @@
         "aria-expanded",
         String(Boolean(revealed)),
       );
+      replayMotion(card, "is-turning", 460);
     });
   refreshLessons();
   render();

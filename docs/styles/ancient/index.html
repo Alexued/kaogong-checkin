@@ -19,7 +19,7 @@
     />
     <meta name="theme-color" content="#f4efe5" />
     <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
-    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v071-release2" />
     <link rel="stylesheet" href="style.css?v=20260807-v071-release" />
     <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v071-release" />
     <script>
@@ -27,9 +27,10 @@
     </script>
     <script src="../shared/release-data.js?v=20260807-v071-release" defer></script>
     <script src="../shared/style-switcher.js?v=20260807-v071-release" defer></script>
+    <script src="../shared/motion.js?v=20260807-motion-v2" defer></script>
     <script src="app.js?v=20260807-v071-release" defer></script>
   </head>
-  <body data-style="ancient">
+  <body data-style="ancient" data-style-transition="scroll-unfurl">
     <a class="skip-link" href="#main-content">跳到主要内容</a>
     <header class="scroll-header">
       <div class="header-inner">
@@ -44,11 +45,17 @@
       <section
         class="scroll-hero"
         aria-labelledby="hero-title"
+        data-motion-scene
         data-enter
         style="--enter-order: 0"
       >
-        <div class="hero-side-mark" aria-hidden="true">策<br />论</div>
-        <div class="hero-copy">
+        <div
+          class="hero-side-mark"
+          aria-hidden="true"
+          data-reveal
+          style="--reveal-index: 0"
+        >策<br />论</div>
+        <div class="hero-copy" data-reveal style="--reveal-index: 1">
           <p class="eyebrow">Android 学习工具 · Windows 案头伴侣</p>
           <h1 id="hero-title">一日一卷，<br /><em>下笔有据。</em></h1>
           <p class="hero-intro">
@@ -58,7 +65,12 @@
             >展开今日功课 <span aria-hidden="true">→</span></a
           >
         </div>
-        <div class="bamboo-seal" aria-label="本地优先">
+        <div
+          class="bamboo-seal"
+          aria-label="本地优先"
+          data-reveal
+          style="--reveal-index: 2"
+        >
           <span>本地</span><span>优先</span>
         </div>
       </section>
@@ -67,14 +79,20 @@
         class="chapter scroll-sheet"
         id="schedule"
         aria-labelledby="schedule-title"
+        data-motion-scene
       >
-        <div class="chapter-ribbon">一</div>
-        <div class="chapter-heading">
+        <div class="chapter-ribbon" data-reveal style="--reveal-index: 0">一</div>
+        <div class="chapter-heading" data-reveal style="--reveal-index: 1">
           <p class="chapter-number">第一卷 · 定课</p>
           <h2 id="schedule-title">今日功课</h2>
           <p>按时辰铺开四件小事，完成一件，便在卷尾落一笔。</p>
         </div>
-        <ol class="lesson-list" data-lesson-list>
+        <ol
+          class="lesson-list"
+          data-lesson-list
+          data-reveal
+          style="--reveal-index: 2"
+        >
           <li class="lesson is-done">
             <button type="button" data-lesson-toggle aria-pressed="true">
               <span class="lesson-time">06:40</span
@@ -108,13 +126,23 @@
             </button>
           </li>
         </ol>
-        <p class="sheet-footnote" data-lesson-status aria-live="polite">
+        <p
+          class="sheet-footnote"
+          data-lesson-status
+          data-reveal
+          style="--reveal-index: 3"
+          aria-live="polite"
+        >
           两项已毕 · 还剩两项，慢慢做完即可。
         </p>
       </section>
 
-      <section class="chapter quiet-room" aria-labelledby="quiet-title">
-        <div class="quiet-column">
+      <section
+        class="chapter quiet-room"
+        aria-labelledby="quiet-title"
+        data-motion-scene
+      >
+        <div class="quiet-column" data-reveal style="--reveal-index: 0">
           <p class="chapter-number">第二卷 · 入静</p>
           <h2 id="quiet-title">一炷香的专注</h2>
           <p>将手机交给计时器，眼前只留一件事。时间到，卷页不会丢失。</p>
@@ -134,13 +162,22 @@
             准备好时，点一下开始。
           </p>
         </div>
-        <aside class="motto" aria-label="案头箴言">
+        <aside
+          class="motto"
+          aria-label="案头箴言"
+          data-reveal
+          style="--reveal-index: 1"
+        >
           <span>静</span><span>以</span><span>致</span><span>远</span>
         </aside>
       </section>
 
-      <section class="chapter card-cabinet" aria-labelledby="cabinet-title">
-        <div class="cabinet-copy">
+      <section
+        class="chapter card-cabinet"
+        aria-labelledby="cabinet-title"
+        data-motion-scene
+      >
+        <div class="cabinet-copy" data-reveal style="--reveal-index: 0">
           <p class="chapter-number">第三卷 · 案头伴侣</p>
           <h2 id="cabinet-title">背诵，先藏答案。</h2>
           <p>
@@ -155,7 +192,12 @@
             揭开一张卡 <span aria-hidden="true">↗</span>
           </button>
         </div>
-        <div class="memory-card" data-memory-card>
+        <div
+          class="memory-card"
+          data-memory-card
+          data-reveal
+          style="--reveal-index: 1"
+        >
           <div class="card-front">
             <small>资料分析 · 高频公式</small><strong>增长量如何估算？</strong
             ><span>点击揭面查看答案</span>
@@ -171,15 +213,16 @@
         class="chapter colophon"
         id="download"
         aria-labelledby="download-title"
+        data-motion-scene
       >
-        <div class="colophon-heading">
+        <div class="colophon-heading" data-reveal style="--reveal-index: 0">
           <p class="chapter-number">卷尾 · 版本落款</p>
           <h2 id="download-title">把这卷带回案头</h2>
           <p>
             Android 负责每日记录，Windows 伴侣负责局域网内的本地备份与版本提示。
           </p>
         </div>
-        <dl class="release-ledger">
+        <dl class="release-ledger" data-reveal style="--reveal-index: 1">
           <div>
             <dt>当前版本</dt>
             <dd>v<span data-release="version">0.7.1</span></dd>
@@ -221,7 +264,7 @@
             </dd>
           </div>
         </dl>
-        <p class="local-note">
+        <p class="local-note" data-reveal style="--reveal-index: 2">
           <strong>本地优先</strong> ·
           关闭电脑同步后，数据只写入手机；重新开启才会恢复发现、配对和局域网更新检查。
         </p>

@@ -4,6 +4,14 @@
   const tasks = [...document.querySelectorAll('[data-structure-task]')];
   const taskStatus = document.querySelector('[data-task-status]');
 
+  const pulse = (element, className, duration = 520) => {
+    if (!element) return;
+    element.classList.remove(className);
+    void element.offsetWidth;
+    element.classList.add(className);
+    window.setTimeout(() => element.classList.remove(className), duration);
+  };
+
   const renderTasks = () => {
     const completed = tasks.filter((task) => task.getAttribute('aria-pressed') === 'true').length;
     tasks.forEach((task) => {
@@ -16,8 +24,10 @@
   };
 
   tasks.forEach((task) => task.addEventListener('click', () => {
-    task.setAttribute('aria-pressed', String(task.getAttribute('aria-pressed') !== 'true'));
+    const isSet = task.getAttribute('aria-pressed') !== 'true';
+    task.setAttribute('aria-pressed', String(isSet));
     renderTasks();
+    pulse(task, isSet ? 'is-snapping' : 'is-releasing', 460);
   }));
 
   const syncRoot = document.querySelector('[data-sync-root]');
@@ -33,6 +43,7 @@
     if (syncLabel) syncLabel.textContent = enabled ? '允许电脑接力' : '保持本地';
     if (syncState) syncState.textContent = enabled ? 'LAN READY' : 'LOCAL';
     if (syncDetail) syncDetail.textContent = enabled ? '可发现已配对电脑，并比较局域网 APK 版本' : '发现、连接与局域网版本检查均已停止';
+    pulse(syncRoot, enabled ? 'is-routing' : 'is-unrouting', 560);
   });
 
   renderTasks();
