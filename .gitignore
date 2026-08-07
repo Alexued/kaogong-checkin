@@ -19,6 +19,7 @@ server/data/
 
 # 测试截图与临时文件
 test-shots/
+/artifacts/
 
 # 项目记忆（本地留存，不上传）
 记忆.md
