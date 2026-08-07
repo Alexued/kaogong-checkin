@@ -1,0 +1,86 @@
+{
+  "name": "kaogong-checkin-desktop",
+  "productName": "考公打卡电脑伴侣",
+  "version": "0.6.0",
+  "private": true,
+  "description": "考公打卡 Windows 电脑同步伴侣",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/renderer.js",
+    "pack": "electron-builder --dir --win --x64",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "io.github.alexued.kaogong-checkin.companion",
+    "productName": "考公打卡电脑伴侣",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "package.json",
+      {
+        "from": "../server/src",
+        "to": "server",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../docs/assets/app-icon.png",
+        "to": "assets/app-icon.png"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/apk",
+        "to": "apk",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "../docs/assets/app-icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "kaogong-checkin-windows-x64-setup-v${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "installerLanguages": [
+        "zh_CN"
+      ]
+    }
+  }
+}

@@ -1,52 +1,115 @@
-/**
- * REST 客户端。
- * API base URL 从 localStorage 的 serverUrl 读取（为空则同源），
- * 为 Capacitor APK 场景做准备（WebView 源为 capacitor://localhost，需指向局域网服务器）。
- */
+/** REST/WebSocket client for the selected computer companion. */
 import type { AppState, ServerInfo } from '../types';
+import {
+  getPairingToken,
+  getSelectedServerId,
+  setSelectedServerId,
+} from './pairing-storage';
 
-export function getServerUrl(): string {
-  return (localStorage.getItem('serverUrl') || '').trim();
+const SERVER_URL_KEY = 'serverUrl';
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }
 
-export function setServerUrl(url: string) {
-  localStorage.setItem('serverUrl', url.trim());
+export interface PairingResult {
+  token: string;
+  serverId: string;
+  protocolVersion?: number;
+}
+
+export function getServerUrl(): string {
+  return (localStorage.getItem(SERVER_URL_KEY) || '').trim();
+}
+
+export function setServerUrl(url: string, serverId?: string) {
+  const previous = getServerUrl();
+  const next = url.trim();
+  localStorage.setItem(SERVER_URL_KEY, next);
+  if (serverId !== undefined) setSelectedServerId(serverId);
+  else if (previous !== next) setSelectedServerId('');
+}
+
+export function rememberServerInfo(info: ServerInfo) {
+  if (info.serverId) setSelectedServerId(info.serverId);
 }
 
 function httpBase(): string {
-  const s = getServerUrl();
-  if (!s) return '';
-  const withProto = /^https?:\/\//.test(s) ? s : `http://${s}`;
-  return withProto.replace(/\/+$/, '');
+  const server = getServerUrl();
+  if (!server) return '';
+  const withProtocol = /^https?:\/\//.test(server) ? server : `http://${server}`;
+  return withProtocol.replace(/\/+$/, '');
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getPairingToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function responseJson<T>(response: Response, operation: string): Promise<T> {
+  if (!response.ok) throw new ApiError(`${operation} ${response.status}`, response.status);
+  return response.json() as Promise<T>;
 }
 
 export function wsUrl(): string {
-  const s = getServerUrl();
-  if (!s) {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${location.host}/ws`;
+  const server = getServerUrl();
+  let url: string;
+  if (!server) {
+    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    url = `${protocol}://${location.host}/ws`;
+  } else {
+    url = httpBase().replace(/^http/, 'ws') + '/ws';
   }
-  return httpBase().replace(/^http/, 'ws') + '/ws';
+
+  const token = getPairingToken();
+  if (!token) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
-export async function fetchState(): Promise<AppState> {
-  const r = await fetch(httpBase() + '/api/state');
-  if (!r.ok) throw new Error(`GET /api/state ${r.status}`);
-  return r.json();
-}
-
-export async function replaceState(state: AppState): Promise<AppState> {
-  const r = await fetch(httpBase() + '/api/state', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(state),
+export async function fetchState(signal?: AbortSignal): Promise<AppState> {
+  const response = await fetch(httpBase() + '/api/state', {
+    headers: authHeaders(),
+    signal,
   });
-  if (!r.ok) throw new Error(`PUT /api/state ${r.status}`);
-  return r.json();
+  return responseJson<AppState>(response, 'GET /api/state');
 }
 
-export async function fetchInfo(): Promise<ServerInfo> {
-  const r = await fetch(httpBase() + '/api/info');
-  if (!r.ok) throw new Error(`GET /api/info ${r.status}`);
-  return r.json();
+export async function replaceState(state: AppState, signal?: AbortSignal): Promise<AppState> {
+  const response = await fetch(httpBase() + '/api/state', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(state),
+    signal,
+  });
+  return responseJson<AppState>(response, 'PUT /api/state');
+}
+
+export async function fetchInfo(signal?: AbortSignal): Promise<ServerInfo> {
+  const response = await fetch(httpBase() + '/api/info', { signal });
+  return responseJson<ServerInfo>(response, 'GET /api/info');
+}
+
+export async function pairServer(
+  code: string,
+  expectedServerId = getSelectedServerId(),
+  signal?: AbortSignal,
+): Promise<PairingResult> {
+  const response = await fetch(httpBase() + '/api/pair', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code.trim(), clientName: '考公打卡 Android', protocolVersion: 2 }),
+    signal,
+  });
+  const result = await responseJson<PairingResult>(response, 'POST /api/pair');
+  if (!result.token || !result.serverId) throw new Error('配对响应缺少令牌或服务器标识');
+  if (expectedServerId && result.serverId !== expectedServerId) {
+    throw new Error('服务器标识已变化，请重新扫描');
+  }
+  return result;
 }

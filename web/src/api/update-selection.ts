@@ -21,3 +21,7 @@ export function selectPreferredRelease<T extends VersionedReleaseSource>(
   if (!github) return lan;
   return compareVersions(lan.version, github.version) >= 0 ? lan : github;
 }
+
+export function shouldUseLanUpdate(syncEnabled: boolean, serverUrl: string): boolean {
+  return syncEnabled && serverUrl.trim().length > 0;
+}

@@ -25,7 +25,14 @@ function compareVersionParts(a, b) {
 
 function findLatestApk(updateDir) {
   let latest = null;
-  for (const entry of fs.readdirSync(updateDir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = fs.readdirSync(updateDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null;
+    throw error;
+  }
+  for (const entry of entries) {
     if (!entry.isFile()) continue;
     const candidate = parseApkFileName(entry.name);
     if (!candidate) continue;

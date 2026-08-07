@@ -6,8 +6,7 @@ import { App as CapApp } from '@capacitor/app';
 import App from './App.vue';
 import { router } from './router';
 import { useAppStore } from './stores/app';
-import { startSync } from './api/sync';
-import { startDiscovery } from './api/discover';
+import { initializeComputerSync } from './api/computer-sync';
 import './styles/theme.css';
 import './styles/app.css';
 
@@ -45,7 +44,6 @@ if (Capacitor.isNativePlatform()) {
   });
 }
 
-void startSync();
-void startDiscovery();
+void initializeComputerSync();
 
 app.mount('#app');

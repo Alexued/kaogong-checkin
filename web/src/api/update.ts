@@ -5,12 +5,13 @@
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { getServerUrl } from './client';
-import { compareVersions, selectPreferredRelease } from './update-selection';
+import { compareVersions, selectPreferredRelease, shouldUseLanUpdate } from './update-selection';
+import { isSyncEnabled } from './sync-preference';
 
 export { compareVersions } from './update-selection';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '0.6.0';
 
 export interface ReleaseInfo {
   version: string;
@@ -139,11 +140,12 @@ export async function fetchLatestLanRelease(serverUrl = getServerUrl()): Promise
 
 export async function fetchLatestRelease(): Promise<ReleaseInfo> {
   const serverUrl = getServerUrl();
+  if (!shouldUseLanUpdate(isSyncEnabled(), serverUrl)) return fetchLatestGitHubRelease();
   const [lanResult, githubResult] = await Promise.allSettled([
-    serverUrl ? fetchLatestLanRelease(serverUrl) : Promise.resolve(null),
+    fetchLatestLanRelease(serverUrl),
     fetchLatestGitHubRelease(),
   ]);
-  const lan = lanResult.status === 'fulfilled' ? lanResult.value : null;
+  const lan = isSyncEnabled() && lanResult.status === 'fulfilled' ? lanResult.value : null;
   const github = githubResult.status === 'fulfilled' ? githubResult.value : null;
   const selected = selectPreferredRelease(lan, github);
   if (!selected) throw new Error('No update source is available');

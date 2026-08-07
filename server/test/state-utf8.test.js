@@ -29,6 +29,7 @@ test('full-state replacement preserves UTF-8 strings', async (t) => {
       KGC_HTTP_PORT: String(httpPort),
       KGC_UDP_PORT: String(udpPort),
       KGC_DATA_DIR: dataDir,
+      KGC_ALLOW_LEGACY: 'true',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

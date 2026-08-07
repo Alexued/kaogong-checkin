@@ -107,6 +107,9 @@ export interface ServerInfo {
   name: string;
   httpPort: number;
   ips: string[];
+  serverId?: string;
+  pairingRequired?: boolean;
+  protocolVersion?: number;
 }
 
 export type SyncEntity = 'task' | 'subtask' | 'checkin' | 'settings' | 'timer' | 'drill' | 'formulaDrill';
@@ -114,6 +117,16 @@ export interface SyncMessage {
   kind: 'upsert' | 'delete';
   entity: SyncEntity;
   payload: any;
+  /** v2 servers echo this value in an ack. Older servers safely ignore it. */
+  clientMutationId?: string;
 }
 
-export type RemoteSyncMessage = SyncMessage | SnapshotMessage;
+export interface SyncAckMessage {
+  kind: 'ack';
+  clientMutationId: string;
+  applied?: boolean;
+  error?: string;
+  protocolVersion?: number;
+}
+
+export type RemoteSyncMessage = SyncMessage | SnapshotMessage | SyncAckMessage;

@@ -4,35 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>页面不存在｜考公打卡</title>
-    <meta name="theme-color" content="#101412" />
-    <link rel="icon" type="image/png" href="/kaogong-checkin/assets/app-icon.png" />
+    <meta name="theme-color" content="#f5f5f7" />
+    <link rel="icon" type="image/png" href="assets/app-icon.png" />
     <style>
-      :root { font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif; color: #f2f6ef; background: #101412; }
-      * { box-sizing: border-box; letter-spacing: 0; }
-      body { min-width: 320px; min-height: 100svh; margin: 0; overflow: hidden; background: #101412; }
-      body::before { content: ""; position: fixed; top: 0; right: 18%; bottom: 0; width: 1px; background: rgba(255,255,255,.15); }
-      body::after { content: ""; position: fixed; right: 0; bottom: 17%; left: 0; height: 1px; background: rgba(255,255,255,.15); }
-      main { position: relative; z-index: 1; width: min(1120px, calc(100% - 48px)); min-height: 100svh; margin: 0 auto; display: grid; align-content: center; padding: 72px 0; }
-      .brand { display: flex; align-items: center; gap: 12px; font-weight: 900; }
-      img { width: 48px; height: 48px; border-radius: 4px; outline: 1px solid rgba(255,255,255,.18); outline-offset: -1px; box-shadow: 5px 5px 0 #ff6c55; }
-      .code { margin: 44px 0 0; color: #e6f438; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 124px; font-weight: 900; line-height: .82; font-variant-numeric: tabular-nums; }
-      h1 { max-width: 8em; margin: 26px 0 14px; font-family: "Arial Black", "Microsoft YaHei", sans-serif; font-size: 56px; line-height: 1.08; }
-      p { max-width: 34em; margin: 0; color: #b7c0b8; font-size: 16px; line-height: 1.8; }
-      a { width: fit-content; min-height: 54px; display: inline-flex; align-items: center; margin-top: 28px; padding: 0 18px; border-radius: 2px; background: #e6f438; color: #101412; font-size: 14px; font-weight: 900; text-decoration: none; box-shadow: 7px 7px 0 #67d9c4; transition: transform 180ms cubic-bezier(.16,1,.3,1); }
-      a:active { transform: scale(.97); }
-      a:focus-visible { outline: 3px solid #ff6c55; outline-offset: 4px; }
-      @media (hover:hover) { a:hover { transform: translateY(-2px); } }
-      @media (max-width:520px) { main { width: calc(100% - 40px); padding: 52px 0; } .code { margin-top: 38px; font-size: 78px; } h1 { font-size: 40px; } p { font-size: 15px; } }
-      @media (prefers-reduced-motion:reduce) { * { transition-duration: .01ms !important; } }
+      :root { color-scheme:light; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; color:#1d1d1f; background:#f5f5f7; }
+      * { box-sizing:border-box; letter-spacing:0; }
+      body { min-width:0; min-height:100svh; margin:0; background:#f5f5f7; }
+      header { height:48px; border-bottom:1px solid rgba(0,0,0,.08); }
+      .nav { display:flex; width:min(calc(100% - 40px),1024px); height:48px; margin:auto; align-items:center; gap:9px; font-size:14px; font-weight:650; }
+      .nav img { width:26px; height:26px; border-radius:6px; }
+      main { width:min(calc(100% - 40px),980px); min-height:calc(100svh - 48px); margin:auto; padding:64px 0; display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.72fr); align-items:center; gap:72px; }
+      .code { margin:0 0 20px; color:#6e6e73; font-size:14px; font-weight:700; }
+      h1 { max-width:8em; margin:0; font-size:clamp(48px,7vw,82px); line-height:1.02; }
+      p { max-width:34em; margin:24px 0 0; color:#6e6e73; font-size:17px; line-height:1.7; }
+      a { display:inline-flex; min-height:48px; margin-top:30px; padding:0 20px; align-items:center; border-radius:999px; background:#0071e3; color:#fff; font-size:14px; font-weight:650; text-decoration:none; transition:opacity 180ms ease,transform 180ms cubic-bezier(.2,0,0,1); }
+      a:focus-visible { outline:3px solid #0071e3; outline-offset:4px; }
+      .device { position:relative; width:min(100%,340px); aspect-ratio:.82; margin:auto; overflow:hidden; border:7px solid #1d1d1f; border-radius:42px; background:#fff; box-shadow:0 28px 70px rgba(0,0,0,.14); }
+      .device::before { position:absolute; top:13px; left:50%; width:76px; height:21px; border-radius:999px; background:#1d1d1f; content:""; transform:translateX(-50%); }
+      .screen { padding:76px 28px 28px; }.screen small { color:#6e6e73; }.screen strong { display:block; margin-top:8px; font-size:28px; }.row { display:flex; min-height:62px; margin-top:22px; padding:0 14px; align-items:center; gap:12px; border-top:1px solid #e6e6e9; }.row i { width:20px; height:20px; border:2px solid #a1a1a6; border-radius:50%; }.row span { display:grid; font-size:13px; }.row em { color:#86868b; font-size:11px; font-style:normal; }
+      @media (hover:hover) { a:hover { opacity:.84; transform:translateY(-1px); } }
+      @media (max-width:720px) { main { grid-template-columns:1fr; gap:48px; padding-top:52px; }.device { width:250px; } }
+      @media (prefers-reduced-motion:reduce) { * { transition-duration:.01ms !important; } }
     </style>
   </head>
   <body>
+    <header><div class="nav"><img src="assets/app-icon.png" width="26" height="26" alt="" /><span>考公打卡</span></div></header>
     <main>
-      <div class="brand"><img src="/kaogong-checkin/assets/app-icon.png" width="48" height="48" alt="" /><span>考公打卡</span></div>
-      <p class="code" aria-hidden="true">404</p>
-      <h1>这里没有计划</h1>
-      <p>这个地址不存在。返回介绍页，可以查看真实应用界面并下载 Android 安装包。</p>
-      <a href="/kaogong-checkin/">返回考公打卡</a>
+      <section><p class="code">404 / 页面不存在</p><h1>今天的计划，不在这里。</h1><p>这个地址可能已经移动。返回产品介绍页，可以了解 Android 学习工具和 Windows 本地伴侣，也可以直接获取最新版本。</p><a href="/kaogong-checkin/">返回考公打卡</a></section>
+      <div class="device" aria-hidden="true"><div class="screen"><small>8 月 5 日</small><strong>今天</strong><div class="row"><i></i><span>资料分析 40 题<em>等待开始</em></span></div><div class="row"><i></i><span>申论晨读<em>预计 20 分钟</em></span></div><div class="row"><i></i><span>常识错题复盘<em>保存在本机</em></span></div></div></div>
     </main>
   </body>
 </html>

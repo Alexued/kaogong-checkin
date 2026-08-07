@@ -54,20 +54,24 @@
       </div>
     </div>
 
-    <div class="section-title">服务器</div>
+    <div class="section-title">电脑同步</div>
     <div class="card block server-card">
       <div class="setting-row top-row">
         <div>
-          <strong>上传同步</strong>
+          <strong>电脑同步</strong>
           <span class="status-line" :class="{ online: store.online, pending: store.pendingSyncCount > 0 }">
             {{ syncStatusText }}
           </span>
         </div>
-        <label class="switch" title="切换上传同步">
+        <label class="switch" title="切换电脑同步">
           <input v-model="syncEnabled" type="checkbox" @change="toggleSync" />
           <span class="switch-track"></span>
         </label>
       </div>
+
+      <p v-if="!syncEnabled" class="sync-off-note">
+        关闭期间的数据只保存在本机；再次开启后会同步这些变更。
+      </p>
 
       <template v-if="syncEnabled">
         <div class="server-heading">
@@ -85,7 +89,10 @@
           @click="selectServer(server)"
         >
           <span class="radio"></span>
-          <span class="server-copy"><strong>{{ server.name }}</strong><small>{{ server.key }}</small></span>
+          <span class="server-copy">
+            <strong>{{ server.name }}</strong>
+            <small>{{ server.key }}{{ server.pairingRequired ? ' · 需要配对' : '' }}</small>
+          </span>
           <span v-if="normalizedServerUrl === server.key" class="selected-label">当前</span>
         </button>
         <div v-if="!discoveredServers.length" class="empty-scan">
@@ -97,8 +104,33 @@
           <span>手动地址</span>
           <input v-model="serverUrlInput" class="input" placeholder="192.168.1.5:8321" />
         </label>
+
+        <div v-if="needsPairing" class="pairing-panel">
+          <div class="pairing-copy">
+            <strong>输入电脑上的六位配对码</strong>
+            <span>配对码显示在 Windows 伴侣程序中。令牌只保存在这台手机。</span>
+          </div>
+          <div class="pairing-controls">
+            <input
+              v-model="pairingCode"
+              class="input pairing-input"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              placeholder="000000"
+              aria-label="六位配对码"
+              @input="normalizePairingCode"
+            />
+            <button class="btn" type="button" :disabled="pairing || pairingCode.length !== 6" @click="submitPairing">
+              {{ pairing ? '配对中…' : '配对' }}
+            </button>
+          </div>
+        </div>
+
         <div class="server-actions">
-          <button class="btn ghost" type="button" @click="saveServerUrl">保存并连接</button>
+          <button class="btn ghost" type="button" :disabled="connectingServer" @click="saveServerUrl">
+            {{ connectingServer ? '连接中…' : '保存并连接' }}
+          </button>
           <button class="btn danger" type="button" :disabled="!store.online || overwriting" @click="overwriteLocal">
             {{ overwriting ? '覆盖中…' : '用本地覆盖服务器' }}
           </button>
@@ -219,15 +251,20 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
-import { getServerUrl, setServerUrl } from '../api/client';
+import { ApiError, getServerUrl } from '../api/client';
 import {
-  restartDiscovery,
-  startDiscovery,
-  stopDiscovery,
   subscribeDiscovery,
   type DiscoveredServer,
 } from '../api/discover';
-import { isSyncEnabled, overwriteServerWithLocal, restartSync, setSyncEnabled } from '../api/sync';
+import { overwriteServerWithLocal } from '../api/sync';
+import {
+  configureComputerServer,
+  isSyncEnabled,
+  pairComputerServer,
+  rescanComputerServers,
+  setComputerSyncEnabled,
+} from '../api/computer-sync';
+import { getPairingToken, getSelectedServerId } from '../api/pairing-storage';
 import {
   APP_VERSION,
   compareVersions,
@@ -263,6 +300,10 @@ const serverUrlInput = ref(getServerUrl());
 const syncEnabled = ref(isSyncEnabled());
 const startupAnimation = ref(isStartupAnimationEnabled());
 const overwriting = ref(false);
+const connectingServer = ref(false);
+const pairing = ref(false);
+const pairingCode = ref('');
+const pairingRevision = ref(0);
 const syncMessage = ref('');
 const discoveredServers = ref<DiscoveredServer[]>([]);
 const scanning = ref(false);
@@ -291,8 +332,28 @@ const heatCells = computed(() =>
 const normalizedServerUrl = computed(() =>
   serverUrlInput.value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')
 );
+const selectedDiscoveredServer = computed(() =>
+  discoveredServers.value.find((server) => server.key === normalizedServerUrl.value)
+);
+const selectedServerId = computed(() =>
+  selectedDiscoveredServer.value?.serverId || store.syncServerId || getSelectedServerId()
+);
+const selectedServerRequiresPairing = computed(() =>
+  Boolean(selectedDiscoveredServer.value?.pairingRequired || store.syncPairingRequired)
+);
+const needsPairing = computed(() => {
+  void pairingRevision.value;
+  void store.syncPhase;
+  return Boolean(
+    syncEnabled.value
+    && selectedServerRequiresPairing.value
+    && selectedServerId.value
+    && !getPairingToken(selectedServerId.value),
+  );
+});
 const syncStatusText = computed(() => {
-  if (!syncEnabled.value) return '已关闭，仅使用本地数据';
+  if (!syncEnabled.value) return '已关闭，仅保存在本机';
+  if (needsPairing.value || store.syncPhase === 'pairing') return '等待与电脑配对';
   if (store.pendingSyncCount > 0) return `${store.pendingSyncCount} 条本地变更未同步`;
   return store.online ? '已连接，数据已同步' : '未连接服务器';
 });
@@ -526,32 +587,77 @@ function saveStartupAnimation() {
 
 async function toggleSync() {
   syncMessage.value = '';
-  setSyncEnabled(syncEnabled.value);
-  if (syncEnabled.value) {
-    await startDiscovery();
-  } else {
-    await stopDiscovery();
+  await setComputerSyncEnabled(syncEnabled.value);
+  if (!syncEnabled.value) {
     scanning.value = false;
+    syncMessage.value = '电脑连接已停止，本地数据和待同步变更已保留';
   }
 }
 
 async function rescanServers() {
   scanning.value = true;
   try {
-    await restartDiscovery();
+    await rescanComputerServers();
   } finally {
     scanning.value = false;
   }
 }
 
-function selectServer(server: DiscoveredServer) {
+async function selectServer(server: DiscoveredServer) {
   serverUrlInput.value = server.key;
-  saveServerUrl();
+  syncMessage.value = '';
+  connectingServer.value = true;
+  try {
+    await configureComputerServer(server.key, server.serverId);
+    if (server.pairingRequired && server.serverId && !getPairingToken(server.serverId)) {
+      syncMessage.value = '请输入 Windows 伴侣程序显示的六位配对码';
+    }
+  } finally {
+    connectingServer.value = false;
+  }
 }
 
-function saveServerUrl() {
-  setServerUrl(serverUrlInput.value);
-  restartSync();
+async function saveServerUrl() {
+  syncMessage.value = '';
+  connectingServer.value = true;
+  try {
+    await configureComputerServer(serverUrlInput.value);
+    if (store.syncPhase === 'pairing') syncMessage.value = '此电脑需要配对，请输入六位配对码';
+    else if (store.online) syncMessage.value = '已连接电脑';
+    else syncMessage.value = '地址已保存，正在等待电脑服务';
+  } finally {
+    connectingServer.value = false;
+  }
+}
+
+function normalizePairingCode() {
+  pairingCode.value = pairingCode.value.replace(/\D/g, '').slice(0, 6);
+}
+
+async function submitPairing() {
+  if (pairingCode.value.length !== 6 || !selectedServerId.value) return;
+  pairing.value = true;
+  syncMessage.value = '';
+  try {
+    await pairComputerServer(pairingCode.value, selectedServerId.value);
+    pairingCode.value = '';
+    pairingRevision.value += 1;
+    syncMessage.value = '配对成功，正在同步本地变更';
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      syncMessage.value = '';
+    } else if (error instanceof ApiError && (error.status === 400 || error.status === 401 || error.status === 403)) {
+      syncMessage.value = '失败：配对码不正确或已失效，请查看电脑上的最新配对码';
+    } else if (error instanceof ApiError && error.status === 429) {
+      syncMessage.value = '失败：尝试次数过多，请稍后再试';
+    } else if (error instanceof ApiError && error.status === 409) {
+      syncMessage.value = '失败：电脑与手机的同步协议版本不兼容，请更新两端应用';
+    } else {
+      syncMessage.value = '失败：无法完成配对，请确认手机与电脑在同一专用网络';
+    }
+  } finally {
+    pairing.value = false;
+  }
 }
 
 async function overwriteLocal() {
@@ -627,7 +733,14 @@ onUnmounted(() => {
 .server-copy { flex: 1; min-width: 0; }.server-copy strong, .server-copy small { display: block; }.server-copy small { margin-top: 3px; color: var(--text-3); }
 .selected-label { color: var(--accent-solid); font-size: 11px; font-weight: 700; }
 .empty-scan { padding: 15px 0; color: var(--text-3); font-size: 13px; display: flex; justify-content: center; align-items: center; gap: 10px; }
+.sync-off-note { margin: 12px 0 0; color: var(--text-2); font-size: 12px; line-height: 1.6; }
 .manual-field { display: block; margin-top: 10px; }.manual-field > span { display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-2); }
+.pairing-panel { margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; }
+.pairing-copy strong, .pairing-copy span { display: block; }
+.pairing-copy strong { font-size: 13px; }
+.pairing-copy span { margin-top: 4px; color: var(--text-3); font-size: 11px; line-height: 1.5; }
+.pairing-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; margin-top: 10px; }
+.pairing-input { letter-spacing: 0; font-variant-numeric: tabular-nums; text-align: center; font-weight: 800; }
 .server-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }.server-actions .btn { padding-inline: 10px; }
 .sync-message { margin-top: 10px; color: var(--accent-solid); font-size: 12px; }.sync-message.bad, .up-msg.bad { color: var(--danger); }
 .row-end { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

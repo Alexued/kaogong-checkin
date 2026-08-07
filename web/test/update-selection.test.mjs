@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectPreferredRelease } from '../src/api/update-selection.ts';
+import { selectPreferredRelease, shouldUseLanUpdate } from '../src/api/update-selection.ts';
 
 const release = (version, source) => ({ version, source });
 
@@ -32,4 +32,10 @@ test('one available source remains usable', () => {
 
 test('no available source returns null', () => {
   assert.equal(selectPreferredRelease(null, null), null);
+});
+
+test('LAN update checks require both computer sync and a configured server', () => {
+  assert.equal(shouldUseLanUpdate(false, '192.168.1.8:8321'), false);
+  assert.equal(shouldUseLanUpdate(true, ''), false);
+  assert.equal(shouldUseLanUpdate(true, '192.168.1.8:8321'), true);
 });

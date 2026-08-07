@@ -1,7 +1,7 @@
 /** UDP 局域网服务器扫描（仅原生 APK 内生效）。发现结果只展示，用户选择后才连接。 */
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { UdpSocket } from 'capacitor-udp-socket';
-import { isSyncEnabled } from './sync';
+import { isSyncEnabled } from './sync-preference';
 
 const UDP_PORT = 8322;
 const STALE_MS = 30000;
@@ -12,6 +12,9 @@ export interface DiscoveredServer {
   host: string;
   httpPort: number;
   lastSeen: number;
+  serverId?: string;
+  pairingRequired: boolean;
+  protocolVersion: number;
 }
 
 let activeSocketId: number | null = null;
@@ -106,7 +109,13 @@ export function startDiscovery(): Promise<void> {
           } catch {
             /* plugin may already provide plaintext */
           }
-          const message = JSON.parse(text) as { name?: string; httpPort?: number };
+          const message = JSON.parse(text) as {
+            name?: string;
+            httpPort?: number;
+            serverId?: string;
+            pairingRequired?: boolean;
+            protocolVersion?: number;
+          };
           const host = (event.remoteAddress || '').replace(/^\//, '');
           if (!host || !message.httpPort) return;
           const key = `${host}:${message.httpPort}`;
@@ -116,6 +125,9 @@ export function startDiscovery(): Promise<void> {
             httpPort: Number(message.httpPort),
             name: String(message.name || host),
             lastSeen: Date.now(),
+            serverId: message.serverId ? String(message.serverId) : undefined,
+            pairingRequired: Boolean(message.pairingRequired),
+            protocolVersion: Number(message.protocolVersion || 1),
           });
           notify();
         } catch {

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self';" />
+    <title>考公打卡电脑伴侣</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">考</span><div><strong>考公打卡</strong><span>电脑伴侣</span></div></div>
+        <nav aria-label="应用区域"><button class="nav-item is-active" type="button">连接中心</button><button class="nav-item" type="button" data-open-data>本地数据</button><button class="nav-item" type="button" data-open-repository>项目主页</button></nav>
+        <div class="sidebar-foot"><span data-version>v0.6.0</span><button type="button" data-quit>退出应用</button></div>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar"><div><p class="eyebrow">WINDOWS COMPANION</p><h1>连接中心</h1></div><div class="status-pill" data-phase="stopped"><span></span><strong data-status>正在读取状态</strong></div></header>
+
+        <section class="hero-panel">
+          <div><p class="panel-label">局域网同步服务</p><h2 data-service-title>准备启动</h2><p data-service-copy>启动后，手机可通过六位配对码连接这台电脑。</p></div>
+          <button class="primary-action" type="button" data-service-toggle>启动服务</button>
+        </section>
+
+        <div class="content-grid">
+          <section class="card connection-card">
+            <div class="card-heading"><div><p class="panel-label">手机连接</p><h2>地址与配对码</h2></div><button class="quiet-action" type="button" data-regenerate>换一组配对码</button></div>
+            <dl class="facts">
+              <div><dt>局域网地址</dt><dd><code data-address>服务启动后显示</code><button type="button" data-copy="address">复制</button></dd></div>
+              <div><dt>六位配对码</dt><dd><strong class="pair-code" data-pairing>------</strong><button type="button" data-copy="pairing">复制</button></dd></div>
+              <div><dt>协议</dt><dd><span data-protocol>--</span></dd></div>
+            </dl>
+            <p class="trust-note">只接受完成配对的客户端。建议在家庭或个人热点等专用网络中使用。</p>
+          </section>
+
+          <section class="card apk-card">
+            <div class="card-heading"><div><p class="panel-label">Android 安装</p><h2>手机扫码下载</h2></div></div>
+            <div class="qr-frame"><img data-qr alt="Android APK 下载二维码" hidden /><div data-qr-empty>安装包就绪后显示二维码</div></div>
+            <strong data-apk-name>正在检查 APK</strong><p data-apk-copy>二维码仅在同一局域网内可访问。</p>
+            <button class="secondary-action" type="button" data-copy="apk">复制下载地址</button>
+          </section>
+        </div>
+
+        <section class="card system-card">
+          <div><p class="panel-label">本机设置</p><h2>数据与后台运行</h2><p>关闭窗口后服务继续在系统托盘运行，退出应用才会停止服务。</p></div>
+          <div class="system-actions"><label><input type="checkbox" data-launch /><span>开机后自动启动</span></label><button type="button" data-open-local>打开网页版</button><button type="button" data-open-data>打开数据目录</button><button type="button" data-copy="diagnostics">复制诊断信息</button></div>
+        </section>
+
+        <div class="toast" role="status" aria-live="polite" data-toast></div>
+      </section>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

@@ -53,6 +53,11 @@ export const useAppStore = defineStore('app', {
     settings: { planEndDate: null, theme: 'light', markDate: null } as Settings,
     online: false,
     pendingSyncCount: 0,
+    syncPhase: 'local' as 'local' | 'connecting' | 'pairing' | 'offline' | 'online',
+    syncPairingRequired: false,
+    syncServerId: '',
+    syncServerName: '',
+    syncProtocolVersion: 1,
     loaded: false,
   }),
   actions: {

@@ -1,277 +1,390 @@
-/**
- * WebSocket 同步：
- * - 启动：本地缓存水合（离线重启数据不丢）→ GET /api/state 全量快照 → 建立 WS
- * - 所有本地变更先入 localStorage 离线队列（乐观更新由 store 完成），
- *   WS 在线时立即按序发送；重连成功后重放队列，再拉一次全量快照对齐
- * - 全量状态持久化到 localStorage（防抖），启动时先恢复再与服务器对齐
- * - WS 断开指数退避重连（1s → 2s → … → 30s 封顶）
- */
+/** Local-first state persistence and guarded WebSocket synchronization. */
 import { useAppStore } from '../stores/app';
-import { fetchState, replaceState, wsUrl } from './client';
-import type { AppState, RemoteSyncMessage, SyncMessage } from '../types';
+import { ApiError, fetchInfo, fetchState, rememberServerInfo, replaceState, wsUrl } from './client';
+import { getPairingToken, removePairingToken } from './pairing-storage';
+import { SyncGeneration } from './sync-generation';
+import { isSyncEnabled, LOCAL_STATE_KEY } from './sync-preference';
+import { compactQueue, normalizeQueue, type QueuedSyncMessage } from './sync-queue';
+import type { AppState, RemoteSyncMessage, ServerInfo, SyncMessage } from '../types';
 
 const QUEUE_KEY = 'kgc-queue';
-const STATE_KEY = 'kgc-state';
-const SYNC_ENABLED_KEY = 'kgc-sync-enabled';
+const ACK_PROTOCOL_VERSION = 2;
 
-function loadQueue(): SyncMessage[] {
+let queue: QueuedSyncMessage[] = [];
+let queueLoaded = false;
+let localInitialized = false;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let subscribed = false;
+
+let socket: WebSocket | null = null;
+let sentMutationIds = new Set<string>();
+let retryDelay = 1000;
+let started = false;
+const generationGuard = new SyncGeneration();
+let runGeneration = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let runAbortController: AbortController | null = null;
+let replaceAbortController: AbortController | null = null;
+let replacing = false;
+let serverInfo: ServerInfo | null = null;
+
+function loadQueue() {
+  if (queueLoaded) return;
+  queueLoaded = true;
   try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    queue = normalizeQueue(JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'));
   } catch {
-    return [];
+    queue = [];
   }
+  persistQueue();
 }
 
-/** 读取本地持久化的全量状态；settings 字段补齐缺省值 */
 function loadState(): AppState | null {
   try {
-    const raw = localStorage.getItem(STATE_KEY);
+    const raw = localStorage.getItem(LOCAL_STATE_KEY);
     if (!raw) return null;
-    const s = JSON.parse(raw) as AppState;
-    s.settings = Object.assign({ planEndDate: null, theme: 'light', markDate: null }, s.settings);
-    return s;
+    const state = JSON.parse(raw) as AppState;
+    state.settings = Object.assign({ planEndDate: null, theme: 'light', markDate: null }, state.settings);
+    return state;
   } catch {
     return null;
   }
 }
 
-let persistTimer: ReturnType<typeof setTimeout> | null = null;
+function currentState(): AppState {
+  const store = useAppStore();
+  return {
+    tasks: store.tasks,
+    subtasks: store.subtasks,
+    checkins: store.checkins,
+    timers: store.timers,
+    drills: store.drills,
+    formulaDrills: store.formulaDrills,
+    settings: store.settings,
+  };
+}
 
-/** 防抖持久化 store 全量状态 */
 function schedulePersistState() {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    const s = useAppStore();
-    const snapshot: AppState = {
-      tasks: s.tasks,
-      subtasks: s.subtasks,
-      checkins: s.checkins,
-      timers: s.timers,
-      drills: s.drills,
-      formulaDrills: s.formulaDrills,
-      settings: s.settings,
-    };
     try {
-      localStorage.setItem(STATE_KEY, JSON.stringify(snapshot));
+      localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(currentState()));
     } catch {
-      /* 存储满等异常忽略 */
+      /* A full storage area must not interrupt local app behavior. */
     }
   }, 300);
 }
 
-let queue: SyncMessage[] = loadQueue();
-let ws: WebSocket | null = null;
-let retryDelay = 1000;
-let started = false;
-let runGeneration = 0;
-let replayed = false;
-let subscribed = false;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let replacing = false;
-
-export function isSyncEnabled(): boolean {
-  return localStorage.getItem(SYNC_ENABLED_KEY) !== 'false';
-}
-
 function persistQueue() {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  } catch {
+    /* Keep the in-memory queue usable if storage is temporarily unavailable. */
+  }
   useAppStore().pendingSyncCount = queue.length;
 }
 
-export function enqueue(msg: SyncMessage) {
-  queue.push(msg);
-  persistQueue();
-  flush();
-}
-
-function flush() {
-  if (replacing || !isSyncEnabled() || !ws || ws.readyState !== WebSocket.OPEN) return;
-  while (queue.length > 0 && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(queue[0]));
-    queue.shift();
-    replayed = true;
-  }
-  persistQueue();
-  if (replayed) {
-    replayed = false;
-    // 队列重放完成后拉全量快照对齐（单用户 last-write-wins）
-    const store = useAppStore();
-    const generation = runGeneration;
-    fetchState()
-      .then((s) => {
-        if (generation === runGeneration && isSyncEnabled() && !replacing) store.applySnapshot(s);
-      })
-      .catch(() => {});
-  }
-}
-
-export async function startSync() {
-  if (started) return;
-  const generation = ++runGeneration;
-  started = true;
-  const isCurrentRun = () => generation === runGeneration;
+function replayPendingLocally() {
   const store = useAppStore();
-  store.pendingSyncCount = queue.length;
-  // 先用本地缓存水合并重放离线队列：离线重启数据不丢
+  for (const message of queue) store.applyRemote(message);
+}
+
+/** Hydration is synchronous and independent from every network branch. */
+export function initializeLocalState() {
+  if (localInitialized) return;
+  localInitialized = true;
+  loadQueue();
+  const store = useAppStore();
   const cached = loadState();
-  if (cached) {
-    store.applySnapshot(cached);
-  }
-  if (!isSyncEnabled()) {
-    if (!isCurrentRun()) return;
-    for (const m of queue) store.applyRemote(m);
-    store.loaded = true;
-    if (!subscribed) {
-      subscribed = true;
-      store.$subscribe(schedulePersistState);
-    }
-    schedulePersistState();
-    started = false;
-    return;
-  }
-  try {
-    const serverState = await fetchState();
-    if (isCurrentRun() && isSyncEnabled()) store.applySnapshot(serverState);
-  } catch {
-    // 服务器不可达：离线模式，使用本地缓存数据
-  }
-  if (!isCurrentRun() || !isSyncEnabled()) return;
-  for (const m of queue) store.applyRemote(m);
+  if (cached) store.applySnapshot(cached);
+  replayPendingLocally();
   store.loaded = true;
-  // 之后所有状态变化都持久化到本地（只订阅一次，restartSync 不重复订阅）
+  store.pendingSyncCount = queue.length;
   if (!subscribed) {
     subscribed = true;
     store.$subscribe(schedulePersistState);
   }
   schedulePersistState();
-  connect();
 }
 
-function connect() {
-  if (!isSyncEnabled() || replacing) return;
+export function enqueue(message: SyncMessage) {
+  loadQueue();
+  queue = compactQueue(queue, message);
+  persistQueue();
+  flushCurrentSocket();
+}
+
+function isCurrentRun(generation: number): boolean {
+  return started && generationGuard.isCurrent(generation) && isSyncEnabled();
+}
+
+function isCurrentSocket(generation: number, candidate: WebSocket): boolean {
+  return isCurrentRun(generation) && socket === candidate;
+}
+
+function supportsAcknowledgements(): boolean {
+  return Number(serverInfo?.protocolVersion || 1) >= ACK_PROTOCOL_VERSION;
+}
+
+function updateServerStatus(info: ServerInfo) {
   const store = useAppStore();
-  try {
-    ws = new WebSocket(wsUrl());
-  } catch {
-    scheduleReconnect();
+  store.syncServerId = info.serverId || '';
+  store.syncServerName = info.name || '';
+  store.syncPairingRequired = Boolean(info.pairingRequired);
+  store.syncProtocolVersion = Number(info.protocolVersion || 1);
+}
+
+function pairingIsMissing(info: ServerInfo): boolean {
+  return Boolean(info.pairingRequired && info.serverId && !getPairingToken(info.serverId));
+}
+
+function applyServerSnapshot(state: AppState) {
+  const store = useAppStore();
+  store.applySnapshot(state);
+  // Pending local writes always win over a snapshot until the server acknowledges them.
+  replayPendingLocally();
+  schedulePersistState();
+}
+
+function removeAcknowledgedMutation(clientMutationId: string) {
+  const index = queue.findIndex((message) => message.clientMutationId === clientMutationId);
+  if (index < 0) return;
+  queue.splice(index, 1);
+  sentMutationIds.delete(clientMutationId);
+  persistQueue();
+}
+
+function flushSocket(generation: number, candidate: WebSocket) {
+  if (replacing || !isCurrentSocket(generation, candidate) || candidate.readyState !== WebSocket.OPEN) return;
+
+  if (supportsAcknowledgements()) {
+    for (const message of queue) {
+      if (sentMutationIds.has(message.clientMutationId)) continue;
+      try {
+        candidate.send(JSON.stringify(message));
+        sentMutationIds.add(message.clientMutationId);
+      } catch {
+        break;
+      }
+    }
     return;
   }
-  ws.onopen = () => {
+
+  // Legacy servers do not acknowledge. Remove only after WebSocket.send succeeds.
+  let changed = false;
+  while (queue.length && isCurrentSocket(generation, candidate) && candidate.readyState === WebSocket.OPEN) {
+    try {
+      candidate.send(JSON.stringify(queue[0]));
+      queue.shift();
+      changed = true;
+    } catch {
+      break;
+    }
+  }
+  if (changed) persistQueue();
+}
+
+function flushCurrentSocket() {
+  if (socket) flushSocket(runGeneration, socket);
+}
+
+function detachAndCloseSocket() {
+  if (!socket) return;
+  const previous = socket;
+  socket = null;
+  previous.onopen = null;
+  previous.onmessage = null;
+  previous.onclose = null;
+  previous.onerror = null;
+  try {
+    previous.close();
+  } catch {
+    /* already closed */
+  }
+  sentMutationIds.clear();
+}
+
+function connect(generation: number) {
+  if (!isCurrentRun(generation) || replacing) return;
+  const store = useAppStore();
+  let candidate: WebSocket;
+  try {
+    candidate = new WebSocket(wsUrl());
+  } catch {
+    scheduleReconnect(generation);
+    return;
+  }
+
+  detachAndCloseSocket();
+  socket = candidate;
+  sentMutationIds = new Set();
+
+  candidate.onopen = () => {
+    if (!isCurrentSocket(generation, candidate)) return;
     retryDelay = 1000;
     store.online = true;
-    flush();
+    store.syncPhase = 'online';
+    flushSocket(generation, candidate);
   };
-  ws.onmessage = (ev) => {
+
+  candidate.onmessage = (event) => {
+    if (!isCurrentSocket(generation, candidate)) return;
     try {
-      const msg = JSON.parse(ev.data as string) as RemoteSyncMessage;
-      if (msg.kind === 'snapshot') store.applySnapshot(msg.state);
-      else store.applyRemote(msg);
+      const message = JSON.parse(event.data as string) as RemoteSyncMessage;
+      if (message.kind === 'ack') {
+        if (message.error) {
+          sentMutationIds.delete(message.clientMutationId);
+          candidate.close();
+        } else {
+          removeAcknowledgedMutation(message.clientMutationId);
+        }
+      }
+      else if (message.kind === 'snapshot') applyServerSnapshot(message.state);
+      else store.applyRemote(message);
     } catch {
-      /* 忽略坏消息 */
+      /* Ignore malformed or unrelated messages. */
     }
   };
-  ws.onclose = () => {
+
+  candidate.onclose = () => {
+    if (!isCurrentSocket(generation, candidate)) return;
+    socket = null;
+    sentMutationIds.clear();
     store.online = false;
-    ws = null;
-    scheduleReconnect();
+    store.syncPhase = 'offline';
+    scheduleReconnect(generation);
   };
-  ws.onerror = () => {
+
+  candidate.onerror = () => {
+    if (!isCurrentSocket(generation, candidate)) return;
     try {
-      ws?.close();
+      candidate.close();
     } catch {
-      /* noop */
+      /* close callback handles retry */
     }
   };
 }
 
-function scheduleReconnect() {
-  if (!isSyncEnabled() || replacing || reconnectTimer) return;
+function scheduleReconnect(generation: number) {
+  if (!isCurrentRun(generation) || replacing || reconnectTimer) return;
   const delay = retryDelay;
   retryDelay = Math.min(retryDelay * 2, 30000);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    connect();
+    void refreshSnapshotAndConnect(generation);
   }, delay);
 }
 
+async function refreshSnapshotAndConnect(generation: number) {
+  if (!isCurrentRun(generation) || replacing) return;
+  const store = useAppStore();
+  store.syncPhase = 'connecting';
+  let info: ServerInfo | null = null;
+
+  try {
+    info = await fetchInfo(runAbortController?.signal);
+    if (!isCurrentRun(generation)) return;
+    rememberServerInfo(info);
+    serverInfo = info;
+    updateServerStatus(info);
+    if (pairingIsMissing(info)) {
+      store.online = false;
+      store.syncPhase = 'pairing';
+      return;
+    }
+  } catch (error) {
+    if (!isCurrentRun(generation) || (error instanceof DOMException && error.name === 'AbortError')) return;
+    // Older or temporarily unreachable servers remain eligible for the legacy WS path.
+  }
+
+  try {
+    const state = await fetchState(runAbortController?.signal);
+    if (!isCurrentRun(generation)) return;
+    applyServerSnapshot(state);
+  } catch (error) {
+    if (!isCurrentRun(generation) || (error instanceof DOMException && error.name === 'AbortError')) return;
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      if (store.syncServerId) removePairingToken(store.syncServerId);
+      store.online = false;
+      store.syncPairingRequired = true;
+      store.syncPhase = 'pairing';
+      return;
+    }
+  }
+
+  if (isCurrentRun(generation)) connect(generation);
+}
+
+export async function startSync() {
+  initializeLocalState();
+  if (!isSyncEnabled() || started) return;
+
+  started = true;
+  const generation = generationGuard.begin();
+  runGeneration = generation;
+  retryDelay = 1000;
+  serverInfo = null;
+  runAbortController?.abort();
+  runAbortController = new AbortController();
+  const store = useAppStore();
+  store.online = false;
+  store.syncPairingRequired = false;
+  store.syncPhase = 'connecting';
+  await refreshSnapshotAndConnect(generation);
+}
+
 export function stopSync() {
-  runGeneration += 1;
+  runGeneration = generationGuard.invalidate();
+  started = false;
+  replacing = false;
+  runAbortController?.abort();
+  runAbortController = null;
+  replaceAbortController?.abort();
+  replaceAbortController = null;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  if (ws) {
-    ws.onclose = null;
-    try {
-      ws.close();
-    } catch {
-      /* noop */
-    }
-    ws = null;
-  }
-  useAppStore().online = false;
-  started = false;
-  replayed = false;
+  detachAndCloseSocket();
+  const store = useAppStore();
+  store.online = false;
+  store.syncPhase = isSyncEnabled() ? 'offline' : 'local';
 }
 
-export function setSyncEnabled(enabled: boolean) {
-  localStorage.setItem(SYNC_ENABLED_KEY, String(enabled));
-  if (enabled) {
-    retryDelay = 1000;
-    void startSync();
-  }
-  else stopSync();
-}
-
-function currentState(): AppState {
-  const s = useAppStore();
-  return {
-    tasks: s.tasks,
-    subtasks: s.subtasks,
-    checkins: s.checkins,
-    timers: s.timers,
-    drills: s.drills,
-    formulaDrills: s.formulaDrills,
-    settings: s.settings,
-  };
+export async function restartSync() {
+  stopSync();
+  if (isSyncEnabled()) await startSync();
 }
 
 export async function overwriteServerWithLocal() {
+  initializeLocalState();
   if (!isSyncEnabled()) throw new Error('sync disabled');
   if (replacing) throw new Error('replace already in progress');
   const store = useAppStore();
   if (!store.online) throw new Error('server offline');
+
   replacing = true;
+  const generation = runGeneration;
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
-  if (ws) {
-    ws.onclose = null;
-    try {
-      ws.close();
-    } catch {
-      /* noop */
-    }
-    ws = null;
-  }
+  detachAndCloseSocket();
   store.online = false;
+  store.syncPhase = 'connecting';
+  replaceAbortController = new AbortController();
   try {
-    const state = await replaceState(currentState());
+    const state = await replaceState(currentState(), replaceAbortController.signal);
+    if (!isCurrentRun(generation)) throw new Error('sync run changed');
     queue = [];
     persistQueue();
     store.applySnapshot(state);
+    schedulePersistState();
     return state;
   } finally {
+    replaceAbortController = null;
     replacing = false;
-    if (isSyncEnabled()) connect();
+    if (isCurrentRun(generation)) void refreshSnapshotAndConnect(generation);
   }
-}
-
-/** 修改 serverUrl 后调用：以新地址重新初始化同步 */
-export function restartSync() {
-  stopSync();
-  retryDelay = 1000;
-  if (isSyncEnabled()) void startSync();
 }
