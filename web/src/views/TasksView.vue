@@ -1,7 +1,14 @@
 <template>
   <div class="page">
-    <h1 class="page-title">任务管理</h1>
-    <p class="page-sub">每日重复或截止型任务</p>
+    <header class="tasks-heading">
+      <button class="back-button" type="button" aria-label="返回今日" title="返回今日" @click="navigateToParent(router)">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      </button>
+      <div>
+        <h1 class="page-title">任务管理</h1>
+        <p class="page-sub">每日重复或截止型任务</p>
+      </div>
+    </header>
 
     <button class="btn add-btn" @click="openEditor()">+ 新建任务</button>
 
@@ -21,6 +28,10 @@
         <div class="row-title">{{ t.title }}</div>
         <div class="row-meta">
           <span class="badge">{{ t.type === 'daily' ? '每日' : '截止' }}</span>
+          <span v-if="t.target > 1" class="badge quantity">{{ t.target }}{{ t.unit || '次' }}</span>
+          <span v-else-if="store.subtasks.some((subtask) => subtask.taskId === t.id)" class="badge">
+            清单
+          </span>
           <span v-if="t.endDate" class="date">
             {{ t.type === 'daily' ? '结束于' : '截止' }} {{ t.endDate }}
           </span>
@@ -59,11 +70,14 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
+import { navigateToParent } from '../lib/backNavigation';
 import TaskEditorSheet from '../components/TaskEditorSheet.vue';
 import type { Task } from '../types';
 
 const store = useAppStore();
+const router = useRouter();
 
 const activeTasks = computed(() =>
   store.tasks.filter((t) => !t.archived).sort((a, b) => a.order - b.order)
@@ -92,6 +106,8 @@ function onSave(form: {
   title: string;
   type: Task['type'];
   endDate: string;
+  target: number;
+  unit: string;
   subs: { id?: string; title: string }[];
 }) {
   const id = store.saveTask({
@@ -99,6 +115,8 @@ function onSave(form: {
     title: form.title,
     type: form.type,
     endDate: form.endDate || null,
+    target: form.target,
+    unit: form.unit,
   });
   if (id) store.saveSubtasks(id, form.subs);
 }
@@ -111,6 +129,32 @@ function onDelete(t: Task) {
 </script>
 
 <style scoped>
+.tasks-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 2px 0 16px;
+}
+
+.tasks-heading .page-title { margin: 0 0 3px; }
+.tasks-heading .page-sub { margin: 0; }
+
+.back-button {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.back-button:active { transform: scale(.94); }
+.back-button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+
 .add-btn {
   width: 100%;
   margin-bottom: 16px;
@@ -149,6 +193,11 @@ function onDelete(t: Task) {
 .date {
   font-size: 12px;
   color: var(--text-3);
+}
+
+.badge.quantity {
+  background: var(--accent-soft);
+  color: var(--accent-solid);
 }
 
 .row-actions {

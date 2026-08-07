@@ -29,6 +29,10 @@
       </div>
     </header>
 
+    <div v-if="store.recoveryRequired" class="recovery-notice" role="alert">
+      本地数据需要恢复，当前已进入只读模式。原始数据未被覆盖。
+    </div>
+
     <section class="progress-overview" aria-label="今日完成进度">
       <ProgressRing :percent="progress">
         <div class="ring-text">
@@ -60,6 +64,25 @@
       @mark="onMark"
     />
 
+    <!-- 结转任务 -->
+    <template v-if="plan.carried.length">
+      <div class="section-title">之前未完成</div>
+      <div class="task-grid">
+        <TaskCard
+          v-for="(item, i) in plan.carried"
+          :key="item.task.id + '@' + item.date"
+          :item="item"
+          :index="plan.today.length + i"
+          :expanded="expandedItems.has(itemKey(item))"
+          @toggle="onToggle"
+          @toggle-source="onToggleSource"
+          @adjust-progress="onAdjustProgress"
+          @toggle-expand="onToggleExpand"
+          @edit="onEditTask"
+        />
+      </div>
+    </template>
+
     <!-- 今日任务 -->
     <template v-if="plan.today.length">
       <div class="section-title">今日任务</div>
@@ -73,26 +96,12 @@
           :first="i === 0"
           :last="i === plan.today.length - 1"
           :sub-items="subsByTask.get(item.task.id) || []"
-          :expanded="expandedTasks.has(item.task.id)"
+          :expanded="expandedItems.has(itemKey(item))"
           @toggle="onToggle"
+          @adjust-progress="onAdjustProgress"
           @move="onMove"
           @toggle-sub="onToggleSub"
           @toggle-expand="onToggleExpand"
-          @edit="onEditTask"
-        />
-      </div>
-    </template>
-
-    <!-- 结转任务 -->
-    <template v-if="plan.carried.length">
-      <div class="section-title">之前未完成</div>
-      <div class="task-grid">
-        <TaskCard
-          v-for="(item, i) in plan.carried"
-          :key="item.task.id + '@' + item.date"
-          :item="item"
-          :index="plan.today.length + i"
-          @toggle="onToggle"
           @edit="onEditTask"
         />
       </div>
@@ -127,7 +136,7 @@ import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import confetti from 'canvas-confetti';
 import { useAppStore } from '../stores/app';
-import { generatePlan, type PlanItem } from '../lib/plan';
+import { generatePlan, selectProgressSource, type PlanItem, type ProgressSource } from '../lib/plan';
 import { completionForDate } from '../lib/completion';
 import { todayStr, diffDays, formatCn, weekdayCn } from '../lib/date';
 import TaskCard from '../components/TaskCard.vue';
@@ -149,13 +158,18 @@ const editingTask = ref<Task | null>(null);
 const isActiveTab = computed(() => route.path === '/');
 
 /** 展开子任务的主任务 id 集合 */
-const expandedTasks = ref(new Set<string>());
+const expandedItems = ref(new Set<string>());
+
+function itemKey(item: PlanItem) {
+  return `${item.task.id}@${item.sources?.length ? 'carried' : item.date}`;
+}
 
 function onToggleExpand(item: PlanItem) {
-  const s = new Set(expandedTasks.value);
-  if (s.has(item.task.id)) s.delete(item.task.id);
-  else s.add(item.task.id);
-  expandedTasks.value = s;
+  const key = itemKey(item);
+  const next = new Set(expandedItems.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedItems.value = next;
 }
 
 interface SubItem {
@@ -191,10 +205,11 @@ const plan = computed(() =>
   generatePlan(store.tasks, store.checkins, selectedDate.value, store.settings.planEndDate)
 );
 
-const doneCount = computed(() => plan.value.today.filter((x) => x.done).length);
-const progress = computed(() =>
-  plan.value.today.length ? doneCount.value / plan.value.today.length : 0
+const completion = computed(() =>
+  completionForDate(store.tasks, store.checkins, selectedDate.value, store.settings.planEndDate)
 );
+const doneCount = computed(() => completion.value.done);
+const progress = computed(() => completion.value.ratio);
 
 /** 任务日期的完成度色阶，与统计页共用 --heat-0 ~ --heat-4。 */
 function completionLevel(date: string): number {
@@ -216,10 +231,39 @@ function onMark(date: string) {
 }
 
 function onToggle(item: PlanItem, ev: MouseEvent) {
-  const checking = !item.done;
-  // 补卡：item.date 为原始日期，直接写入 checkin.date
-  store.toggleCheckin(item.task.id, item.date, item.checkinId);
+  const source = selectProgressSource(item, item.done ? -1 : 1);
+  const checking = source.progress < source.target;
+  store.setProgress(
+    item.task.id,
+    source.date,
+    checking ? source.target : 0,
+    source.checkinId,
+  );
   if (checking) {
+    celebrate(ev);
+    checkAllDone();
+  }
+}
+
+function onToggleSource(item: PlanItem, source: ProgressSource, ev: MouseEvent) {
+  const checking = source.progress < source.target;
+  store.setProgress(item.task.id, source.date, checking ? source.target : 0, source.checkinId);
+  if (checking) {
+    celebrate(ev);
+    checkAllDone();
+  }
+}
+
+function onAdjustProgress(
+  item: PlanItem,
+  delta: -1 | 1,
+  explicitSource: ProgressSource | undefined,
+  ev: MouseEvent,
+) {
+  const source = explicitSource || selectProgressSource(item, delta);
+  const next = Math.min(source.target, Math.max(0, source.progress + delta));
+  store.setProgress(item.task.id, source.date, next, source.checkinId);
+  if (delta > 0 && next === source.target) {
     celebrate(ev);
     checkAllDone();
   }
@@ -254,6 +298,8 @@ function onSaveTask(form: {
   title: string;
   type: Task['type'];
   endDate: string;
+  target: number;
+  unit: string;
   subs: { id?: string; title: string }[];
 }) {
   const id = store.saveTask({
@@ -261,6 +307,8 @@ function onSaveTask(form: {
     title: form.title,
     type: form.type,
     endDate: form.endDate || null,
+    target: form.target,
+    unit: form.unit,
   });
   if (id) store.saveSubtasks(id, form.subs);
   editingTask.value = null;
@@ -377,6 +425,17 @@ function celebrate(ev: MouseEvent) {
   padding: 4px 2px 14px;
 }
 
+.recovery-notice {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--card-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .progress-copy {
   display: flex;
   flex-direction: column;
@@ -439,7 +498,7 @@ function celebrate(ev: MouseEvent) {
 /* 右下角新增任务 FAB */
 .fab {
   position: fixed;
-  right: 18px;
+  right: calc(18px + env(safe-area-inset-right));
   bottom: calc(84px + env(safe-area-inset-bottom));
   width: 56px;
   height: 56px;
@@ -468,7 +527,18 @@ function celebrate(ev: MouseEvent) {
   }
 
   .fab {
-    right: calc(50% - 440px + 24px);
+    right: max(
+      calc(24px + env(safe-area-inset-right)),
+      calc(50% - 440px + 24px + env(safe-area-inset-right))
+    );
+  }
+}
+
+@media (max-height: 420px) and (orientation: landscape) {
+  .fab {
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    width: 48px;
+    height: 48px;
   }
 }
 </style>

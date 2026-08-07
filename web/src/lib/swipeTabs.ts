@@ -84,9 +84,37 @@ export function useSwipeTabs() {
   let startY = 0;
   let startT = 0;
   let lastRawDx = 0;
+  let pendingDragDx = 0;
+  let dragFrame: number | null = null;
   let decided: 'none' | 'h' | 'v' = 'none';
   /** 内部发起的滑动导航（路由变化 watch 走瞬时归位分支） */
   let internalNav = false;
+
+  function applyDragOffset(dx: number) {
+    const idx = activeIndex.value;
+    if ((idx === 0 && dx > 0) || (idx === TAB_PATHS.length - 1 && dx < 0)) {
+      dragOffset.value = rubberBand(dx, vw.value);
+    } else {
+      dragOffset.value = dx;
+    }
+  }
+
+  function scheduleDragOffset(dx: number) {
+    pendingDragDx = dx;
+    if (dragFrame !== null) return;
+    dragFrame = requestAnimationFrame(() => {
+      dragFrame = null;
+      applyDragOffset(pendingDragDx);
+    });
+  }
+
+  function flushDragOffset() {
+    if (dragFrame !== null) {
+      cancelAnimationFrame(dragFrame);
+      dragFrame = null;
+    }
+    applyDragOffset(pendingDragDx);
+  }
 
   function onTouchStart(e: TouchEvent) {
     decided = 'none';
@@ -104,6 +132,7 @@ export function useSwipeTabs() {
     startY = t.clientY;
     startT = e.timeStamp;
     lastRawDx = 0;
+    pendingDragDx = 0;
   }
 
   function onTouchMove(e: TouchEvent) {
@@ -123,13 +152,8 @@ export function useSwipeTabs() {
     e.preventDefault();
     lastRawDx = dx;
 
-    const idx = activeIndex.value;
-    // 边缘 iOS 橡皮筋（非线性阻尼），其余直接 1:1 跟手
-    if ((idx === 0 && dx > 0) || (idx === TAB_PATHS.length - 1 && dx < 0)) {
-      dragOffset.value = rubberBand(dx, vw.value);
-    } else {
-      dragOffset.value = dx;
-    }
+    // DOM/响应式写入按显示帧合并，避免高刷新率设备在同一帧重复合成整条轨道。
+    scheduleDragOffset(dx);
   }
 
   function onTouchEnd(e: TouchEvent) {
@@ -138,6 +162,7 @@ export function useSwipeTabs() {
       return;
     }
     decided = 'none';
+    flushDragOffset();
 
     const idx = activeIndex.value;
     const dt = Math.max(1, e.timeStamp - startT);
@@ -210,6 +235,7 @@ export function useSwipeTabs() {
   });
 
   onUnmounted(() => {
+    if (dragFrame !== null) cancelAnimationFrame(dragFrame);
     window.removeEventListener('touchstart', onTouchStart);
     window.removeEventListener('touchmove', onTouchMove);
     window.removeEventListener('touchend', onTouchEnd);

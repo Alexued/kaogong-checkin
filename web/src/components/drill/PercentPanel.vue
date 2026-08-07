@@ -69,7 +69,11 @@
           }"
         >
           <div class="verdict">{{ lastCorrect ? '✓ 回答正确' : '✗ 回答错误' }}</div>
+          <div v-if="!lastCorrect" class="feedback">{{ gradeMessage }}</div>
           <div class="std">标准答案：<strong>{{ current.answer }}</strong></div>
+          <div v-if="current.approximations.length" class="accepted">
+            也接受：{{ acceptedAnswers(current).slice(1).join('、') }}
+          </div>
           <div v-if="!lastCorrect" class="requeue">已插回队列，稍后再考一次</div>
           <button class="btn confirm-btn" @click="next">下一题</button>
         </div>
@@ -156,7 +160,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useAppStore } from '../../stores/app';
-import { DRILL_TABLE, isCorrect, shuffle, type DrillItem } from '../../lib/drill';
+import {
+  DRILL_TABLE,
+  acceptedAnswers,
+  gradeAnswer,
+  shuffle,
+  type DrillItem,
+} from '../../lib/drill';
 import { formatDateTime } from '../../lib/date';
 import RefTable from './RefTable.vue';
 import type { DrillRecord } from '../../types';
@@ -164,7 +174,13 @@ import type { DrillRecord } from '../../types';
 const store = useAppStore();
 
 /** 完整对照表条目（百分数 → 分数） */
-const refItems = DRILL_TABLE.map((t) => ({ label: `${t.percent}%`, answer: t.answer }));
+const refItems = DRILL_TABLE.map((item) => ({
+  label: `${item.percent}%`,
+  answer: item.answer,
+  note: item.approximations.length
+    ? `常用近似：${acceptedAnswers(item).slice(1).join('、')}`
+    : undefined,
+}));
 
 const phase = ref<'setup' | 'playing' | 'done'>('setup');
 const mode = ref<'full' | 'random'>('full');
@@ -176,6 +192,7 @@ const roundKey = ref(0);
 const input = ref('');
 const answered = ref(false);
 const lastCorrect = ref(false);
+const gradeMessage = ref('');
 
 const sessionId = ref('');
 const attempts = ref(0);
@@ -194,6 +211,7 @@ function startSession() {
   roundKey.value = 0;
   input.value = '';
   answered.value = false;
+  gradeMessage.value = '';
   sessionId.value = crypto.randomUUID();
   attempts.value = 0;
   correctAttempts.value = 0;
@@ -208,14 +226,17 @@ function onExit() {
     queue.value = [];
     input.value = '';
     answered.value = false;
+    gradeMessage.value = '';
   }
 }
 
 function confirm() {
   const item = current.value;
   if (!item || answered.value || !input.value.trim()) return;
-  const ok = isCorrect(item.percent, input.value);
+  const grade = gradeAnswer(item, input.value);
+  const ok = grade.correct;
   lastCorrect.value = ok;
+  gradeMessage.value = grade.message;
   answered.value = true;
   attempts.value++;
   if (ok) correctAttempts.value++;
@@ -237,6 +258,7 @@ function next() {
   roundKey.value++;
   input.value = '';
   answered.value = false;
+  gradeMessage.value = '';
   if (!current.value) phase.value = 'done';
 }
 
@@ -443,6 +465,20 @@ function onClear() {
 .std {
   margin: 8px 0;
   font-size: 15px;
+}
+
+.feedback,
+.accepted {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.feedback {
+  margin-top: 6px;
+}
+
+.accepted {
+  margin: -4px 0 10px;
 }
 
 .requeue {

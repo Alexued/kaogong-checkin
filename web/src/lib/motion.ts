@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+
 export const MOTION = {
   quick: 160,
   page: 320,
@@ -18,7 +20,11 @@ type ViewTransitionDocument = Document & {
 
 export async function runViewTransition(update: () => void | Promise<void>): Promise<void> {
   const documentWithTransitions = document as ViewTransitionDocument;
-  if (!documentWithTransitions.startViewTransition || prefersReducedMotion()) {
+  if (
+    Capacitor.isNativePlatform()
+    || !documentWithTransitions.startViewTransition
+    || prefersReducedMotion()
+  ) {
     await update();
     return;
   }

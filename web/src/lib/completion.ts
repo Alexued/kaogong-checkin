@@ -25,6 +25,8 @@ export function completionForDate(
   const items = generatePlan(tasks, checkins, date, planEndDate).today;
   const done = items.filter((item) => item.done).length;
   const total = items.length;
-  const ratio = total > 0 ? done / total : 0;
+  const ratio = total > 0
+    ? items.reduce((sum, item) => sum + item.progress / item.target, 0) / total
+    : 0;
   return { done, total, ratio, level: completionLevel(ratio, total) };
 }

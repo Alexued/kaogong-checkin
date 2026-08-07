@@ -12,15 +12,24 @@
 
     <!-- 开始设置 -->
     <div v-if="phase === 'setup'" class="card block">
+      <label class="field">
+        <span>公式分类</span>
+        <select v-model="selectedCategory" class="input category-select">
+          <option value="全部">全部分类（{{ FORMULA_TABLE.length }} 个）</option>
+          <option v-for="category in FORMULA_CATEGORIES" :key="category" :value="category">
+            {{ category }}（{{ formulasByCategory(category).length }} 个）
+          </option>
+        </select>
+      </label>
       <div class="seg">
         <button :class="{ on: mode === 'full' }" @click="mode = 'full'">
-          完整顺序（{{ FORMULA_TABLE.length }} 个）
+          完整顺序（{{ activeFormulas.length }} 个）
         </button>
         <button :class="{ on: mode === 'random' }" @click="mode = 'random'">随机抽取</button>
       </div>
       <label v-if="mode === 'random'" class="field">
         <span>抽取数量</span>
-        <input v-model.number="randomCount" type="number" min="1" max="50" class="input" />
+        <input v-model.number="randomCount" type="number" min="1" :max="activeFormulas.length" class="input" />
       </label>
       <button class="btn start-btn" @click="startSession">开始</button>
       <div class="symbols-hint">{{ FORMULA_SYMBOLS }}</div>
@@ -47,6 +56,7 @@
           transition: { type: 'spring', stiffness: 280, damping: 24 },
         }"
       >
+        <div class="formula-category">{{ current.category }}</div>
         <div class="fname">{{ current.name }}</div>
         <template v-if="!revealed">
           <div class="flip-hint">回忆公式，点击卡片翻面</div>
@@ -64,7 +74,8 @@
           }"
         >
           <div class="formula">{{ current.formula }}</div>
-          <div v-if="current.note" class="note">{{ current.note }}</div>
+          <div v-if="current.condition" class="condition">{{ current.condition }}</div>
+          <div v-if="current.tip" class="tip">{{ current.tip }}</div>
           <div class="judge">
             <button class="judge-btn known" @click="judge(true)">记住了</button>
             <button class="judge-btn unknown" @click="judge(false)">没记住</button>
@@ -112,18 +123,31 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useAppStore } from '../../stores/app';
-import { FORMULA_SYMBOLS, FORMULA_TABLE, type FormulaItem } from '../../lib/formula';
+import {
+  FORMULA_CATEGORIES,
+  FORMULA_SYMBOLS,
+  FORMULA_TABLE,
+  canonicalFormulaKey,
+  formulasByCategory,
+  type FormulaItem,
+} from '../../lib/formula';
 import { shuffle } from '../../lib/drill';
 import RefTable from './RefTable.vue';
 
 const store = useAppStore();
 
 /** 完整对照表条目（名称 / 公式 / 备注） */
-const refItems = FORMULA_TABLE.map((f) => ({ label: f.name, answer: f.formula, note: f.note }));
+const refItems = FORMULA_TABLE.map((formula) => ({
+  label: `${formula.category} · ${formula.name}`,
+  answer: formula.formula,
+  note: [formula.condition, formula.tip].filter(Boolean).join(' · '),
+}));
 
 const phase = ref<'setup' | 'playing' | 'done'>('setup');
 const mode = ref<'full' | 'random'>('full');
 const randomCount = ref(10);
+const selectedCategory = ref('全部');
+const activeFormulas = computed(() => formulasByCategory(selectedCategory.value));
 
 const queue = ref<FormulaItem[]>([]);
 const current = ref<FormulaItem | null>(null);
@@ -138,10 +162,11 @@ const unknownMap = new Map<string, FormulaItem>();
 const unknownList = computed(() => [...unknownMap.values()]);
 
 function startSession() {
+  const source = activeFormulas.value;
   const items =
     mode.value === 'full'
-      ? FORMULA_TABLE.slice()
-      : shuffle(FORMULA_TABLE).slice(0, Math.max(1, Math.min(50, randomCount.value || 10)));
+      ? source.slice()
+      : shuffle(source).slice(0, Math.max(1, Math.min(source.length, randomCount.value || 10)));
   queue.value = items.slice(1);
   current.value = items[0] || null;
   roundKey.value = 0;
@@ -189,10 +214,11 @@ const perFormulaStats = computed(() => {
   const map = new Map<string, { attempts: number; known: number }>();
   for (const d of store.formulaDrills) {
     if (d.deleted) continue;
-    const s = map.get(d.formulaKey) || { attempts: 0, known: 0 };
+    const key = canonicalFormulaKey(d.formulaKey);
+    const s = map.get(key) || { attempts: 0, known: 0 };
     s.attempts++;
     if (d.known) s.known++;
-    map.set(d.formulaKey, s);
+    map.set(key, s);
   }
   return FORMULA_TABLE.map((f) => {
     const s = map.get(f.key) || { attempts: 0, known: 0 };
@@ -248,6 +274,11 @@ const perFormulaStats = computed(() => {
   margin-bottom: 6px;
 }
 
+.category-select {
+  width: 100%;
+  min-height: 42px;
+}
+
 .start-btn {
   width: 100%;
 }
@@ -288,9 +319,19 @@ const perFormulaStats = computed(() => {
   text-align: center;
 }
 
+.formula-category {
+  margin-bottom: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .fname {
-  font-size: 34px;
+  max-width: 100%;
+  font-size: 24px;
   font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
   background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
   -webkit-background-clip: text;
   background-clip: text;
@@ -318,10 +359,15 @@ const perFormulaStats = computed(() => {
   white-space: pre-line;
 }
 
-.note {
+.condition,
+.tip {
   font-size: 12.5px;
   color: var(--text-2);
   margin-top: 10px;
+}
+
+.tip {
+  color: var(--accent-solid);
 }
 
 .symbols-hint {
@@ -329,6 +375,7 @@ const perFormulaStats = computed(() => {
   font-size: 12px;
   color: var(--text-2);
   text-align: center;
+  white-space: pre-line;
 }
 
 .judge {

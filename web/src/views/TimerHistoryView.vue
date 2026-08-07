@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="top-bar">
-      <button class="back-btn" @click="router.back()">
+      <button class="back-btn" type="button" @click="navigateToParent(router)">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         返回
@@ -109,6 +109,7 @@ import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { fmtDuration } from '../lib/stopwatch';
 import { formatTime } from '../lib/date';
+import { navigateToParent } from '../lib/backNavigation';
 import type { TimerRecord } from '../types';
 
 const store = useAppStore();

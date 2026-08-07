@@ -1,28 +1,22 @@
-/**
- * 每日计划生成（纯函数）
- *
- * 给定日期 D（本地 yyyy-MM-dd），计划 = A + B：
- * - A 今日应做：createdAt(日期部分) <= D && (endDate 空 || endDate >= D) 且未归档
- *   - daily：每天出现，当日有 checkin 才算完成
- *   - deadline：完成前每天出现；一旦有任意 checkin 即完成，之后不再出现
- *     （查看历史日时，若 checkin.date === D 则以完成态展示）
- * - B 结转：daily 任务对每个应做日 D' < D 无有效 checkin → 结转到 D，
- *   overdueDays = D - D'，按逾期天数降序排在今日任务之后
- *   （deadline 任务在完成前本就每天出现在 A 中，故不重复结转）
- * - 补卡：勾选结转项 → 写 checkin{taskId, date: D'}（记原始日期）
- * - settings.planEndDate 非空时，超过该日不再生成新任务（结转仍显示）
- */
-import type { Task, Checkin } from '../types';
-import { datePart, addDays, diffDays } from './date';
+/** Daily planning and traceable quantity progress projections. */
+import type { Checkin, Task } from '../types';
+import { addDays, datePart, diffDays } from './date';
+import { normalizeTarget, normalizeUnit } from './stateMigration';
 
-export interface PlanItem {
-  task: Task;
-  /** 应完成日期（结转项为原始日期 D'） */
+export interface ProgressSource {
   date: string;
-  /** 0 = 今日应做；>0 = 结转逾期天数 */
   overdueDays: number;
+  progress: number;
+  target: number;
+  unit: string;
   done: boolean;
   checkinId?: string;
+}
+
+export interface PlanItem extends ProgressSource {
+  task: Task;
+  /** Aggregated carried items retain every original due date here. */
+  sources?: ProgressSource[];
 }
 
 export interface DayPlan {
@@ -30,7 +24,6 @@ export interface DayPlan {
   carried: PlanItem[];
 }
 
-/** 任务在 day 当天是否处于有效期内（不含完成状态判断） */
 function isActiveOn(task: Task, day: string, planEndDate: string | null): boolean {
   if (task.archived) return false;
   if (datePart(task.createdAt) > day) return false;
@@ -39,61 +32,151 @@ function isActiveOn(task: Task, day: string, planEndDate: string | null): boolea
   return true;
 }
 
+function checkinForDate(checkins: Checkin[], date: string): Checkin | undefined {
+  return checkins
+    .filter((checkin) => checkin.date === date)
+    .sort((left, right) => (right.updatedAt || '').localeCompare(left.updatedAt || ''))[0];
+}
+
+function sourceFor(task: Task, date: string, day: string, checkin?: Checkin): ProgressSource {
+  const target = checkin ? normalizeTarget(checkin.targetSnapshot) : normalizeTarget(task.target);
+  const progress = checkin && !checkin.deleted
+    ? Math.min(target, Math.max(0, Number.isSafeInteger(checkin.progress) ? checkin.progress : 0))
+    : 0;
+  return {
+    date,
+    overdueDays: diffDays(date, day),
+    progress,
+    target,
+    unit: checkin ? normalizeUnit(checkin.unitSnapshot) : normalizeUnit(task.unit),
+    done: progress >= target,
+    ...(checkin ? { checkinId: checkin.id } : {}),
+  };
+}
+
+function aggregateDebt(task: Task, sources: ProgressSource[]): PlanItem {
+  const ordered = sources.slice().sort((left, right) => left.date.localeCompare(right.date));
+  const first = ordered[0];
+  const units = new Set(ordered.map((source) => source.unit));
+  return {
+    task,
+    date: first.date,
+    overdueDays: Math.max(...ordered.map((source) => source.overdueDays)),
+    progress: ordered.reduce((sum, source) => sum + source.progress, 0),
+    target: ordered.reduce((sum, source) => sum + source.target, 0),
+    unit: units.size === 1 ? first.unit : '',
+    done: false,
+    sources: ordered,
+  };
+}
+
+export function selectProgressSource(item: PlanItem, delta: -1 | 1): ProgressSource {
+  const sources = item.sources?.length ? item.sources : [item];
+  if (delta > 0) return sources.find((source) => source.progress < source.target) || sources[0];
+  return sources.slice().reverse().find((source) => source.progress > 0) || sources[0];
+}
+
+/** Pure record builder used by the store. A zero for a missing day creates no tombstone. */
+export function buildProgressCheckin(
+  task: Task | undefined,
+  taskId: string,
+  date: string,
+  requestedProgress: number,
+  existing: Checkin | undefined,
+  timestamp: string,
+  id: string,
+): Checkin | null {
+  if (!existing && requestedProgress <= 0) return null;
+  const targetSnapshot = existing
+    ? normalizeTarget(existing.targetSnapshot)
+    : normalizeTarget(task?.target);
+  const progress = Math.min(
+    targetSnapshot,
+    Math.max(0, Number.isSafeInteger(requestedProgress) ? requestedProgress : 0),
+  );
+  if (existing) {
+    return {
+      ...existing,
+      progress,
+      targetSnapshot,
+      unitSnapshot: normalizeUnit(existing.unitSnapshot),
+      deleted: progress === 0,
+      updatedAt: timestamp,
+    };
+  }
+  return {
+    id,
+    taskId,
+    date,
+    progress,
+    targetSnapshot,
+    unitSnapshot: normalizeUnit(task?.unit),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    deleted: false,
+  };
+}
+
 export function generatePlan(
   tasks: Task[],
   checkins: Checkin[],
   day: string,
-  planEndDate: string | null
+  planEndDate: string | null,
 ): DayPlan {
   const today: PlanItem[] = [];
   const carried: PlanItem[] = [];
-
   const byTask = new Map<string, Checkin[]>();
-  for (const c of checkins) {
-    if (c.deleted) continue;
-    const arr = byTask.get(c.taskId);
-    if (arr) arr.push(c);
-    else byTask.set(c.taskId, [c]);
+
+  for (const checkin of checkins) {
+    const records = byTask.get(checkin.taskId);
+    if (records) records.push(checkin);
+    else byTask.set(checkin.taskId, [checkin]);
   }
 
   for (const task of tasks) {
     if (task.archived) continue;
-    const cs = (byTask.get(task.id) || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const records = byTask.get(task.id) || [];
 
     if (task.type === 'deadline') {
-      const done = cs[0];
-      if (done) {
-        // 完成后不再出现；仅在完成当天以完成态展示
-        if (done.date === day && isActiveOn(task, day, planEndDate)) {
-          today.push({ task, date: day, overdueDays: 0, done: true, checkinId: done.id });
+      const activeRecords = records
+        .filter((checkin) => !checkin.deleted)
+        .sort((left, right) => left.date.localeCompare(right.date));
+      const completed = activeRecords.find((checkin) => {
+        const target = normalizeTarget(checkin.targetSnapshot);
+        return checkin.progress >= target;
+      });
+      if (completed) {
+        if (completed.date === day && isActiveOn(task, day, planEndDate)) {
+          today.push({ task, ...sourceFor(task, day, day, completed) });
         }
         continue;
       }
       if (isActiveOn(task, day, planEndDate)) {
-        today.push({ task, date: day, overdueDays: 0, done: false });
+        const partial = activeRecords.slice().reverse()[0];
+        today.push({ task, ...sourceFor(task, partial?.date || day, day, partial) });
       }
       continue;
     }
 
-    // daily
     if (isActiveOn(task, day, planEndDate)) {
-      const c = cs.find((x) => x.date === day);
-      today.push({ task, date: day, overdueDays: 0, done: !!c, checkinId: c?.id });
+      today.push({ task, ...sourceFor(task, day, day, checkinForDate(records, day)) });
     }
-    // 结转：从创建日到 min(D-1, endDate, planEndDate)，缺哪天补哪天
+
+    const debtSources: ProgressSource[] = [];
     const start = datePart(task.createdAt);
     let endLimit = addDays(day, -1);
     if (task.endDate && task.endDate < endLimit) endLimit = task.endDate;
     if (planEndDate && planEndDate < endLimit) endLimit = planEndDate;
-    for (let d = start; d <= endLimit; d = addDays(d, 1)) {
-      if (!cs.some((x) => x.date === d)) {
-        carried.push({ task, date: d, overdueDays: diffDays(d, day), done: false });
-      }
+    for (let date = start; date <= endLimit; date = addDays(date, 1)) {
+      const source = sourceFor(task, date, day, checkinForDate(records, date));
+      if (!source.done) debtSources.push(source);
     }
+    if (debtSources.length) carried.push(aggregateDebt(task, debtSources));
   }
 
-  carried.sort((a, b) => b.overdueDays - a.overdueDays);
-  // 今日任务固定按任务排序值排列：完成后留在原位，不沉底
-  today.sort((a, b) => a.task.order - b.task.order);
+  today.sort((left, right) => left.task.order - right.task.order);
+  carried.sort((left, right) =>
+    left.date.localeCompare(right.date) || left.task.order - right.task.order,
+  );
   return { today, carried };
 }

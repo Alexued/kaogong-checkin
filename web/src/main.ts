@@ -7,6 +7,7 @@ import App from './App.vue';
 import { router } from './router';
 import { useAppStore } from './stores/app';
 import { initializeComputerSync } from './api/computer-sync';
+import { resolveBackAction } from './lib/backNavigation';
 import './styles/theme.css';
 import './styles/app.css';
 
@@ -28,18 +29,15 @@ watch(
   (t) => applyTheme(t)
 );
 
-// 安卓返回键/返回手势：二级页路由后退，Tab 根页退到桌面（不闪退）
+// 安卓返回键/返回手势：二级页回明确父页，Tab 根页退到桌面。
 if (Capacitor.isNativePlatform()) {
-  const ROOT_TABS = new Set(['/', '/timer', '/drill', '/settings']);
   void CapApp.addListener('backButton', () => {
-    const path = router.currentRoute.value.path;
-    if (!ROOT_TABS.has(path) && window.history.state?.back) {
-      router.back();
-    } else if (!ROOT_TABS.has(path)) {
-      // 二级页但没有可退的历史（极端情况）：回今日页
-      void router.push('/');
-    } else {
+    const route = router.currentRoute.value;
+    const action = resolveBackAction(route.path, route.meta.parentPath);
+    if (action.type === 'minimize') {
       void CapApp.minimizeApp();
+    } else {
+      void router.replace(action.path);
     }
   });
 }

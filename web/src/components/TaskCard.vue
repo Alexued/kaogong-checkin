@@ -20,22 +20,48 @@
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
     @lostpointercapture="onPointerCancel"
-  >
+    >
     <div class="main-row">
-      <CheckButton :done="item.done" @toggle="onToggle" />
+      <CheckButton v-if="!isQuantity" :done="item.done" @toggle="onToggle" />
       <div class="body">
         <div class="title">{{ item.task.title }}</div>
         <div class="meta">
-          <span v-if="item.overdueDays > 0" class="badge warn">逾期 {{ item.overdueDays }} 天</span>
-          <span v-if="item.overdueDays > 0" class="date">{{ item.date }} 应完成</span>
+          <span v-if="item.overdueDays > 0" class="badge warn">
+            {{ debtSources.length > 1 ? `欠账 ${debtSources.length} 天` : `逾期 ${item.overdueDays} 天` }}
+          </span>
+          <span v-if="item.overdueDays > 0" class="date">
+            {{ debtSources.length > 1 ? `最早 ${item.date}` : `${item.date} 应完成` }}
+          </span>
           <span v-else class="badge">{{ item.task.type === 'daily' ? '每日' : '截止' }}</span>
+          <span v-if="isQuantity" class="badge quantity">
+            {{ item.target - item.progress }}{{ item.unit }}待完成
+          </span>
           <span v-if="subItems.length" class="badge sub">
             子任务 {{ subDoneCount }}/{{ subItems.length }}
           </span>
         </div>
       </div>
+      <div v-if="isQuantity && !reorder" class="progress-control" @click.stop>
+        <button
+          class="progress-btn"
+          type="button"
+          :disabled="item.progress <= 0"
+          :aria-label="`减少${item.task.title}进度`"
+          @click="emit('adjust-progress', item, -1, undefined, $event)"
+        >−</button>
+        <output class="progress-value" :aria-label="`${item.task.title}进度 ${item.progress}/${item.target}${item.unit}`">
+          <strong>{{ item.progress }}</strong><span>/{{ item.target }}{{ item.unit }}</span>
+        </output>
+        <button
+          class="progress-btn add"
+          type="button"
+          :disabled="item.progress >= item.target"
+          :aria-label="`增加${item.task.title}进度`"
+          @click="emit('adjust-progress', item, 1, undefined, $event)"
+        >＋</button>
+      </div>
       <svg
-        v-if="subItems.length && !reorder"
+        v-if="hasDetails && !reorder"
         class="chev" :class="{ open: expanded }"
         viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
@@ -71,13 +97,42 @@
         <span class="sub-title">{{ s.title }}</span>
       </div>
     </div>
+
+    <div v-if="debtSources.length && expanded && !reorder" class="sources" @click.stop>
+      <div v-for="source in debtSources" :key="source.date" class="source-row">
+        <div class="source-date">
+          <strong>{{ source.date }}</strong>
+          <span>逾期 {{ source.overdueDays }} 天</span>
+        </div>
+        <div v-if="isQuantity" class="source-progress">
+          <button
+            type="button"
+            :disabled="source.progress <= 0"
+            :aria-label="`减少 ${source.date} 进度`"
+            @click="emit('adjust-progress', item, -1, source, $event)"
+          >−</button>
+          <span>{{ source.progress }}/{{ source.target }}{{ source.unit }}</span>
+          <button
+            type="button"
+            :disabled="source.progress >= source.target"
+            :aria-label="`增加 ${source.date} 进度`"
+            @click="emit('adjust-progress', item, 1, source, $event)"
+          >＋</button>
+        </div>
+        <CheckButton
+          v-else
+          :done="source.done"
+          @toggle="(event) => emit('toggle-source', item, source, event)"
+        />
+      </div>
+    </div>
   </div>
 
 </template>
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
-import type { PlanItem } from '../lib/plan';
+import type { PlanItem, ProgressSource } from '../lib/plan';
 import CheckButton from './CheckButton.vue';
 
 interface SubItem {
@@ -107,9 +162,18 @@ const emit = defineEmits<{
   (e: 'toggle-sub', sub: SubItem, ev: MouseEvent): void;
   (e: 'toggle-expand', item: PlanItem): void;
   (e: 'edit', item: PlanItem): void;
+  (e: 'adjust-progress', item: PlanItem, delta: -1 | 1, source: ProgressSource | undefined, ev: MouseEvent): void;
+  (e: 'toggle-source', item: PlanItem, source: ProgressSource, ev: MouseEvent): void;
 }>();
 
 const subDoneCount = computed(() => props.subItems.filter((s) => s.done).length);
+const isQuantity = computed(() =>
+  props.item.sources?.length
+    ? props.item.sources.some((source) => source.target > 1)
+    : props.item.target > 1,
+);
+const debtSources = computed(() => props.item.sources || []);
+const hasDetails = computed(() => props.subItems.length > 0 || debtSources.value.length > 0);
 
 const LONG_PRESS_MS = 450;
 const MOVE_CANCEL_PX = 10;
@@ -240,7 +304,8 @@ function onCardClick(ev: MouseEvent) {
     return;
   }
   if (props.reorder) return;
-  if (props.subItems.length) emit('toggle-expand', props.item);
+  if (hasDetails.value) emit('toggle-expand', props.item);
+  else if (isQuantity.value) return;
   else emit('toggle', props.item, ev);
 }
 </script>
@@ -308,6 +373,60 @@ function onCardClick(ev: MouseEvent) {
   border: 1px solid var(--card-border);
 }
 
+.badge.quantity {
+  background: var(--accent-soft);
+  color: var(--accent-solid);
+}
+
+.progress-control {
+  flex: none;
+  display: grid;
+  grid-template-columns: 44px minmax(64px, auto) 44px;
+  align-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.progress-btn,
+.source-progress button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: var(--bg-elev);
+  color: var(--text-2);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.progress-btn.add {
+  color: var(--accent-solid);
+}
+
+.progress-btn:disabled,
+.source-progress button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.progress-value {
+  min-width: 0;
+  padding: 0 6px;
+  text-align: center;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.progress-value strong {
+  font-size: 15px;
+}
+
+.progress-value span {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
 .date {
   font-size: 12px;
   color: var(--text-3);
@@ -332,6 +451,78 @@ function onCardClick(ev: MouseEvent) {
   margin-top: 10px;
   padding-top: 6px;
   border-top: 1px dashed var(--card-border);
+}
+
+.sources {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--card-border);
+}
+
+.source-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.source-date {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.source-date strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.source-date span {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.source-progress {
+  flex: none;
+  display: grid;
+  grid-template-columns: 44px minmax(68px, auto) 44px;
+  align-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.source-progress span {
+  padding: 0 6px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .main-row {
+    flex-wrap: wrap;
+  }
+
+  .progress-control {
+    order: 2;
+    width: 100%;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .source-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .source-progress {
+    width: 100%;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
 }
 
 .sub-row {

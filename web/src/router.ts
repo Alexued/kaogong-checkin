@@ -4,6 +4,7 @@ import TimerView from './views/TimerView.vue';
 import TimerHistoryView from './views/TimerHistoryView.vue';
 import DrillView from './views/DrillView.vue';
 import TasksView from './views/TasksView.vue';
+import StatsView from './views/StatsView.vue';
 import DayDetailView from './views/DayDetailView.vue';
 import SettingsView from './views/SettingsView.vue';
 
@@ -12,11 +13,26 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'today', component: TodayView },
     { path: '/timer', name: 'timer', component: TimerView },
-    { path: '/timer/history', name: 'timer-history', component: TimerHistoryView },
+    {
+      path: '/timer/history',
+      name: 'timer-history',
+      component: TimerHistoryView,
+      meta: { parentPath: '/timer' },
+    },
     { path: '/drill', name: 'drill', component: DrillView },
-    { path: '/tasks', name: 'tasks', component: TasksView },
-    { path: '/stats', redirect: '/settings' },
-    { path: '/stats/day/:date', name: 'day-detail', component: DayDetailView },
+    { path: '/tasks', name: 'tasks', component: TasksView, meta: { parentPath: '/' } },
+    {
+      path: '/stats',
+      name: 'stats',
+      component: StatsView,
+      meta: { parentPath: '/settings', rootTab: '/settings' },
+    },
+    {
+      path: '/stats/day/:date',
+      name: 'day-detail',
+      component: DayDetailView,
+      meta: { parentPath: '/settings', rootTab: '/settings' },
+    },
     { path: '/settings', name: 'settings', component: SettingsView },
   ],
 });

@@ -8,6 +8,10 @@ export interface Task {
   updatedAt: string;
   archived: boolean;
   order: number;
+  /** 每个应完成日期的目标数量。清单任务和含子任务的主任务固定为 1。 */
+  target: number;
+  /** 数量单位，最多 12 个 Unicode 字符；清单任务为空。 */
+  unit: string;
 }
 
 export interface Checkin {
@@ -20,6 +24,12 @@ export interface Checkin {
   updatedAt: string;
   /** 取消打卡 = 软删除，便于同步合并 */
   deleted: boolean;
+  /** 该原始日期已完成的数量。 */
+  progress: number;
+  /** 首次产生进度时复制的任务目标，后续编辑任务不会改写。 */
+  targetSnapshot: number;
+  /** 首次产生进度时复制的任务单位。 */
+  unitSnapshot: string;
 }
 
 export interface Subtask {
@@ -89,6 +99,7 @@ export interface FormulaDrillRecord {
 }
 
 export interface AppState {
+  schemaVersion: 2;
   tasks: Task[];
   subtasks: Subtask[];
   checkins: Checkin[];
@@ -110,6 +121,8 @@ export interface ServerInfo {
   serverId?: string;
   pairingRequired?: boolean;
   protocolVersion?: number;
+  stateSchemaVersion?: number;
+  minimumClientStateSchemaVersion?: number;
 }
 
 export type SyncEntity = 'task' | 'subtask' | 'checkin' | 'settings' | 'timer' | 'drill' | 'formulaDrill';

@@ -42,6 +42,7 @@ const tabs = [
 ];
 
 function isActive(to: string) {
+  if (route.meta.rootTab === to) return true;
   return to === '/' ? route.path === '/' : route.path.startsWith(to);
 }
 </script>

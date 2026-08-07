@@ -28,6 +28,13 @@
         <i v-for="level in [0, 1, 2, 3, 4]" :key="level" :class="'lv' + level"></i>
         <span>全部完成</span>
       </div>
+      <router-link class="stats-link" to="/stats">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 19V9M10 19V5M16 19v-7M22 19V3" />
+        </svg>
+        <span>查看完整统计</span>
+        <svg class="stats-link-arrow" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </router-link>
     </div>
 
     <div class="section-title">计划与外观</div>
@@ -157,8 +164,8 @@
         <div class="update-download-row">
           <div class="update-actions">
             <button v-if="downloadStatus?.status === 'downloaded'" class="btn download-primary" type="button" @click="installUpdate">安装更新</button>
-            <button v-else class="btn download-primary" :disabled="downloadBusy" type="button" @click="download">
-              {{ downloadBusy ? '下载中…' : downloadFailed ? '重新下载' : '应用内下载' }}
+            <button v-else class="btn download-primary" :disabled="downloadBusy || !latest.sha256" type="button" @click="download">
+              {{ !latest.sha256 ? '无法校验' : downloadBusy ? '下载中…' : downloadFailed ? '重新下载' : '应用内下载' }}
             </button>
             <button
               v-if="latest.source !== 'lan' || syncEnabled"
@@ -532,6 +539,10 @@ function checkUpdate() {
 function download() {
   const release = latest.value;
   if (!release) return;
+  if (!release.sha256) {
+    downloadMessage.value = '该版本未提供可验证摘要，请使用浏览器下载';
+    return;
+  }
   if (release.source === 'lan' && !isSyncEnabled()) {
     downloadMessage.value = '电脑同步已关闭，请检查 GitHub 更新后再下载';
     return;
@@ -544,7 +555,7 @@ function download() {
   lastDownloadBytes = 0;
   downloadStarting.value = true;
   armDownloadStallTimer();
-  void startAppUpdateDownload(release.apkUrl, `kaogong-checkin-v${release.version}.apk`, release.source)
+  void startAppUpdateDownload(release.apkUrl, `kaogong-checkin-v${release.version}.apk`, release.source, release.sha256)
     .then(applyDownloadStatus)
     .catch(() => {
       if (getActiveAppUpdateSource() === 'lan' && !isSyncEnabled()) {
@@ -604,8 +615,19 @@ async function installUpdate() {
     } else {
       downloadMessage.value = '';
     }
-  } catch {
-    downloadMessage.value = '无法打开安装程序，请稍后重试';
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    if (code === 'APK_DIGEST_MISMATCH') {
+      clearActiveAppUpdateSource();
+      downloadStatus.value = null;
+      downloadMessage.value = '文件校验失败，可重新下载';
+    } else if (code === 'APK_DIGEST_MISSING') {
+      clearActiveAppUpdateSource();
+      downloadStatus.value = null;
+      downloadMessage.value = '该文件缺少校验摘要，请重新检查更新';
+    } else {
+      downloadMessage.value = '无法打开安装程序，请稍后重试';
+    }
   }
 }
 
@@ -838,6 +860,9 @@ onUnmounted(() => {
 .lv2 { background: var(--heat-2); } .lv3 { background: var(--heat-3); } .lv4 { background: var(--heat-4); }
 .legend { display: flex; align-items: center; justify-content: flex-end; gap: 5px; margin-top: 10px; font-size: 10px; color: var(--text-3); }
 .legend i { width: 10px; height: 10px; border-radius: 3px; }
+.stats-link { min-height: 44px; display: flex; align-items: center; gap: 9px; margin-top: 12px; border-top: 1px solid var(--card-border); padding-top: 12px; color: var(--accent-solid); font-size: 13px; font-weight: 700; text-decoration: none; }
+.stats-link-arrow { margin-inline-start: auto; color: var(--text-3); }
+.stats-link:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 3px; }
 .setting-row { min-height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--card-border); }
 .setting-row:last-child { border-bottom: 0; }
 .setting-row strong { display: block; font-size: 14px; }

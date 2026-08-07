@@ -33,6 +33,33 @@
           </button>
         </label>
         <label class="field">
+          <span>完成方式</span>
+          <div class="seg">
+            <button type="button" :class="{ on: form.target === 1 }" @click="setChecklistMode">
+              清单
+            </button>
+            <button
+              type="button"
+              :disabled="form.subs.length > 0"
+              :class="{ on: form.target > 1 }"
+              @click="setQuantityMode"
+            >
+              数量
+            </button>
+          </div>
+          <small v-if="form.subs.length" class="field-note">有子任务时固定为清单模式</small>
+        </label>
+        <div v-if="form.target > 1" class="quantity-fields">
+          <label class="field">
+            <span>每日目标</span>
+            <input v-model.number="form.target" class="input" type="number" min="2" step="1" inputmode="numeric" />
+          </label>
+          <label class="field">
+            <span>单位（可空）</span>
+            <input v-model="form.unit" class="input" maxlength="12" placeholder="如：题、页、分钟" />
+          </label>
+        </div>
+        <label class="field">
           <span>子任务（可空，在今日页点主任务展开）</span>
           <div v-for="(s, i) in form.subs" :key="i" class="sub-edit-row">
             <input v-model="s.title" class="input" placeholder="子任务标题" />
@@ -41,7 +68,7 @@
                 stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
           </div>
-          <button class="sub-add" type="button" @click="form!.subs.push({ title: '' })">
+          <button class="sub-add" type="button" @click="addSubtask">
             ＋ 添加子任务
           </button>
         </label>
@@ -78,6 +105,8 @@ interface TaskEditState {
   title: string;
   type: 'daily' | 'deadline';
   endDate: string;
+  target: number;
+  unit: string;
   subs: SubEdit[];
 }
 
@@ -106,9 +135,11 @@ watch(
           title: t.title,
           type: t.type,
           endDate: t.endDate || '',
+          target: t.target || 1,
+          unit: t.unit || '',
           subs: (props.subtasks || []).map((s) => ({ id: s.id, title: s.title })),
         }
-      : { title: '', type: 'daily', endDate: '', subs: [] };
+      : { title: '', type: 'daily', endDate: '', target: 1, unit: '', subs: [] };
   },
   { immediate: true }
 );
@@ -117,8 +148,33 @@ const canSave = computed(() => {
   const f = form.value;
   if (!f || !f.title.trim()) return false;
   if (f.type === 'deadline' && !f.endDate) return false;
+  if (!Number.isSafeInteger(f.target) || f.target < 1) return false;
+  if (Array.from(f.unit.trim()).length > 12) return false;
   return true;
 });
+
+function setChecklistMode() {
+  if (!form.value) return;
+  form.value.target = 1;
+  form.value.unit = '';
+}
+
+function setQuantityMode() {
+  if (!form.value || form.value.subs.length) return;
+  form.value.target = Math.max(2, form.value.target || 2);
+}
+
+function addSubtask() {
+  const current = form.value;
+  if (!current) return;
+  if (current.subs.length === 0 && current.target > 1) {
+    const confirmed = window.confirm('添加子任务会把数量目标重置为清单模式，是否继续？');
+    if (!confirmed) return;
+    current.target = 1;
+    current.unit = '';
+  }
+  current.subs.push({ title: '' });
+}
 
 function close() {
   emit('update:open', false);
@@ -132,6 +188,8 @@ function save() {
     title: f.title.trim(),
     type: f.type,
     endDate: f.endDate,
+    target: f.subs.length ? 1 : f.target,
+    unit: f.subs.length || f.target === 1 ? '' : Array.from(f.unit.trim()).slice(0, 12).join(''),
     subs: f.subs.filter((s) => s.title.trim()),
   });
   emit('update:open', false);
@@ -241,6 +299,24 @@ function save() {
   font-weight: 600;
 }
 
+.seg button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.field-note {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.quantity-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .sheet-actions {
   display: flex;
   justify-content: flex-end;
@@ -295,6 +371,13 @@ function save() {
   .editor-sheet-leave-active .sheet {
     transition-duration: 0.01ms !important;
     transition-delay: 0ms !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .quantity-fields {
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 }
 </style>
