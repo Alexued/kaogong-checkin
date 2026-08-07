@@ -11,6 +11,11 @@ const { WebSocketServer } = require('ws');
 
 const { findLatestApk } = require('./update');
 const {
+  BACKUP_FORMAT_VERSION,
+  BackupStoreV3Error,
+  createBackupStoreV3,
+} = require('./backupStoreV3');
+const {
   STATE_SCHEMA_VERSION,
   isValidV2State,
   migrateStoredState,
@@ -19,6 +24,7 @@ const {
 } = require('./stateSchema');
 
 const PROTOCOL_VERSION = 2;
+const BACKUP_PROTOCOL_VERSION = 3;
 const DEFAULT_HTTP_PORT = 8321;
 const DEFAULT_HTTP_PORT_END = 8330;
 const DEFAULT_UDP_PORT = 8322;
@@ -218,6 +224,9 @@ function createKgcServer(options = {}) {
   const getLanAddresses = options.getLanAddresses || lanAddresses;
   const logger = options.logger === undefined ? console : options.logger;
   const events = new EventEmitter();
+  const backupStore = options.backupStore || createBackupStoreV3({
+    rootDir: path.join(dataDir, 'backups-v3'),
+  });
 
   if (options.pairingCode !== undefined && !/^\d{6}$/.test(String(options.pairingCode))) {
     throw new TypeError('pairingCode must contain exactly six digits');
@@ -412,6 +421,29 @@ function createKgcServer(options = {}) {
     });
   }
 
+  function sendBackupError(response, error) {
+    const code = error instanceof BackupStoreV3Error ? error.code : 'BACKUP_STORE_FAILED';
+    const statusByCode = {
+      INVALID_ARGUMENT: 400,
+      SNAPSHOT_NOT_FOUND: 404,
+      MUTATION_ID_REUSED: 409,
+      BACKUP_REVISION_CONFLICT: 409,
+      LOCAL_REVISION_CONFLICT: 409,
+      CAPACITY_EXCEEDED: 507,
+    };
+    const status = statusByCode[code] || 500;
+    if (status >= 500) log('error', '[backup-v3] request failed:', error.message);
+    return response.status(status).json({
+      error: error.message || 'backup request failed',
+      code,
+      ...(error instanceof BackupStoreV3Error && error.details
+        ? { details: error.details }
+        : {}),
+      backupProtocolVersion: BACKUP_PROTOCOL_VERSION,
+      backupFormatVersion: BACKUP_FORMAT_VERSION,
+    });
+  }
+
   function applyMutation(target, message) {
     const { kind, entity, payload } = message || {};
     if (
@@ -556,6 +588,8 @@ function createKgcServer(options = {}) {
       protocolVersion: PROTOCOL_VERSION,
       stateSchemaVersion: STATE_SCHEMA_VERSION,
       minimumClientStateSchemaVersion: STATE_SCHEMA_VERSION,
+      backupProtocolVersion: BACKUP_PROTOCOL_VERSION,
+      backupFormatVersion: BACKUP_FORMAT_VERSION,
       legacyMode: allowLegacy,
       apkAvailable: Boolean(apk),
       apkFileName: apk ? apk.fileName : null,
@@ -627,6 +661,8 @@ function createKgcServer(options = {}) {
           protocolVersion: PROTOCOL_VERSION,
           stateSchemaVersion: STATE_SCHEMA_VERSION,
           minimumClientStateSchemaVersion: STATE_SCHEMA_VERSION,
+          backupProtocolVersion: BACKUP_PROTOCOL_VERSION,
+          backupFormatVersion: BACKUP_FORMAT_VERSION,
         });
       } catch (error) {
         log('error', '[auth] failed to persist paired client:', error.message);
@@ -673,6 +709,57 @@ function createKgcServer(options = {}) {
         });
       }
     });
+
+    app.post('/api/v3/backups', requireAuthentication, (request, response) => {
+      try {
+        const result = backupStore.appendSnapshot(request.body);
+        response.setHeader('Cache-Control', 'no-store');
+        return response.status(result.idempotent ? 200 : 201).json({
+          ...result,
+          backupProtocolVersion: BACKUP_PROTOCOL_VERSION,
+          backupFormatVersion: BACKUP_FORMAT_VERSION,
+        });
+      } catch (error) {
+        return sendBackupError(response, error);
+      }
+    });
+
+    app.get('/api/v3/backups/:deviceId', requireAuthentication, (request, response) => {
+      try {
+        const snapshots = backupStore.listSnapshots(request.params.deviceId);
+        response.setHeader('Cache-Control', 'no-store');
+        return response.json({
+          deviceId: request.params.deviceId,
+          head: snapshots[0] || null,
+          snapshots,
+          backupProtocolVersion: BACKUP_PROTOCOL_VERSION,
+          backupFormatVersion: BACKUP_FORMAT_VERSION,
+        });
+      } catch (error) {
+        return sendBackupError(response, error);
+      }
+    });
+
+    app.get(
+      '/api/v3/backups/:deviceId/:snapshotId',
+      requireAuthentication,
+      (request, response) => {
+        try {
+          const result = backupStore.readSnapshot(
+            request.params.deviceId,
+            request.params.snapshotId,
+          );
+          response.setHeader('Cache-Control', 'no-store');
+          return response.json({
+            ...result,
+            backupProtocolVersion: BACKUP_PROTOCOL_VERSION,
+            backupFormatVersion: BACKUP_FORMAT_VERSION,
+          });
+        } catch (error) {
+          return sendBackupError(response, error);
+        }
+      },
+    );
 
     app.get('/api/update/latest', (request, response) => {
       try {
@@ -1239,6 +1326,7 @@ function createKgcServer(options = {}) {
 }
 
 module.exports = {
+  BACKUP_PROTOCOL_VERSION,
   PROTOCOL_VERSION,
   collectActiveIpv4InterfaceNames,
   collectUdpBroadcastAddresses,

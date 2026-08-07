@@ -157,6 +157,26 @@ test('retains only the latest ten snapshot bodies while preserving the mutation 
   assert.deepEqual(replay.metadata, first.metadata);
 });
 
+test('bounds the idempotency audit window and continues backing up after compaction', (t) => {
+  const rootDir = temporaryDirectory(t);
+  const store = fixtureStore(t, { rootDir, maxMutationRecords: 10 });
+  for (let revision = 1; revision <= 12; revision += 1) {
+    store.appendSnapshot(request('device-a', revision));
+  }
+  const indexPath = findFiles(rootDir, 'index.json')[0];
+  const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+  assert.equal(index.mutationFloorRevision, 2);
+  assert.equal(index.mutations.length, 10);
+  assert.deepEqual(index.mutations.map((item) => item.metadata.backupRevision), [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+  const next = store.appendSnapshot(request('device-a', 13));
+  assert.equal(next.metadata.backupRevision, 13);
+  assert.throws(
+    () => store.appendSnapshot(request('device-a', 1, 0)),
+    assertCode('BACKUP_REVISION_CONFLICT'),
+  );
+});
+
 test('rejects capacity overflow without deleting or replacing retained data', (t) => {
   const rootDir = temporaryDirectory(t);
   const firstEnvelope = envelope('device-a', 1, 'first');
@@ -175,6 +195,23 @@ test('rejects capacity overflow without deleting or replacing retained data', (t
   assert.deepEqual(fs.readFileSync(indexPath), before);
   assert.deepEqual(store.listSnapshots('device-a'), [first.metadata]);
   assert.equal(store.readSnapshot('device-a', first.metadata.snapshotId).envelope.state.value, 'first');
+});
+
+test('applies the retained-byte capacity across all device indexes', (t) => {
+  const rootDir = temporaryDirectory(t);
+  const firstEnvelope = envelope('device-a', 1, 'first');
+  const secondEnvelope = envelope('device-b', 1, 'second');
+  const maxTotalBytes = Buffer.byteLength(JSON.stringify(firstEnvelope))
+    + Buffer.byteLength(JSON.stringify(secondEnvelope)) - 1;
+  const store = fixtureStore(t, { rootDir, maxTotalBytes });
+  const first = store.appendSnapshot(request('device-a', 1, 0, 'first'));
+
+  assert.throws(
+    () => store.appendSnapshot(request('device-b', 1, 0, 'second')),
+    assertCode('CAPACITY_EXCEEDED'),
+  );
+  assert.deepEqual(store.listSnapshots('device-a'), [first.metadata]);
+  assert.deepEqual(store.listSnapshots('device-b'), []);
 });
 
 test('rejects mutation audit index overflow without changing the current head', (t) => {
@@ -196,22 +233,92 @@ test('rejects mutation audit index overflow without changing the current head', 
   assert.deepEqual(cappedStore.getHead('device-a'), first.metadata);
 });
 
-test('rejects corrupted snapshots and leaves the previous index untouched', (t) => {
+test('isolates a corrupted historical snapshot while keeping the healthy head recoverable', (t) => {
   const rootDir = temporaryDirectory(t);
   const store = fixtureStore(t, { rootDir });
   const first = store.appendSnapshot(request('device-a', 1, 0, 'first'));
+  const second = store.appendSnapshot(request('device-a', 2, 1, 'second'));
   const indexPath = findFiles(rootDir, 'index.json')[0];
   const snapshotFile = findFiles(rootDir, `${first.metadata.snapshotId}.json`)[0];
   const indexBefore = fs.readFileSync(indexPath);
   fs.writeFileSync(snapshotFile, '{"tampered":true}', 'utf8');
 
-  assert.throws(() => store.listSnapshots('device-a'), assertCode('CORRUPT_STORE'));
+  assert.deepEqual(store.listSnapshots('device-a'), [second.metadata, first.metadata]);
+  assert.equal(store.readSnapshot('device-a', second.metadata.snapshotId).envelope.state.value, 'second');
   assert.throws(
-    () => store.appendSnapshot(request('device-a', 2, 1, 'second')),
+    () => store.readSnapshot('device-a', first.metadata.snapshotId),
+    assertCode('CORRUPT_STORE'),
+  );
+  assert.throws(
+    () => store.appendSnapshot(request('device-a', 3, 2, 'third')),
     assertCode('CORRUPT_STORE'),
   );
   assert.deepEqual(fs.readFileSync(indexPath), indexBefore);
   assert.equal(fs.readFileSync(snapshotFile, 'utf8'), '{"tampered":true}');
+});
+
+test('rejects unsafe snapshot paths before touching the filesystem', (t) => {
+  const rootDir = temporaryDirectory(t);
+  const store = createBackupStoreV3({
+    rootDir,
+    createSnapshotId: () => '../../../escaped',
+  });
+
+  assert.throws(
+    () => store.appendSnapshot(request('device-a', 1, 0)),
+    assertCode('INVALID_ARGUMENT'),
+  );
+  assert.throws(
+    () => store.readSnapshot('device-a', '../index'),
+    assertCode('INVALID_ARGUMENT'),
+  );
+  assert.equal(findFiles(rootDir, 'index.json').length, 0);
+  assert.equal(fs.existsSync(path.join(rootDir, 'escaped.json')), false);
+});
+
+test('rejects values that JSON.stringify would silently change or discard', (t) => {
+  const rootDir = temporaryDirectory(t);
+  const store = fixtureStore(t, { rootDir });
+  const withUndefined = request('device-a', 1, 0);
+  withUndefined.envelope.state.omitted = undefined;
+  assert.throws(() => store.appendSnapshot(withUndefined), assertCode('INVALID_ARGUMENT'));
+
+  const withNaN = request('device-a', 1, 0);
+  withNaN.envelope.state.value = Number.NaN;
+  assert.throws(() => store.appendSnapshot(withNaN), assertCode('INVALID_ARGUMENT'));
+  assert.equal(findFiles(rootDir, 'index.json').length, 0);
+});
+
+test('serializes writers with a cross-process lock before reading the CAS head', (t) => {
+  const rootDir = temporaryDirectory(t);
+  const store = fixtureStore(t, { rootDir });
+  const lockPath = path.join(rootDir, '.backup-store-v3.lock');
+  fs.writeFileSync(lockPath, JSON.stringify({
+    pid: process.pid,
+    token: 'other-writer',
+    createdAt: new Date().toISOString(),
+  }), 'utf8');
+
+  assert.throws(
+    () => store.appendSnapshot(request('device-a', 1, 0)),
+    assertCode('STORE_BUSY'),
+  );
+  assert.equal(findFiles(rootDir, 'index.json').length, 0);
+  fs.rmSync(lockPath);
+  assert.equal(store.appendSnapshot(request('device-a', 1, 0)).metadata.backupRevision, 1);
+});
+
+test('removes uncommitted orphan files before accepting the next mutation', (t) => {
+  const rootDir = temporaryDirectory(t);
+  const store = fixtureStore(t, { rootDir });
+  store.appendSnapshot(request('device-a', 1, 0));
+  const indexPath = findFiles(rootDir, 'index.json')[0];
+  const snapshotsDirectory = path.join(path.dirname(indexPath), 'snapshots');
+  const orphanPath = path.join(snapshotsDirectory, '.orphan.tmp');
+  fs.writeFileSync(orphanPath, 'orphan');
+
+  assert.equal(store.appendSnapshot(request('device-a', 2, 1)).metadata.backupRevision, 2);
+  assert.equal(fs.existsSync(orphanPath), false);
 });
 
 test('rejects a corrupted index instead of creating an empty replacement', (t) => {

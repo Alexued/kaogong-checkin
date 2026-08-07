@@ -1,5 +1,6 @@
 /** REST/WebSocket client for the selected computer companion. */
 import type { AppState, ServerInfo } from '../types';
+import type { StorageEnvelopeV3 } from '../domain/v3';
 import {
   getPairingToken,
   getSelectedServerId,
@@ -21,6 +22,41 @@ export interface PairingResult {
   token: string;
   serverId: string;
   protocolVersion?: number;
+  backupProtocolVersion?: number;
+  backupFormatVersion?: number;
+}
+
+export interface BackupSnapshotMetadataV3 {
+  snapshotId: string;
+  localRevision: number;
+  backupRevision: number;
+  sha256: string;
+  bytes: number;
+  createdAt: string;
+}
+
+export interface BackupCatalogV3 {
+  deviceId: string;
+  head: BackupSnapshotMetadataV3 | null;
+  snapshots: BackupSnapshotMetadataV3[];
+  backupProtocolVersion: 3;
+  backupFormatVersion: 1;
+}
+
+export interface BackupAppendResultV3 {
+  metadata: BackupSnapshotMetadataV3;
+  idempotent: boolean;
+  retained: boolean;
+  prunedSnapshotIds: string[];
+  backupProtocolVersion: 3;
+  backupFormatVersion: 1;
+}
+
+export interface BackupSnapshotV3 {
+  metadata: BackupSnapshotMetadataV3;
+  envelope: StorageEnvelopeV3;
+  backupProtocolVersion: 3;
+  backupFormatVersion: 1;
 }
 
 export function getServerUrl(): string {
@@ -88,6 +124,48 @@ export async function replaceState(state: AppState, signal?: AbortSignal): Promi
     signal,
   });
   return responseJson<AppState>(response, 'PUT /api/state');
+}
+
+export async function fetchBackupCatalogV3(
+  deviceId: string,
+  signal?: AbortSignal,
+): Promise<BackupCatalogV3> {
+  const response = await fetch(
+    `${httpBase()}/api/v3/backups/${encodeURIComponent(deviceId)}`,
+    { headers: authHeaders(), signal },
+  );
+  return responseJson<BackupCatalogV3>(response, 'GET /api/v3/backups/:deviceId');
+}
+
+export async function appendBackupSnapshotV3(
+  request: {
+    mutationId: string;
+    deviceId: string;
+    expectedBackupRevision: number;
+    localRevision: number;
+    envelope: StorageEnvelopeV3;
+  },
+  signal?: AbortSignal,
+): Promise<BackupAppendResultV3> {
+  const response = await fetch(`${httpBase()}/api/v3/backups`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(request),
+    signal,
+  });
+  return responseJson<BackupAppendResultV3>(response, 'POST /api/v3/backups');
+}
+
+export async function fetchBackupSnapshotV3(
+  deviceId: string,
+  snapshotId: string,
+  signal?: AbortSignal,
+): Promise<BackupSnapshotV3> {
+  const response = await fetch(
+    `${httpBase()}/api/v3/backups/${encodeURIComponent(deviceId)}/${encodeURIComponent(snapshotId)}`,
+    { headers: authHeaders(), signal },
+  );
+  return responseJson<BackupSnapshotV3>(response, 'GET /api/v3/backups/:deviceId/:snapshotId');
 }
 
 export async function fetchInfo(signal?: AbortSignal): Promise<ServerInfo> {

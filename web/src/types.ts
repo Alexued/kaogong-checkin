@@ -123,6 +123,8 @@ export interface ServerInfo {
   protocolVersion?: number;
   stateSchemaVersion?: number;
   minimumClientStateSchemaVersion?: number;
+  backupProtocolVersion?: number;
+  backupFormatVersion?: number;
 }
 
 export type SyncEntity = 'task' | 'subtask' | 'checkin' | 'settings' | 'timer' | 'drill' | 'formulaDrill';

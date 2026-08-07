@@ -138,8 +138,8 @@
           <button class="btn ghost" type="button" :disabled="connectingServer" @click="saveServerUrl">
             {{ connectingServer ? '连接中…' : '保存并连接' }}
           </button>
-          <button class="btn danger" type="button" :disabled="!store.online || overwriting" @click="overwriteLocal">
-            {{ overwriting ? '覆盖中…' : '用本地覆盖服务器' }}
+          <button class="btn" type="button" :disabled="!store.online || overwriting" @click="overwriteLocal">
+            {{ overwriting ? '备份中…' : '立即备份到电脑' }}
           </button>
         </div>
       </template>
@@ -268,7 +268,7 @@ import {
   subscribeDiscovery,
   type DiscoveredServer,
 } from '../api/discover';
-import { overwriteServerWithLocal } from '../api/sync';
+import { backupLocalStateToComputer } from '../api/sync';
 import {
   configureComputerServer,
   isSyncEnabled,
@@ -770,14 +770,16 @@ async function submitPairing() {
 }
 
 async function overwriteLocal() {
-  if (!window.confirm('确定用本地完整数据覆盖服务器吗？服务器现有数据将被替换。')) return;
+  if (!window.confirm('立即在电脑上保留一份当前手机数据快照吗？此操作不会修改手机数据。')) return;
   overwriting.value = true;
   syncMessage.value = '';
   try {
-    await overwriteServerWithLocal();
-    syncMessage.value = '已用本地数据覆盖服务器';
+    const result = await backupLocalStateToComputer();
+    syncMessage.value = 'metadata' in result
+      ? `备份完成：电脑端第 ${result.metadata.backupRevision} 代快照`
+      : '旧版电脑端已接收当前手机数据';
   } catch {
-    syncMessage.value = '失败：覆盖未完成，本地数据和队列已保留';
+    syncMessage.value = '失败：备份未完成，手机数据和待同步队列均已保留';
   } finally {
     overwriting.value = false;
   }

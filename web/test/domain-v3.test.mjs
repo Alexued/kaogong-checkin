@@ -72,6 +72,90 @@ test('repository locks a corrupt primary and never substitutes blank state', asy
   assert.ok(storage.getItem('kgc-migration-lock-v3'));
 });
 
+test('repository write failure preserves the complete previous primary record', async () => {
+  const storage = new MemoryStorage();
+  const repository = new repositoryModule.RepositoryV3(storage);
+  const loaded = await repository.load();
+  const previous = storage.getItem('kgc-repository-v3');
+  const nextState = structuredClone(loaded.record.envelope.state);
+  nextState.settings.theme = 'dark';
+  storage.failKey = 'kgc-repository-v3';
+
+  await assert.rejects(
+    repository.commit(nextState),
+    (error) => error.code === 'REPOSITORY_WRITE_FAILED',
+  );
+  assert.equal(storage.getItem('kgc-repository-v3'), previous);
+});
+
+test('migration source changes after backup are locked without overwriting either source', async () => {
+  const originalState = JSON.stringify(legacyState());
+  const changed = legacyState();
+  changed.tasks[0].title = 'changed-after-backup';
+  const rawQueue = JSON.stringify([]);
+  const backupStorage = new MemoryStorage({ 'kgc-state': originalState, 'kgc-queue': rawQueue });
+  const firstRepository = new repositoryModule.RepositoryV3(backupStorage);
+  await firstRepository.load();
+  const backup = backupStorage.getItem('kgc-migration-backup-v3');
+
+  const storage = new MemoryStorage({
+    'kgc-state': JSON.stringify(changed),
+    'kgc-queue': rawQueue,
+    'kgc-migration-backup-v3': backup,
+  });
+  const repository = new repositoryModule.RepositoryV3(storage);
+  await assert.rejects(repository.load(), (error) => {
+    assert.equal(error.lock.errorCode, 'MIGRATION_SOURCE_CHANGED');
+    return true;
+  });
+  assert.equal(storage.getItem('kgc-state'), JSON.stringify(changed));
+  assert.equal(storage.getItem('kgc-migration-backup-v3'), backup);
+  assert.equal(storage.getItem('kgc-repository-v3'), null);
+});
+
+test('a damaged migration lock remains fail-closed even with a valid primary', async () => {
+  const seedStorage = new MemoryStorage();
+  const seedRepository = new repositoryModule.RepositoryV3(seedStorage);
+  await seedRepository.load();
+  const primary = seedStorage.getItem('kgc-repository-v3');
+  const storage = new MemoryStorage({
+    'kgc-repository-v3': primary,
+    'kgc-migration-lock-v3': '{damaged',
+  });
+  const repository = new repositoryModule.RepositoryV3(storage);
+  await assert.rejects(repository.load(), (error) => {
+    assert.equal(error.lock.errorCode, 'INVALID_MIGRATION_LOCK');
+    return true;
+  });
+  assert.equal(storage.getItem('kgc-repository-v3'), primary);
+});
+
+test('manual migration retry rebuilds only from the preserved backup and clears the lock', async () => {
+  const rawState = JSON.stringify(legacyState());
+  const rawQueue = JSON.stringify([]);
+  const sourceStorage = new MemoryStorage({ 'kgc-state': rawState, 'kgc-queue': rawQueue });
+  const sourceRepository = new repositoryModule.RepositoryV3(sourceStorage);
+  await sourceRepository.load();
+  const storage = new MemoryStorage({
+    'kgc-state': '{live-source-is-corrupt',
+    'kgc-queue': '[{"live":"queue"}]',
+    'kgc-migration-backup-v3': sourceStorage.getItem('kgc-migration-backup-v3'),
+    'kgc-migration-lock-v3': JSON.stringify({
+      formatVersion: 1,
+      sourceDigest: 'locked',
+      sourceBytesRef: 'backup',
+      errorCode: 'MIGRATION_FAILED',
+      firstFailedAt: '2026-08-08T00:00:00.000Z',
+    }),
+  });
+  const repository = new repositoryModule.RepositoryV3(storage);
+  const retried = await repository.retryMigration();
+  assert.equal(retried.record.envelope.state.tasks[0].title, legacyState().tasks[0].title);
+  assert.equal(storage.getItem('kgc-migration-lock-v3'), null);
+  assert.equal(storage.getItem('kgc-state'), '{live-source-is-corrupt');
+  assert.equal(storage.getItem('kgc-queue'), '[{"live":"queue"}]');
+});
+
 test('domain validation rejects duplicate progress keys and orphan timers', () => {
   const state = domain.emptyDomainState();
   state.tasks.push({

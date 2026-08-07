@@ -6,9 +6,11 @@ const path = require('node:path');
 
 const BACKUP_FORMAT_VERSION = 1;
 const SNAPSHOT_RETENTION_COUNT = 10;
+const DEFAULT_MAX_MUTATION_RECORDS = 2048;
 const DEFAULT_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 const DEFAULT_MAX_INDEX_BYTES = 4 * 1024 * 1024;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+const SNAPSHOT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/;
 
 class BackupStoreV3Error extends Error {
   constructor(code, message, details = {}) {
@@ -43,6 +45,13 @@ function validateRevision(value, label, minimum = 0) {
   return value;
 }
 
+function validateSnapshotId(value, label = 'snapshotId') {
+  if (typeof value !== 'string' || !SNAPSHOT_ID_PATTERN.test(value) || value === '.' || value === '..') {
+    fail('INVALID_ARGUMENT', `${label} must be a safe file identifier`);
+  }
+  return value;
+}
+
 function validatePositiveOption(value, label) {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new TypeError(`${label} must be a positive safe integer`);
@@ -58,6 +67,39 @@ function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function assertJsonValue(value, location = 'envelope', ancestors = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) return;
+    fail('INVALID_ARGUMENT', `${location} contains a non-finite number`);
+  }
+  if (typeof value !== 'object') {
+    fail('INVALID_ARGUMENT', `${location} contains a non-JSON value`);
+  }
+  if (ancestors.has(value)) fail('INVALID_ARGUMENT', `${location} contains a circular reference`);
+  ancestors.add(value);
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      if (!Object.hasOwn(value, index)) fail('INVALID_ARGUMENT', `${location} contains a sparse array`);
+      assertJsonValue(value[index], `${location}[${index}]`, ancestors);
+    }
+  } else {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      fail('INVALID_ARGUMENT', `${location} contains a non-plain object`);
+    }
+    for (const [key, child] of Object.entries(value)) {
+      assertJsonValue(child, `${location}.${key}`, ancestors);
+    }
+    for (const symbol of Object.getOwnPropertySymbols(value)) {
+      if (Object.prototype.propertyIsEnumerable.call(value, symbol)) {
+        fail('INVALID_ARGUMENT', `${location} contains an enumerable Symbol property`);
+      }
+    }
+  }
+  ancestors.delete(value);
+}
+
 function serializeEnvelope(envelope, deviceId, localRevision) {
   if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
     fail('INVALID_ARGUMENT', 'envelope must be a JSON object');
@@ -71,6 +113,7 @@ function serializeEnvelope(envelope, deviceId, localRevision) {
   if (envelope.revision !== localRevision) {
     fail('INVALID_ARGUMENT', 'envelope revision must match localRevision');
   }
+  assertJsonValue(envelope);
 
   let serialized;
   try {
@@ -98,6 +141,7 @@ function emptyIndex(deviceId) {
   return {
     formatVersion: BACKUP_FORMAT_VERSION,
     deviceId,
+    mutationFloorRevision: 0,
     headBackupRevision: 0,
     totalBytes: 0,
     snapshots: [],
@@ -125,7 +169,7 @@ function validateMetadata(metadata, label) {
     fail('CORRUPT_STORE', `${label} metadata is invalid`);
   }
   try {
-    validateIdentifier(metadata.snapshotId, `${label}.snapshotId`);
+    validateSnapshotId(metadata.snapshotId, `${label}.snapshotId`);
   } catch (error) {
     fail('CORRUPT_STORE', `${label} snapshotId is invalid`);
   }
@@ -183,7 +227,7 @@ function verifySnapshotFile(directory, metadata) {
   }
 }
 
-function validateIndex(index, deviceId, directory, limits) {
+function validateIndex(index, deviceId, limits) {
   if (!index || typeof index !== 'object' || Array.isArray(index)) {
     fail('CORRUPT_STORE', 'backup index is not an object');
   }
@@ -196,9 +240,16 @@ function validateIndex(index, deviceId, directory, limits) {
   if (index.snapshots.length > SNAPSHOT_RETENTION_COUNT) {
     fail('CORRUPT_STORE', 'backup index exceeds the snapshot retention count');
   }
+  if (
+    !Number.isSafeInteger(index.mutationFloorRevision)
+    || index.mutationFloorRevision < 0
+    || index.mutations.length > limits.maxMutationRecords
+  ) {
+    fail('CORRUPT_STORE', 'backup index mutation window is invalid');
+  }
 
   const mutationIds = new Set();
-  let previousBackupRevision = 0;
+  let previousBackupRevision = index.mutationFloorRevision;
   for (const [offset, mutation] of index.mutations.entries()) {
     const label = `mutations[${offset}]`;
     if (!mutation || typeof mutation !== 'object' || Array.isArray(mutation)) {
@@ -243,7 +294,6 @@ function validateIndex(index, deviceId, directory, limits) {
     if (!Number.isSafeInteger(totalBytes)) {
       fail('CORRUPT_STORE', 'backup index total size is invalid');
     }
-    verifySnapshotFile(directory, metadata);
   }
   if (index.totalBytes !== totalBytes || totalBytes > limits.maxTotalBytes) {
     fail('CORRUPT_STORE', 'backup index total size is inconsistent or over capacity');
@@ -265,11 +315,26 @@ function writeFileAtomic(filePath, bytes) {
     fs.closeSync(descriptor);
     descriptor = undefined;
     fs.renameSync(temporaryPath, filePath);
+    fsyncDirectory(directory);
   } finally {
     if (descriptor !== undefined) {
       try { fs.closeSync(descriptor); } catch { /* already closed */ }
     }
     try { fs.rmSync(temporaryPath, { force: true }); } catch { /* best effort */ }
+  }
+}
+
+function fsyncDirectory(directory) {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(directory, 'r');
+    fs.fsyncSync(descriptor);
+  } catch (error) {
+    if (!['EINVAL', 'EPERM', 'EISDIR', 'ENOTSUP'].includes(error.code)) throw error;
+  } finally {
+    if (descriptor !== undefined) {
+      try { fs.closeSync(descriptor); } catch { /* already closed */ }
+    }
   }
 }
 
@@ -287,19 +352,84 @@ function createBackupStoreV3(options = {}) {
       options.maxIndexBytes ?? DEFAULT_MAX_INDEX_BYTES,
       'maxIndexBytes',
     ),
+    maxMutationRecords: validatePositiveOption(
+      options.maxMutationRecords ?? DEFAULT_MAX_MUTATION_RECORDS,
+      'maxMutationRecords',
+    ),
   };
+  if (limits.maxMutationRecords < SNAPSHOT_RETENTION_COUNT) {
+    throw new TypeError(`maxMutationRecords must be at least ${SNAPSHOT_RETENTION_COUNT}`);
+  }
   const now = options.now || (() => new Date());
   const createSnapshotId = options.createSnapshotId || (() => crypto.randomUUID());
   if (typeof now !== 'function' || typeof createSnapshotId !== 'function') {
     throw new TypeError('now and createSnapshotId must be functions');
   }
 
-  function readIndex(deviceId) {
+  function acquireStoreLock() {
+    fs.mkdirSync(rootDir, { recursive: true });
+    const lockPath = path.join(rootDir, '.backup-store-v3.lock');
+    const token = crypto.randomUUID();
+    let descriptor;
+    try {
+      descriptor = fs.openSync(lockPath, 'wx', 0o600);
+      fs.writeFileSync(descriptor, JSON.stringify({
+        pid: process.pid,
+        token,
+        createdAt: new Date().toISOString(),
+      }));
+      fs.fsyncSync(descriptor);
+      return { descriptor, lockPath, token };
+    } catch (error) {
+      if (descriptor !== undefined) {
+        try { fs.closeSync(descriptor); } catch { /* already closed */ }
+        try { fs.rmSync(lockPath, { force: true }); } catch { /* best effort */ }
+      }
+      if (error.code === 'EEXIST') fail('STORE_BUSY', 'another backup writer holds the store lock');
+      const storeError = new BackupStoreV3Error('STORE_WRITE_FAILED', 'unable to acquire backup lock');
+      storeError.cause = error;
+      throw storeError;
+    }
+  }
+
+  function releaseStoreLock(lock) {
+    try { fs.closeSync(lock.descriptor); } catch { /* already closed */ }
+    try {
+      const current = JSON.parse(fs.readFileSync(lock.lockPath, 'utf8'));
+      if (current.token === lock.token) fs.rmSync(lock.lockPath, { force: true });
+    } catch {
+      // A missing or replaced lock must not be removed by the previous owner.
+    }
+  }
+
+  function withStoreLock(operation) {
+    const lock = acquireStoreLock();
+    try {
+      return operation();
+    } finally {
+      releaseStoreLock(lock);
+    }
+  }
+
+  function readIndex(deviceId, recoverUnindexedOrphans = false) {
     const directory = deviceDirectory(rootDir, deviceId);
     const indexPath = path.join(directory, 'index.json');
     if (!fs.existsSync(indexPath)) {
       if (directoryContainsFiles(directory)) {
-        fail('CORRUPT_STORE', 'device backup directory exists without an index');
+        if (!recoverUnindexedOrphans) {
+          fail('CORRUPT_STORE', 'device backup directory exists without an index');
+        }
+        try {
+          fs.rmSync(directory, { recursive: true, force: true });
+          fsyncDirectory(path.dirname(directory));
+        } catch (error) {
+          const storeError = new BackupStoreV3Error(
+            'STORE_CLEANUP_FAILED',
+            'unable to remove an uncommitted snapshot directory',
+          );
+          storeError.cause = error;
+          throw storeError;
+        }
       }
       return { directory, indexPath, index: emptyIndex(deviceId) };
     }
@@ -316,15 +446,87 @@ function createBackupStoreV3(options = {}) {
       if (error instanceof BackupStoreV3Error) throw error;
       fail('CORRUPT_STORE', 'backup index is unreadable or contains invalid JSON');
     }
-    validateIndex(index, deviceId, directory, limits);
+    validateIndex(index, deviceId, limits);
     return { directory, indexPath, index };
+  }
+
+  function verifyRetainedSnapshots(directory, index) {
+    for (const metadata of index.snapshots) verifySnapshotFile(directory, metadata);
+  }
+
+  function cleanupUnreferencedSnapshots(directory, index) {
+    const snapshotsDirectory = path.join(directory, 'snapshots');
+    if (!fs.existsSync(snapshotsDirectory)) return;
+    const retainedFiles = new Set(index.snapshots.map((metadata) => `${metadata.snapshotId}.json`));
+    let changed = false;
+    for (const entry of fs.readdirSync(snapshotsDirectory, { withFileTypes: true })) {
+      if (entry.isDirectory() || entry.isSymbolicLink()) {
+        fail('CORRUPT_STORE', 'snapshot directory contains an unexpected entry');
+      }
+      if (retainedFiles.has(entry.name)) continue;
+      try {
+        fs.rmSync(path.join(snapshotsDirectory, entry.name));
+        changed = true;
+      } catch (error) {
+        const storeError = new BackupStoreV3Error(
+          'STORE_CLEANUP_FAILED',
+          `unable to remove unreferenced snapshot file ${entry.name}`,
+        );
+        storeError.cause = error;
+        throw storeError;
+      }
+    }
+    if (changed) fsyncDirectory(snapshotsDirectory);
+  }
+
+  function retainedStoreBytes() {
+    const devicesDirectory = path.join(rootDir, 'devices');
+    if (!fs.existsSync(devicesDirectory)) return 0;
+    let totalBytes = 0;
+    for (const entry of fs.readdirSync(devicesDirectory, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) {
+        fail('CORRUPT_STORE', 'backup devices directory contains an unexpected entry');
+      }
+      const directory = path.join(devicesDirectory, entry.name);
+      const indexPath = path.join(directory, 'index.json');
+      if (!fs.existsSync(indexPath)) {
+        if (directoryContainsFiles(directory)) {
+          fail('CORRUPT_STORE', 'device backup directory exists without an index');
+        }
+        continue;
+      }
+      let index;
+      try {
+        const bytes = fs.readFileSync(indexPath);
+        if (bytes.length > limits.maxIndexBytes) {
+          fail('CORRUPT_STORE', 'backup index exceeds its capacity limit');
+        }
+        index = JSON.parse(bytes.toString('utf8'));
+      } catch (error) {
+        if (error instanceof BackupStoreV3Error) throw error;
+        fail('CORRUPT_STORE', 'backup index is unreadable or contains invalid JSON');
+      }
+      try {
+        validateIdentifier(index.deviceId, 'index.deviceId');
+      } catch {
+        fail('CORRUPT_STORE', 'backup index contains an invalid deviceId');
+      }
+      if (path.basename(deviceDirectory(rootDir, index.deviceId)) !== entry.name) {
+        fail('CORRUPT_STORE', 'device backup directory does not match its index identity');
+      }
+      validateIndex(index, index.deviceId, limits);
+      cleanupUnreferencedSnapshots(directory, index);
+      totalBytes += index.totalBytes;
+      if (!Number.isSafeInteger(totalBytes)) fail('CORRUPT_STORE', 'backup store size is invalid');
+    }
+    return totalBytes;
   }
 
   function nextSnapshotId(directory, index) {
     const known = new Set(index.mutations.map((mutation) => mutation.metadata.snapshotId));
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const candidate = createSnapshotId();
-      validateIdentifier(candidate, 'snapshotId');
+      validateSnapshotId(candidate);
       if (!known.has(candidate) && !fs.existsSync(snapshotPath(directory, candidate))) return candidate;
     }
     fail('STORE_WRITE_FAILED', 'unable to allocate a unique snapshotId');
@@ -350,7 +552,11 @@ function createBackupStoreV3(options = {}) {
       envelopeSha256,
     }), 'utf8'));
 
-    const { directory, indexPath, index } = readIndex(deviceId);
+    return withStoreLock(() => {
+    const { directory, indexPath, index } = readIndex(deviceId, true);
+    cleanupUnreferencedSnapshots(directory, index);
+    verifyRetainedSnapshots(directory, index);
+    const currentStoreBytes = retainedStoreBytes();
     const duplicate = index.mutations.find((mutation) => mutation.mutationId === mutationId);
     if (duplicate) {
       if (duplicate.requestSha256 !== requestSha256) {
@@ -400,20 +606,24 @@ function createBackupStoreV3(options = {}) {
     };
     const nextSnapshots = [...index.snapshots, metadata].slice(-SNAPSHOT_RETENTION_COUNT);
     const nextTotalBytes = nextSnapshots.reduce((total, snapshot) => total + snapshot.bytes, 0);
-    if (!Number.isSafeInteger(nextTotalBytes) || nextTotalBytes > limits.maxTotalBytes) {
+    const requestedStoreBytes = currentStoreBytes - index.totalBytes + nextTotalBytes;
+    if (!Number.isSafeInteger(requestedStoreBytes) || requestedStoreBytes > limits.maxTotalBytes) {
       fail('CAPACITY_EXCEEDED', 'snapshot would exceed the retained backup capacity', {
         maxTotalBytes: limits.maxTotalBytes,
-        requestedTotalBytes: nextTotalBytes,
+        requestedTotalBytes: requestedStoreBytes,
       });
     }
 
+    const nextMutations = [...index.mutations, { mutationId, requestSha256, metadata }]
+      .slice(-limits.maxMutationRecords);
     const nextIndex = {
       formatVersion: BACKUP_FORMAT_VERSION,
       deviceId,
+      mutationFloorRevision: nextMutations[0].metadata.backupRevision - 1,
       headBackupRevision: metadata.backupRevision,
       totalBytes: nextTotalBytes,
       snapshots: nextSnapshots,
-      mutations: [...index.mutations, { mutationId, requestSha256, metadata }],
+      mutations: nextMutations,
     };
     const indexBytes = Buffer.from(`${JSON.stringify(nextIndex, null, 2)}\n`, 'utf8');
     if (indexBytes.length > limits.maxIndexBytes) {
@@ -428,11 +638,24 @@ function createBackupStoreV3(options = {}) {
       writeFileAtomic(newSnapshotPath, envelopeBytes);
       writeFileAtomic(indexPath, indexBytes);
     } catch (error) {
-      try { fs.rmSync(newSnapshotPath, { force: true }); } catch { /* best effort */ }
+      let indexCommitted = false;
+      try {
+        indexCommitted = fs.existsSync(indexPath)
+          && fs.readFileSync(indexPath).equals(indexBytes);
+      } catch {
+        indexCommitted = false;
+      }
+      if (!indexCommitted) {
+        try {
+          fs.rmSync(newSnapshotPath, { force: true });
+          fsyncDirectory(path.dirname(newSnapshotPath));
+        } catch { /* best effort */ }
+      }
       if (error instanceof BackupStoreV3Error) throw error;
       const storeError = new BackupStoreV3Error(
         'STORE_WRITE_FAILED',
         'failed to persist the backup snapshot',
+        { committed: indexCommitted },
       );
       storeError.cause = error;
       throw storeError;
@@ -442,9 +665,7 @@ function createBackupStoreV3(options = {}) {
     const prunedSnapshotIds = index.snapshots
       .filter((snapshot) => !retainedIds.has(snapshot.snapshotId))
       .map((snapshot) => snapshot.snapshotId);
-    for (const snapshotId of prunedSnapshotIds) {
-      try { fs.rmSync(snapshotPath(directory, snapshotId), { force: true }); } catch { /* orphan is harmless */ }
-    }
+    cleanupUnreferencedSnapshots(directory, nextIndex);
 
     return {
       metadata: cloneJson(metadata),
@@ -452,6 +673,7 @@ function createBackupStoreV3(options = {}) {
       retained: true,
       prunedSnapshotIds,
     };
+    });
   }
 
   function listSnapshots(deviceIdValue) {
@@ -462,7 +684,7 @@ function createBackupStoreV3(options = {}) {
 
   function readSnapshot(deviceIdValue, snapshotIdValue) {
     const deviceId = validateIdentifier(deviceIdValue, 'deviceId');
-    const snapshotId = validateIdentifier(snapshotIdValue, 'snapshotId');
+    const snapshotId = validateSnapshotId(snapshotIdValue);
     const { directory, index } = readIndex(deviceId);
     const metadata = index.snapshots.find((candidate) => candidate.snapshotId === snapshotId);
     if (!metadata) fail('SNAPSHOT_NOT_FOUND', `snapshot ${snapshotId} is not retained`);

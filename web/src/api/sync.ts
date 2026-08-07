@@ -1,6 +1,16 @@
 /** Local-first state persistence and guarded WebSocket synchronization. */
 import { useAppStore } from '../stores/app';
-import { ApiError, fetchInfo, fetchState, rememberServerInfo, replaceState, wsUrl } from './client';
+import {
+  ApiError,
+  appendBackupSnapshotV3,
+  fetchBackupCatalogV3,
+  fetchInfo,
+  fetchState,
+  rememberServerInfo,
+  replaceState,
+  wsUrl,
+  type BackupAppendResultV3,
+} from './client';
 import { getPairingToken, removePairingToken } from './pairing-storage';
 import { SyncGeneration } from './sync-generation';
 import { isSyncEnabled, LOCAL_STATE_KEY } from './sync-preference';
@@ -474,6 +484,56 @@ export async function overwriteServerWithLocal() {
     store.applySnapshot(state);
     schedulePersistState();
     return state;
+  } finally {
+    replaceAbortController = null;
+    replacing = false;
+    if (isCurrentRun(generation)) void refreshSnapshotAndConnect(generation);
+  }
+}
+
+export async function backupLocalStateToComputer(): Promise<BackupAppendResultV3 | AppState> {
+  await initializeLocalStateAsync();
+  if (!isSyncEnabled()) throw new Error('sync disabled');
+  if (replacing) throw new Error('replace already in progress');
+  const store = useAppStore();
+  if (!store.online) throw new Error('server offline');
+
+  if (Number(serverInfo?.backupProtocolVersion || 0) < 3) {
+    return overwriteServerWithLocal();
+  }
+  if (!v3Repository || store.recoveryRequired) throw new Error('local repository unavailable');
+
+  replacing = true;
+  const generation = runGeneration;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  detachAndCloseSocket();
+  store.online = false;
+  store.syncPhase = 'connecting';
+  replaceAbortController = new AbortController();
+  try {
+    const record = await v3Repository.commit(toV3(currentState()));
+    const catalog = await fetchBackupCatalogV3(
+      record.envelope.deviceId,
+      replaceAbortController.signal,
+    );
+    if (!isCurrentRun(generation)) throw new Error('sync run changed');
+    const result = await appendBackupSnapshotV3({
+      mutationId: crypto.randomUUID(),
+      deviceId: record.envelope.deviceId,
+      expectedBackupRevision: catalog.head?.backupRevision || 0,
+      localRevision: record.envelope.revision,
+      envelope: record.envelope,
+    }, replaceAbortController.signal);
+    if (!isCurrentRun(generation)) throw new Error('sync run changed');
+    return result;
+  } catch (error) {
+    if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      scheduleV3Persist();
+    }
+    throw error;
   } finally {
     replaceAbortController = null;
     replacing = false;
