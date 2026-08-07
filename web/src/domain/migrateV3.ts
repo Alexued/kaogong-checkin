@@ -182,7 +182,11 @@ export function migrateLegacyToV3(rawState: string, rawQueue = ''): LegacyMigrat
   const checkinsByGroup = new Map<string, { parent: JsonRecord[]; children: Map<string, JsonRecord[]> }>();
   for (const source of state.checkins as unknown as JsonRecord[]) {
     const parentId = subtaskParent.get(String(source.taskId)) || String(source.taskId);
-    if (!state.tasks.some((task) => task.id === parentId)) { report.orphanCount += 1; throw new Error('ORPHAN_CHECKIN'); }
+    if (!state.tasks.some((task) => task.id === parentId)) {
+      report.orphanCount += 1;
+      if (source.deleted === true) continue;
+      throw new Error('ORPHAN_CHECKIN');
+    }
     const date = String(source.date);
     const key = `${parentId}\u0000${date}`;
     const group = checkinsByGroup.get(key) || { parent: [], children: new Map<string, JsonRecord[]>() };

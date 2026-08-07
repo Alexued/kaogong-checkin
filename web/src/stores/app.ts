@@ -195,6 +195,9 @@ export const useAppStore = defineStore('app', {
       const kept = new Set(list.filter((x) => x.id).map((x) => x.id));
       for (const s of cur) {
         if (!kept.has(s.id)) {
+          for (const checkin of this.checkins.filter((x) => x.taskId === s.id)) {
+            this.send({ kind: 'delete', entity: 'checkin', payload: { ...checkin, updatedAt: t, deleted: true } });
+          }
           this.send({ kind: 'delete', entity: 'subtask', payload: { id: s.id, updatedAt: t } });
         }
       }
@@ -257,7 +260,14 @@ export const useAppStore = defineStore('app', {
 
     deleteTask(id: string) {
       const t = now();
-      // 级联删除其子任务（打卡记录保留）
+      // Preserve timer history while tombstoning progress references before hard deletion.
+      const subtaskIds = new Set(this.subtasks.filter((x) => x.taskId === id).map((x) => x.id));
+      for (const checkin of this.checkins.filter((x) => x.taskId === id || subtaskIds.has(x.taskId))) {
+        this.send({ kind: 'delete', entity: 'checkin', payload: { ...checkin, updatedAt: t, deleted: true } });
+      }
+      for (const timer of this.timers.filter((x) => x.taskId === id)) {
+        this.send({ kind: 'upsert', entity: 'timer', payload: { ...timer, taskId: null, updatedAt: t } });
+      }
       for (const s of this.subtasks.filter((x) => x.taskId === id)) {
         this.send({ kind: 'delete', entity: 'subtask', payload: { id: s.id, updatedAt: t } });
       }

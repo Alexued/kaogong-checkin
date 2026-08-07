@@ -67,6 +67,23 @@ test('orphan progress is fatal instead of being silently dropped', () => {
   assert.throws(() => migration.migrateLegacyToV3(JSON.stringify(source)), /ORPHAN_CHECKIN/);
 });
 
+test('deleted check-in tombstones from a removed task do not recreate task progress', () => {
+  const source = legacyState();
+  source.tasks = [];
+  source.subtasks = [];
+  source.checkins = source.checkins.map((checkin) => ({ ...checkin, deleted: true }));
+  const result = migration.migrateLegacyToV3(JSON.stringify(source));
+  assert.equal(result.state.tasks.length, 0);
+  assert.equal(result.state.dailyProgress.length, 0);
+  assert.equal(result.report.orphanCount, 3);
+});
+
+test('migration rejects a timer with an unexplained orphan task link', () => {
+  const source = legacyState();
+  source.timers = [{ id: 'timer-orphan', label: 'history', taskId: 'missing', date: '2026-08-01', startedAt: '2026-08-01T04:00:00.000Z', durationMs: 1000, laps: [], createdAt: '2026-08-01T04:00:00.000Z', updatedAt: '2026-08-01T04:00:01.000Z', deleted: false, mode: 'stopwatch' }];
+  assert.throws(() => migration.migrateLegacyToV3(JSON.stringify(source)), /ORPHAN_TIMER/);
+});
+
 test('repository migration stores exact source backup and commits a stable v3 envelope', async () => {
   const rawState = JSON.stringify(legacyState());
   const rawQueue = JSON.stringify([]);

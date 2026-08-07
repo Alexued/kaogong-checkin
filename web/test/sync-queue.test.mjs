@@ -18,7 +18,7 @@ test('queue compaction keeps only the final mutation for one entity', () => {
   assert.equal(queue[0].clientMutationId, 'm2');
 });
 
-test('settings collapse to one final entry while unrelated entities retain order', () => {
+test('a replacement moves to the tail so queue order matches the latest mutation order', () => {
   let queue = [];
   queue = compactQueue(queue, mutation('task', 'task-1', '1', 'm1'));
   queue = compactQueue(queue, {
@@ -28,8 +28,16 @@ test('settings collapse to one final entry while unrelated entities retain order
   queue = compactQueue(queue, {
     kind: 'upsert', entity: 'settings', payload: { theme: 'dark', updatedAt: '2' }, clientMutationId: 's2',
   });
-  assert.deepEqual(queue.map((item) => item.clientMutationId), ['m1', 's2', 'm2']);
-  assert.equal(queue[1].payload.theme, 'dark');
+  assert.deepEqual(queue.map((item) => item.clientMutationId), ['m1', 'm2', 's2']);
+  assert.equal(queue[2].payload.theme, 'dark');
+});
+
+test('task deletion remains after newly enqueued dependent tombstones', () => {
+  let queue = [];
+  queue = compactQueue(queue, mutation('task', 'task-1', '1', 'task-upsert'));
+  queue = compactQueue(queue, mutation('checkin', 'checkin-1', '2', 'checkin-delete', 'delete'));
+  queue = compactQueue(queue, mutation('task', 'task-1', '3', 'task-delete', 'delete'));
+  assert.deepEqual(queue.map((item) => item.clientMutationId), ['checkin-delete', 'task-delete']);
 });
 
 test('legacy queues gain stable mutation ids and are compacted during load', () => {

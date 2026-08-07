@@ -23,7 +23,7 @@ export function queueEntityKey(message: SyncMessage): string {
   return `${message.entity}:${typeof id === 'string' ? id : message.clientMutationId || ''}`;
 }
 
-/** Keep only the final effective mutation for an entity while preserving queue order. */
+/** Keep only the final mutation for an entity at its latest position in the queue. */
 export function compactQueue(
   queue: readonly QueuedSyncMessage[],
   incoming: SyncMessage,
@@ -33,9 +33,7 @@ export function compactQueue(
   const index = queue.findIndex((item) => queueEntityKey(item) === key);
   if (index < 0) return [...queue, next];
 
-  const compacted = queue.slice();
-  compacted[index] = next;
-  return compacted;
+  return [...queue.slice(0, index), ...queue.slice(index + 1), next];
 }
 
 export function normalizeQueue(value: unknown): QueuedSyncMessage[] {
