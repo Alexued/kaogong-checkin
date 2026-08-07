@@ -15,6 +15,8 @@ export interface DiscoveredServer {
   serverId?: string;
   pairingRequired: boolean;
   protocolVersion: number;
+  apkAvailable: boolean;
+  apkVersion?: string;
 }
 
 let activeSocketId: number | null = null;
@@ -115,6 +117,8 @@ export function startDiscovery(): Promise<void> {
             serverId?: string;
             pairingRequired?: boolean;
             protocolVersion?: number;
+            apkAvailable?: boolean;
+            apkVersion?: string;
           };
           const host = (event.remoteAddress || '').replace(/^\//, '');
           if (!host || !message.httpPort) return;
@@ -128,6 +132,10 @@ export function startDiscovery(): Promise<void> {
             serverId: message.serverId ? String(message.serverId) : undefined,
             pairingRequired: Boolean(message.pairingRequired),
             protocolVersion: Number(message.protocolVersion || 1),
+            apkAvailable: Boolean(message.apkAvailable),
+            apkVersion: /^\d+\.\d+\.\d+$/.test(String(message.apkVersion || ''))
+              ? String(message.apkVersion)
+              : undefined,
           });
           notify();
         } catch {

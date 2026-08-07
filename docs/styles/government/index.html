@@ -1,0 +1,425 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  class="no-js"
+  style="
+    background: #f4f0e8;
+    --page-bg: #f4f0e8;
+    --page-ink: #17242c;
+    --focus-color: #245d67;
+  "
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>产品资料公报｜考公打卡</title>
+    <meta
+      name="description"
+      content="考公打卡产品资料页，列明适用范围、核心能力、数据管理、安装办法与附件下载。"
+    />
+    <meta name="theme-color" content="#f4f0e8" />
+    <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
+    <script>
+      document.documentElement.className = "js";
+    </script>
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v070-release" />
+    <script src="../shared/release-data.js?v=20260807-v070-release" defer></script>
+    <script src="../shared/style-switcher.js?v=20260807-v070-release" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <header class="document-masthead">
+      <div class="masthead-inner">
+        <a href="../../" class="document-brand"
+          ><img
+            src="../../assets/app-icon.png"
+            width="36"
+            height="36"
+            alt=""
+          /><span><strong>考公打卡</strong><small>产品资料页</small></span></a
+        >
+        <dl>
+          <div>
+            <dt>文件编号</dt>
+            <dd>KGC-2026-070</dd>
+          </div>
+          <div>
+            <dt>发布日期</dt>
+            <dd>2026-08-07</dd>
+          </div>
+          <div>
+            <dt>资料状态</dt>
+            <dd>正式发布</dd>
+          </div>
+        </dl>
+      </div>
+    </header>
+
+    <main id="main-content" class="document-layout">
+      <article class="public-document">
+        <header class="document-title" data-enter style="--enter-order: 0">
+          <p>产品资料公报 · 第 05 类页面风格</p>
+          <h1>考公打卡</h1>
+          <h2>移动端学习记录与可选局域网伴侣说明</h2>
+          <div class="abstract">
+            <strong>摘要</strong>
+            <p>
+              本资料说明考公打卡 Android 应用与 Windows
+              伴侣的用途、数据边界、安装条件和下载附件。电脑同步默认由用户控制，关闭后不进行局域网发现、连接或更新查询。
+            </p>
+          </div>
+        </header>
+
+        <section class="release-register" aria-labelledby="register-title">
+          <h2 id="register-title">版本登记</h2>
+          <div class="register-table" role="table" aria-label="版本与校验信息">
+            <div role="row">
+              <b role="rowheader">当前版本</b
+              ><span role="cell"
+                >v<span data-release="version">0.7.0</span></span
+              ><span role="cell">Android 7 及以上；Windows 10/11 x64</span>
+            </div>
+            <div role="row">
+              <b role="rowheader">Android 文件</b
+              ><code
+                class="release-file"
+                role="cell"
+                data-release="android-file"
+                >kaogong-checkin-v0.7.0.apk</code
+              ><span role="cell" data-release="android-size">3.27 MiB</span>
+            </div>
+            <div role="row">
+              <b role="rowheader">Android SHA-256</b
+              ><code
+                class="release-sha"
+                role="cell"
+                id="gov-android-sha"
+                data-release="android-sha"
+                >2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A</code
+              ><button type="button" data-copy-target="gov-android-sha">
+                复制校验值
+              </button>
+            </div>
+            <div role="row">
+              <b role="rowheader">Windows 文件</b
+              ><code
+                class="release-file"
+                role="cell"
+                data-release="windows-file"
+                >kaogong-checkin-windows-x64-setup-v0.7.0.exe</code
+              ><span role="cell" data-release="windows-size">91.38 MiB</span>
+            </div>
+            <div role="row">
+              <b role="rowheader">Windows SHA-256</b
+              ><code
+                class="release-sha"
+                role="cell"
+                id="gov-windows-sha"
+                data-release="windows-sha"
+                >BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18</code
+              ><button type="button" data-copy-target="gov-windows-sha">
+                复制校验值
+              </button>
+            </div>
+          </div>
+          <p class="copy-status" data-copy-status aria-live="polite"></p>
+        </section>
+
+        <nav class="document-index" aria-label="资料目录">
+          <strong>目录</strong>
+          <ol>
+            <li><a href="#scope">适用范围</a></li>
+            <li><a href="#capabilities">核心能力</a></li>
+            <li><a href="#data">数据管理</a></li>
+            <li><a href="#installation">安装办法</a></li>
+            <li><a href="#attachments">附件下载</a></li>
+          </ol>
+        </nav>
+
+        <section
+          class="numbered-section"
+          id="scope"
+          aria-labelledby="scope-title"
+        >
+          <div class="section-number">一</div>
+          <div class="section-body">
+            <h2 id="scope-title">适用范围</h2>
+            <p>
+              考公打卡适用于需要安排每日任务、记录专注时长和进行背诵复习的个人用户。Android
+              应用承担主要记录工作，数据首先保存在用户设备中。
+            </p>
+            <p>
+              Windows
+              伴侣用于同一可信局域网中的电脑备份、配对和安装包提供，不是使用移动端功能的必要条件。
+            </p>
+          </div>
+        </section>
+
+        <section
+          class="numbered-section"
+          id="capabilities"
+          aria-labelledby="capabilities-title"
+        >
+          <div class="section-number">二</div>
+          <div class="section-body">
+            <h2 id="capabilities-title">核心能力</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>能力</th>
+                  <th>用途</th>
+                  <th>默认位置</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>任务计划</td>
+                  <td>安排、勾选和回顾每日复习项目</td>
+                  <td>Android 本地</td>
+                </tr>
+                <tr>
+                  <td>专注计时</td>
+                  <td>记录学习时段及完成情况</td>
+                  <td>Android 本地</td>
+                </tr>
+                <tr>
+                  <td>背诵训练</td>
+                  <td>按掌握程度安排卡片复习</td>
+                  <td>Android 本地</td>
+                </tr>
+                <tr>
+                  <td>电脑伴侣</td>
+                  <td>提供局域网备份与安装包</td>
+                  <td>用户开启后</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section
+          class="numbered-section"
+          id="data"
+          aria-labelledby="data-title"
+        >
+          <div class="section-number">三</div>
+          <div class="section-body">
+            <h2 id="data-title">数据管理</h2>
+            <p>
+              电脑同步设有总开关。开关关闭后，应用停止 REST
+              请求、WebSocket、重连、UDP
+              发现、配对以及局域网更新检查；本地记录、服务器配置、配对信息与待同步队列保留。
+            </p>
+            <div class="policy-lines">
+              <div>
+                <b>关闭</b
+                ><span>仅在手机保存，不扫描电脑，不发起局域网更新查询。</span>
+              </div>
+              <div>
+                <b>开启</b
+                ><span>启动发现；选定服务器并配对后，才建立数据连接。</span>
+              </div>
+              <div>
+                <b>版本检查</b
+                ><span
+                  >比较局域网与 GitHub 版本，只显示结果，不自动下载安装。</span
+                >
+              </div>
+            </div>
+            <details>
+              <summary>展开技术边界说明</summary>
+              <p>
+                每次同步生命周期使用新的
+                generation。关闭或更换服务器时，旧请求被取消；迟到结果不得恢复连接或更新界面。GitHub
+                手动检查可独立进行，但不会绕过同步总开关启动局域网活动。
+              </p>
+            </details>
+          </div>
+        </section>
+
+        <section
+          class="numbered-section"
+          id="installation"
+          aria-labelledby="installation-title"
+        >
+          <div class="section-number">四</div>
+          <div class="section-body">
+            <h2 id="installation-title">安装办法</h2>
+            <ol class="procedure">
+              <li>
+                <span>01</span>
+                <p>
+                  <strong>核对平台。</strong>Android 安装 APK；Windows 10/11 x64
+                  安装桌面伴侣。
+                </p>
+              </li>
+              <li>
+                <span>02</span>
+                <p>
+                  <strong>核对文件。</strong
+                  >确认文件名、版本与本页登记一致，必要时校验 SHA-256。
+                </p>
+              </li>
+              <li>
+                <span>03</span>
+                <p>
+                  <strong>完成授权。</strong>Android
+                  安装仍由系统请求用户确认；局域网配对使用电脑显示的六位码。
+                </p>
+              </li>
+            </ol>
+            <details>
+              <summary>展开局域网更新流程</summary>
+              <ol>
+                <li>用户打开电脑同步并选定服务器。</li>
+                <li>移动端读取局域网安装包版本，同时查询 GitHub Release。</li>
+                <li>比较三段语义版本，同版本优先显示局域网来源。</li>
+                <li>用户点击下载后，再由 Android 系统确认安装。</li>
+              </ol>
+            </details>
+          </div>
+        </section>
+
+        <section
+          class="attachments"
+          id="attachments"
+          aria-labelledby="attachments-title"
+        >
+          <header>
+            <p>附件目录</p>
+            <h2 id="attachments-title">附件下载</h2>
+            <span>版本 v<span data-release="version">0.7.0</span></span>
+          </header>
+          <div class="attachment-row">
+            <span>附件一</span>
+            <div>
+              <strong>Android 应用安装包</strong
+              ><code class="release-file" data-release="android-file"
+                >kaogong-checkin-v0.7.0.apk</code
+              ><small
+                >文件大小：<span data-release="android-size"
+                  >3.27 MiB</span
+                ></small
+              >
+            </div>
+            <a
+              data-release-link="android"
+              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk"
+              >下载 APK</a
+            >
+          </div>
+          <div class="attachment-row">
+            <span>附件二</span>
+            <div>
+              <strong>Windows x64 伴侣安装程序</strong
+              ><code class="release-file" data-release="windows-file"
+                >kaogong-checkin-windows-x64-setup-v0.7.0.exe</code
+              ><small
+                >文件大小：<span data-release="windows-size"
+                  >91.38 MiB</span
+                ></small
+              >
+            </div>
+            <a
+              data-release-link="windows"
+              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe"
+              >下载安装程序</a
+            >
+          </div>
+          <p class="disclaimer">
+            本页面为考公打卡产品资料页，不代表任何政府机关、事业单位或考试主管机构。
+          </p>
+        </section>
+      </article>
+    </main>
+
+    <footer class="document-footer">
+      <span>考公打卡产品资料 · KGC-2026-070</span
+      ><a href="https://github.com/Alexued/kaogong-checkin">查看源代码</a>
+    </footer>
+
+    <details class="style-switcher">
+      <summary>风格 05 / 政府严肃型</summary>
+      <nav aria-label="页面风格">
+        <ol>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4efe5"
+              href="../ancient/"
+              ><span>01</span><strong>古风长卷</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#081116" href="../cyber/"
+              ><span>02</span><strong>赛博朋克</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#f5f5f7" href="../../"
+              ><span>03</span><strong>Apple</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#070907"
+              href="../terminal/"
+              ><span>04</span><strong>终端控制台</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4f0e8"
+              href="./"
+              aria-current="page"
+              ><span>05</span><strong>政府严肃型</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#f3f1ea" href="../sprint/"
+              ><span>06</span><strong>冲刺仪表</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f1ead7"
+              href="../bauhaus/"
+              ><span>07</span><strong>包豪斯</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f8f7f2"
+              href="../stationery/"
+              ><span>08</span><strong>日系文具</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4f7f8"
+              href="../blueprint/"
+              ><span>09</span><strong>科研蓝图</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f2f0e9"
+              href="../newspaper/"
+              ><span>10</span><strong>墨水报刊</strong></a
+            >
+          </li>
+        </ol>
+      </nav>
+    </details>
+  </body>
+</html>

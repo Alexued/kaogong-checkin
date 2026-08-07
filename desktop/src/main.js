@@ -13,6 +13,7 @@ const {
 const fs = require('fs');
 const path = require('path');
 const QRCode = require('qrcode');
+const { selectCanonicalApk } = require('./apk-selection');
 
 const PRODUCT_NAME = '考公打卡电脑伴侣';
 const DATA_FOLDER_NAME = 'KaogongCheckin';
@@ -26,6 +27,7 @@ let mainWindow = null;
 let tray = null;
 let serverInstance = null;
 let serverFactoryPath = null;
+let serverModuleExports = null;
 let statusTimer = null;
 let lifecycle = Promise.resolve();
 let quitting = false;
@@ -48,11 +50,11 @@ let desktopState = {
   pairingCode: '',
   protocolVersion: '',
   serverId: '',
-  apk: { available: false, fileName: '', size: 0, downloadUrl: '', qrDataUrl: '', error: '' },
+  apk: { available: false, fileName: '', version: '', size: 0, downloadUrl: '', qrDataUrl: '', error: '' },
   launchAtLogin: false,
   launchAtLoginAvailable: false,
   isPackaged: false,
-  appVersion: '0.6.0',
+  appVersion: '0.7.0',
   dataDirectory: '',
   resources: { server: false, web: false, apk: false },
   logs: [],
@@ -182,20 +184,6 @@ function classifyError(error) {
   };
 }
 
-function findLatestApk(directory) {
-  if (!directory || !fs.existsSync(directory)) return null;
-  const candidates = fs
-    .readdirSync(directory, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.apk'))
-    .map((entry) => {
-      const filePath = path.join(directory, entry.name);
-      const stat = fs.statSync(filePath);
-      return { fileName: entry.name, filePath, size: stat.size, modifiedAt: stat.mtimeMs };
-    })
-    .sort((a, b) => b.modifiedAt - a.modifiedAt || b.fileName.localeCompare(a.fileName));
-  return candidates[0] || null;
-}
-
 function normalizeIps(value) {
   const source = Array.isArray(value) ? value : [];
   const unique = [...new Set(source.map(String))];
@@ -212,17 +200,37 @@ function normalizePairingCode(value) {
   return typeof value === 'string' || typeof value === 'number' ? String(value).replace(/\D/g, '').slice(0, 6) : '';
 }
 
-function loadServerFactory() {
+function loadServerModule() {
   const candidate = runtimePaths.serverModule;
   if (!candidate || !fs.existsSync(candidate)) {
     throw new Error(`createKgcServer resource not found: ${candidate || 'unknown path'}`);
   }
+  if (serverModuleExports && serverFactoryPath === candidate) return serverModuleExports;
   delete require.cache[require.resolve(candidate)];
-  const serverModule = require(candidate);
+  serverModuleExports = require(candidate);
+  serverFactoryPath = candidate;
+  return serverModuleExports;
+}
+
+function loadServerFactory() {
+  const serverModule = loadServerModule();
   const factory = serverModule.createKgcServer || serverModule.default || serverModule;
   if (typeof factory !== 'function') throw new TypeError('server.js does not export createKgcServer');
-  serverFactoryPath = candidate;
   return factory;
+}
+
+function inspectCanonicalApk(rawStatus) {
+  try {
+    return selectCanonicalApk(rawStatus, () => {
+      const serverModule = loadServerModule();
+      return typeof serverModule.findLatestApk === 'function'
+        ? serverModule.findLatestApk(runtimePaths.updateDirectory)
+        : null;
+    });
+  } catch (error) {
+    recordLog('warn', 'Unable to inspect bundled APK:', error);
+    return null;
+  }
 }
 
 async function getRawServerStatus(fallback = {}) {
@@ -267,7 +275,7 @@ async function refreshDesktopState(rawStatus = null) {
   const pairingCode = desktopState.phase === 'running' ? await getPairingCode() : '';
   const localUrl = port ? `http://127.0.0.1:${port}/` : '';
   const primaryLanUrl = port && ips[0] ? `http://${ips[0]}:${port}/` : '';
-  const apkFile = findLatestApk(runtimePaths.updateDirectory);
+  const apkFile = inspectCanonicalApk(raw);
   let downloadUrl = '';
   let qrDataUrl = '';
   let apkError = '';
@@ -313,6 +321,7 @@ async function refreshDesktopState(rawStatus = null) {
     apk: {
       available: Boolean(apkFile),
       fileName: apkFile ? apkFile.fileName : '',
+      version: apkFile ? apkFile.version : '',
       size: apkFile ? apkFile.size : 0,
       downloadUrl,
       qrDataUrl,

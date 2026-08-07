@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN" class="no-js" style="background:#f8f7f2">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>每日手账｜考公打卡</title>
+    <meta name="description" content="用日期手账、学习时间线、背诵便签和工具袋介绍考公打卡 Android 应用与 Windows 伴侣。" />
+    <meta name="theme-color" content="#f8f7f2" />
+    <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
+    <script>document.documentElement.className = 'js';</script>
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../shared/release-data.js?v=20260807-v070-release" defer></script>
+    <script src="../shared/style-switcher.js?v=20260807-v070-release" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <header class="journal-header" data-enter style="--enter-order:0">
+      <a class="journal-brand" href="../../"><img src="../../assets/app-icon.png" width="32" height="32" alt="" /><span>考公打卡</span><small>每日手账</small></a>
+      <p>2026 / 学习记录册</p>
+      <a href="#journal-tabs">翻到今天 ↓</a>
+    </header>
+
+    <main id="main-content" class="notebook">
+      <nav class="journal-tabs" id="journal-tabs" aria-label="手账页签" role="tablist" data-enter style="--enter-order:1">
+        <a href="#today-page" role="tab" aria-selected="true" aria-controls="today-page" id="today-tab" data-journal-tab="today">今天</a>
+        <a href="#memory-page" role="tab" aria-selected="false" aria-controls="memory-page" id="memory-tab" data-journal-tab="memory">背诵夹</a>
+        <a href="#tools-page" role="tab" aria-selected="false" aria-controls="tools-page" id="tools-tab" data-journal-tab="tools">工具袋</a>
+      </nav>
+
+      <section class="journal-sheet today-sheet" id="today-page" role="tabpanel" aria-labelledby="today-tab" data-journal-page="today">
+        <div class="date-leaf" data-enter style="--enter-order:2">
+          <p>八月</p>
+          <strong>07</strong>
+          <span>星期五</span>
+          <small>备考第 38 天</small>
+        </div>
+        <div class="today-heading" data-enter style="--enter-order:3">
+          <p>Today's list</p>
+          <h1>今天，按格子慢慢完成。</h1>
+          <span data-day-progress aria-live="polite">2 / 5 已完成</span>
+        </div>
+
+        <ol class="day-timeline">
+          <li class="time-entry entry-reading">
+            <time datetime="06:40">06:40</time>
+            <label><input type="checkbox" data-journal-task checked /><span class="check-box" aria-hidden="true"></span><span><strong>晨读</strong><small>申论范文两段，圈出转折句</small></span></label>
+            <em>18 min</em>
+          </li>
+          <li class="time-entry entry-drill">
+            <time datetime="09:20">09:20</time>
+            <label><input type="checkbox" data-journal-task checked /><span class="check-box" aria-hidden="true"></span><span><strong>做题</strong><small>判断推理 32 题，错 4 题</small></span></label>
+            <em>✓</em>
+          </li>
+          <li class="time-entry entry-focus">
+            <time datetime="14:00">14:00</time>
+            <label><input type="checkbox" data-journal-task /><span class="check-box" aria-hidden="true"></span><span><strong>专注</strong><small>资料分析限时一组</small></span></label>
+            <em>25:00</em>
+          </li>
+          <li class="time-entry entry-review">
+            <time datetime="20:30">20:30</time>
+            <label><input type="checkbox" data-journal-task /><span class="check-box" aria-hidden="true"></span><span><strong>复盘</strong><small>把四道错题写回笔记</small></span></label>
+            <em>4 cards</em>
+          </li>
+          <li class="time-entry entry-backup">
+            <time datetime="21:10">21:10</time>
+            <label><input type="checkbox" data-journal-task /><span class="check-box" aria-hidden="true"></span><span><strong>电脑备份</strong><small>可选，关闭后继续保留手机记录</small></span></label>
+            <em>local</em>
+          </li>
+        </ol>
+
+        <aside class="day-note" aria-label="今日便签"><strong>给今天</strong><p>不追赶昨天。先把 14:00 的一组做完，再决定下一页写什么。</p><span>只记真实进度</span></aside>
+      </section>
+
+      <section class="journal-sheet memory-sheet" id="memory-page" role="tabpanel" aria-labelledby="memory-tab" data-journal-page="memory">
+        <header class="sheet-heading"><p>Memory notes / 03</p><h2>先合上答案，<br />再翻一张。</h2><span>资料分析 · 高频公式</span></header>
+        <div class="note-stage" data-note-stage>
+          <article class="memory-note note-blue is-current" data-memory-note>
+            <small>便签 01 / 基期量</small><h3>已知现期量和增长率，怎么求基期量？</h3><p>现期量 ÷（1＋增长率）。先估算数量级，再计算。</p>
+          </article>
+          <article class="memory-note note-red" data-memory-note>
+            <small>便签 02 / 增长量</small><h3>增长量比较，先看什么？</h3><p>先看现期量与增长率的乘积，再用百化分修正。</p>
+          </article>
+          <article class="memory-note note-mint" data-memory-note>
+            <small>便签 03 / 比重</small><h3>部分增长快于整体，比重怎么变？</h3><p>部分增长率大于整体增长率，比重上升；反之下降。</p>
+          </article>
+        </div>
+        <div class="note-controls">
+          <button type="button" data-note-prev aria-label="上一张便签">←</button>
+          <p><span data-note-index>1</span> / 3</p>
+          <button type="button" data-note-next aria-label="下一张便签">→</button>
+        </div>
+        <p class="memory-caption">答题前先停三秒。手机记录“再看一次”或“已经记住”，不替你跳过回忆。</p>
+      </section>
+
+      <section class="journal-sheet tools-sheet" id="tools-page" role="tabpanel" aria-labelledby="tools-tab" data-journal-page="tools">
+        <header class="tools-heading"><div><p>Tools pocket</p><h2>工具袋</h2></div><span class="version-sticker">v<span data-release="version">0.7.0</span></span><p>安装包、电脑备份和版本标签，都收在这一页。</p></header>
+
+        <div class="backup-pocket" data-backup-root>
+          <div class="pocket-label"><span>电脑备份</span><small>optional / LAN only</small></div>
+          <div class="backup-copy"><h3>手机记录默认留在手机。</h3><p>需要电脑接力时再打开。关闭会停止扫描、配对、连接和局域网版本检查，但不会清空本地内容。</p></div>
+          <button type="button" class="backup-switch" data-backup-toggle aria-pressed="false"><i aria-hidden="true"></i><span data-backup-label>电脑同步：关闭</span></button>
+          <p class="backup-status" data-backup-status aria-live="polite">本地模式 · 没有局域网活动</p>
+        </div>
+
+        <div class="download-pocket">
+          <article class="tool-label android-label">
+            <div class="label-top"><span>01</span><p>移动端</p><b>Android 7+</b></div>
+            <h3>Android APK</h3>
+            <code class="release-file" data-release="android-file">kaogong-checkin-v0.7.0.apk</code>
+            <dl><div><dt>版本</dt><dd>v<span data-release="version">0.7.0</span></dd></div><div><dt>大小</dt><dd data-release="android-size">3.27 MiB</dd></div></dl>
+            <a data-release-link="android" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk">下载 APK ↓</a>
+            <small>SHA-256</small><code class="release-sha" data-release="android-sha">2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A</code>
+          </article>
+          <article class="tool-label windows-label">
+            <div class="label-top"><span>02</span><p>电脑端</p><b>Windows 10/11 x64</b></div>
+            <h3>Windows 伴侣</h3>
+            <code class="release-file" data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.7.0.exe</code>
+            <dl><div><dt>版本</dt><dd>v<span data-release="version">0.7.0</span></dd></div><div><dt>大小</dt><dd data-release="windows-size">91.38 MiB</dd></div></dl>
+            <a data-release-link="windows" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe">下载 Windows ↓</a>
+            <small>SHA-256</small><code class="release-sha" data-release="windows-sha">BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18</code>
+          </article>
+        </div>
+        <p class="update-slip"><span>局域网更新</span>同步打开且发现电脑后，手机会自动比较电脑 APK 与 GitHub 版本，只显示更新，不会自动下载或安装。</p>
+      </section>
+    </main>
+
+    <footer class="journal-footer"><span>考公打卡 · 每日手账</span><a href="https://github.com/Alexued/kaogong-checkin">查看源码 ↗</a></footer>
+
+    <details class="style-switcher">
+      <summary>风格 08 / 日系文具</summary>
+      <nav aria-label="页面风格"><ol>
+        <li><a data-style-link data-transition-color="#f4efe5" href="../ancient/"><span>01</span><strong>古风长卷</strong></a></li>
+        <li><a data-style-link data-transition-color="#081116" href="../cyber/"><span>02</span><strong>赛博朋克</strong></a></li>
+        <li><a data-style-link data-transition-color="#f5f5f7" href="../../"><span>03</span><strong>Apple</strong></a></li>
+        <li><a data-style-link data-transition-color="#070907" href="../terminal/"><span>04</span><strong>终端控制台</strong></a></li>
+        <li><a data-style-link data-transition-color="#f4f0e8" href="../government/"><span>05</span><strong>政府严肃型</strong></a></li>
+        <li><a data-style-link data-transition-color="#f3f1ea" href="../sprint/"><span>06</span><strong>冲刺仪表</strong></a></li>
+        <li><a data-style-link data-transition-color="#f1ead7" href="../bauhaus/"><span>07</span><strong>包豪斯</strong></a></li>
+        <li><a data-style-link data-transition-color="#f8f7f2" href="./" aria-current="page"><span>08</span><strong>日系文具</strong></a></li>
+        <li><a data-style-link data-transition-color="#f4f7f8" href="../blueprint/"><span>09</span><strong>科研蓝图</strong></a></li>
+        <li><a data-style-link data-transition-color="#f2f0e9" href="../newspaper/"><span>10</span><strong>墨水报刊</strong></a></li>
+      </ol></nav>
+    </details>
+  </body>
+</html>

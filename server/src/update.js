@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const APK_FILE_PATTERN = /^kaogong-checkin-v(\d+)\.(\d+)\.(\d+)\.apk$/i;
+const APK_FILE_PATTERN = /^kaogong-checkin-v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)\.apk$/;
 
 function parseApkFileName(fileName) {
   const match = APK_FILE_PATTERN.exec(fileName);

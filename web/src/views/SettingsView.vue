@@ -160,7 +160,12 @@
             <button v-else class="btn download-primary" :disabled="downloadBusy" type="button" @click="download">
               {{ downloadBusy ? '下载中…' : downloadFailed ? '重新下载' : '应用内下载' }}
             </button>
-            <button class="browser-download" type="button" @click="downloadInBrowser">
+            <button
+              v-if="latest.source !== 'lan' || syncEnabled"
+              class="browser-download"
+              type="button"
+              @click="downloadInBrowser"
+            >
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3h7v7"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
               浏览器下载
             </button>
@@ -248,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { ApiError, getServerUrl } from '../api/client';
@@ -274,13 +279,20 @@ import {
   openDownload,
   canDownloadInApp,
   cancelAppUpdate,
+  cancelActiveLanAppUpdate,
+  clearActiveAppUpdateSource,
+  getActiveAppUpdateSource,
   getAppUpdateStatus,
+  hasActiveAppUpdateStopFailure,
   installAppUpdate,
   startAppUpdateDownload,
+  subscribeActiveAppUpdateStopFailure,
   subscribeAppUpdateProgress,
   type AppUpdateDownloadStatus,
   type ReleaseInfo,
 } from '../api/update';
+import { UpdateCoordinator } from '../api/update-coordinator';
+import { advertisedApkFingerprint, automaticUpdateFingerprint } from '../api/update-automation';
 import { completionForDate } from '../lib/completion';
 import { addDays, formatCn, todayStr } from '../lib/date';
 import { streakDays, totalDone } from '../lib/stats';
@@ -362,13 +374,17 @@ const checking = ref(false);
 const updateState = ref<'' | 'latest' | 'has' | 'error'>('');
 const latest = ref<ReleaseInfo | null>(null);
 const downloadStatus = ref<AppUpdateDownloadStatus | null>(null);
+const downloadStarting = ref(false);
 const downloadMessage = ref('');
 const historyOpen = ref(false);
 const historyLoading = ref(false);
 const historyError = ref(false);
 const releaseHistory = ref<ReleaseInfo[]>([]);
 let githubFallbackChecked = false;
+let selectedApkFingerprint = '';
 let updateListener: Awaited<ReturnType<typeof subscribeAppUpdateProgress>> | null = null;
+let unsubscribeUpdateStopFailure: (() => void) | null = null;
+let settingsViewActive = false;
 let versionHoldTimer: ReturnType<typeof setTimeout> | null = null;
 let versionHoldX = 0;
 let versionHoldY = 0;
@@ -376,7 +392,8 @@ let downloadStallTimer: ReturnType<typeof setTimeout> | null = null;
 let lastDownloadBytes = 0;
 
 const downloadBusy = computed(() =>
-  downloadStatus.value?.status === 'queued'
+  downloadStarting.value
+  || downloadStatus.value?.status === 'queued'
   || downloadStatus.value?.status === 'downloading'
   || downloadStatus.value?.status === 'paused',
 );
@@ -406,6 +423,39 @@ const downloadStatusLabel = computed(() => {
   }
 });
 
+function applyRelease(release: ReleaseInfo) {
+  latest.value = release;
+  updateState.value = compareVersions(release.version, APP_VERSION) > 0 ? 'has' : 'latest';
+}
+
+const updateCoordinator = new UpdateCoordinator<ReleaseInfo>({
+  debounceMs: 400,
+  canCheckAutomatically: () => true,
+  automaticFingerprint: () => automaticUpdateFingerprint(
+    isSyncEnabled(),
+    getServerUrl(),
+    APP_VERSION,
+    selectedDiscoveredServer.value?.apkVersion,
+  ),
+  performCheck: (signal) => fetchLatestRelease({ signal }),
+  onStart: (mode) => {
+    githubFallbackChecked = false;
+    checking.value = true;
+    if (mode === 'manual') updateState.value = '';
+  },
+  onSuccess: (release) => {
+    applyRelease(release);
+    checking.value = false;
+  },
+  onError: () => {
+    updateState.value = 'error';
+    checking.value = false;
+  },
+  onCancelled: () => {
+    checking.value = false;
+  },
+});
+
 function formatBytes(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
@@ -419,14 +469,21 @@ function applyDownloadStatus(status: AppUpdateDownloadStatus) {
     lastDownloadBytes = status.bytesDownloaded;
     armDownloadStallTimer();
   }
-  if (!['queued', 'downloading', 'paused'].includes(status.status)) clearDownloadStallTimer();
+  if (!['queued', 'downloading', 'paused'].includes(status.status)) {
+    clearActiveAppUpdateSource();
+    clearDownloadStallTimer();
+  }
   if (status.status === 'failed') {
     downloadMessage.value = '下载失败，请检查网络后重试';
     void prepareGithubFallback();
   } else if (status.status === 'not_found') {
     downloadMessage.value = '更新文件已失效，请重新下载';
     void prepareGithubFallback();
-  } else if (status.status !== 'downloaded') downloadMessage.value = '';
+  } else if (status.status !== 'downloaded') {
+    downloadMessage.value = hasActiveAppUpdateStopFailure() && getActiveAppUpdateSource() === 'lan'
+      ? '局域网下载停止失败，已保留当前进度'
+      : '';
+  }
 }
 
 async function prepareGithubFallback() {
@@ -457,47 +514,46 @@ function armDownloadStallTimer() {
   }, 30000);
 }
 
-async function checkUpdate() {
-  checking.value = true;
-  updateState.value = '';
+function checkUpdate() {
   githubFallbackChecked = false;
   if (downloadStatus.value && ['failed', 'not_found', 'cancelled'].includes(downloadStatus.value.status)) {
     downloadStatus.value = null;
     downloadMessage.value = '';
   }
-  try {
-    const release = await fetchLatestRelease();
-    if (compareVersions(release.version, APP_VERSION) > 0) {
-      latest.value = release;
-      updateState.value = 'has';
-    } else updateState.value = 'latest';
-  } catch {
-    updateState.value = 'error';
-  } finally {
-    checking.value = false;
-  }
+  void updateCoordinator.checkNow();
 }
 
 function download() {
   const release = latest.value;
   if (!release) return;
+  if (release.source === 'lan' && !isSyncEnabled()) {
+    downloadMessage.value = '电脑同步已关闭，请检查 GitHub 更新后再下载';
+    return;
+  }
   if (!release.apkUrl || !canDownloadInApp()) {
     void openDownload(release.apkUrl || release.pageUrl);
     return;
   }
   downloadMessage.value = '';
   lastDownloadBytes = 0;
+  downloadStarting.value = true;
   armDownloadStallTimer();
-  void startAppUpdateDownload(release.apkUrl, `kaogong-checkin-v${release.version}.apk`)
+  void startAppUpdateDownload(release.apkUrl, `kaogong-checkin-v${release.version}.apk`, release.source)
     .then(applyDownloadStatus)
     .catch(() => {
+      if (getActiveAppUpdateSource() === 'lan' && !isSyncEnabled()) {
+        downloadMessage.value = '局域网下载停止失败；重新开启电脑同步后可再次停止';
+        return;
+      }
       applyDownloadStatus({ downloadId: null, status: 'failed', percent: -1, bytesDownloaded: 0, totalBytes: -1, speedBytesPerSecond: 0 });
-    });
+    })
+    .finally(() => { downloadStarting.value = false; });
 }
 
 function downloadInBrowser() {
   const release = latest.value;
-  if (release) void openDownload(release.apkUrl || release.pageUrl);
+  if (!release || (release.source === 'lan' && !isSyncEnabled())) return;
+  void openDownload(release.apkUrl || release.pageUrl);
 }
 
 function startVersionHold(event: PointerEvent) {
@@ -549,7 +605,12 @@ async function installUpdate() {
 
 async function cancelUpdate() {
   try {
-    await cancelAppUpdate(downloadStatus.value?.downloadId);
+    if (getActiveAppUpdateSource() === 'lan') {
+      await cancelActiveLanAppUpdate(downloadStatus.value?.downloadId);
+    } else {
+      await cancelAppUpdate(downloadStatus.value?.downloadId);
+    }
+    clearActiveAppUpdateSource();
     downloadStatus.value = null;
     downloadMessage.value = '';
   } catch {
@@ -559,6 +620,7 @@ async function cancelUpdate() {
     } catch {
       // Keep the current status visible when the native status query is unavailable.
     }
+    downloadMessage.value = '取消下载失败，正在保留当前进度';
   }
 }
 
@@ -587,11 +649,25 @@ function saveStartupAnimation() {
 
 async function toggleSync() {
   syncMessage.value = '';
+  const disabling = !syncEnabled.value;
+  if (disabling) updateCoordinator.cancel(true);
+  const wasDownloadingFromLan = disabling && getActiveAppUpdateSource() === 'lan';
   await setComputerSyncEnabled(syncEnabled.value);
   if (!syncEnabled.value) {
     scanning.value = false;
-    syncMessage.value = '电脑连接已停止，本地数据和待同步变更已保留';
+    if (wasDownloadingFromLan) {
+      downloadStarting.value = false;
+      clearDownloadStallTimer();
+    }
+    if (latest.value?.source === 'lan' && downloadStatus.value?.status !== 'downloaded') {
+      latest.value = null;
+      updateState.value = '';
+    }
+    syncMessage.value = getActiveAppUpdateSource() === 'lan'
+      ? '电脑同步已关闭，但局域网下载未能停止；重新开启后可再次停止'
+      : '电脑连接已停止，本地数据和待同步变更已保留';
   }
+  updateCoordinator.scheduleAutomatic(true);
 }
 
 async function rescanServers() {
@@ -607,11 +683,13 @@ async function selectServer(server: DiscoveredServer) {
   serverUrlInput.value = server.key;
   syncMessage.value = '';
   connectingServer.value = true;
+  updateCoordinator.cancel(true);
   try {
     await configureComputerServer(server.key, server.serverId);
     if (server.pairingRequired && server.serverId && !getPairingToken(server.serverId)) {
       syncMessage.value = '请输入 Windows 伴侣程序显示的六位配对码';
     }
+    updateCoordinator.scheduleAutomatic(true);
   } finally {
     connectingServer.value = false;
   }
@@ -620,11 +698,13 @@ async function selectServer(server: DiscoveredServer) {
 async function saveServerUrl() {
   syncMessage.value = '';
   connectingServer.value = true;
+  updateCoordinator.cancel(true);
   try {
     await configureComputerServer(serverUrlInput.value);
     if (store.syncPhase === 'pairing') syncMessage.value = '此电脑需要配对，请输入六位配对码';
     else if (store.online) syncMessage.value = '已连接电脑';
     else syncMessage.value = '地址已保存，正在等待电脑服务';
+    updateCoordinator.scheduleAutomatic(true);
   } finally {
     connectingServer.value = false;
   }
@@ -643,6 +723,7 @@ async function submitPairing() {
     pairingCode.value = '';
     pairingRevision.value += 1;
     syncMessage.value = '配对成功，正在同步本地变更';
+    updateCoordinator.scheduleAutomatic(true);
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       syncMessage.value = '';
@@ -675,13 +756,43 @@ async function overwriteLocal() {
 }
 
 onMounted(async () => {
+  settingsViewActive = true;
+  unsubscribeUpdateStopFailure = subscribeActiveAppUpdateStopFailure((failed) => {
+    if (failed && getActiveAppUpdateSource() === 'lan') {
+      downloadMessage.value = '局域网下载停止失败，已保留当前进度';
+    } else if (downloadMessage.value.startsWith('局域网下载停止失败')
+      || downloadMessage.value.startsWith('取消下载失败')) {
+      downloadMessage.value = '';
+    }
+  });
   unsubscribeDiscovery = subscribeDiscovery((servers) => {
     discoveredServers.value = servers;
+    const savedUrl = getServerUrl().trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const savedServerId = getSelectedServerId();
+    const selected = servers.find((server) =>
+      server.key === savedUrl || Boolean(savedServerId && server.serverId === savedServerId)
+    );
+    const nextFingerprint = advertisedApkFingerprint(selected);
+    if (nextFingerprint && nextFingerprint !== selectedApkFingerprint) {
+      selectedApkFingerprint = nextFingerprint;
+      updateCoordinator.scheduleAutomatic(true);
+    } else if (!nextFingerprint) {
+      selectedApkFingerprint = '';
+    }
   });
+  updateCoordinator.scheduleAutomatic();
   if (canDownloadInApp()) {
     try {
-      updateListener = await subscribeAppUpdateProgress(applyDownloadStatus);
+      const listener = await subscribeAppUpdateProgress((status) => {
+        if (settingsViewActive) applyDownloadStatus(status);
+      });
+      if (!settingsViewActive) {
+        void listener.remove();
+        return;
+      }
+      updateListener = listener;
       const status = await getAppUpdateStatus();
+      if (!settingsViewActive) return;
       if (status.status !== 'idle') applyDownloadStatus(status);
     } catch {
       // Older builds without the native update plugin keep the web fallback.
@@ -689,10 +800,20 @@ onMounted(async () => {
   }
 });
 
+watch(
+  () => store.online,
+  (online, wasOnline) => {
+    if (online && !wasOnline) updateCoordinator.scheduleAutomatic(true);
+  },
+);
+
 onUnmounted(() => {
+  settingsViewActive = false;
+  updateCoordinator.dispose();
   cancelVersionHold();
   clearDownloadStallTimer();
   unsubscribeDiscovery?.();
+  unsubscribeUpdateStopFailure?.();
   void updateListener?.remove();
 });
 </script>

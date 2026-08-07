@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN" class="no-js" style="background:#f4f7f8">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>科研蓝图｜考公打卡</title>
+    <meta name="description" content="以工程组件图和局域网版本检测流程介绍考公打卡。" />
+    <meta name="theme-color" content="#f4f7f8" />
+    <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
+    <script>document.documentElement.className = 'js';</script>
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../shared/release-data.js?v=20260807-v070-release" defer></script>
+    <script src="../shared/style-switcher.js?v=20260807-v070-release" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <header class="drawing-header" data-enter style="--enter-order:0">
+      <a href="../../" aria-label="考公打卡首页"><img src="../../assets/app-icon.png" width="32" height="32" alt="" /><strong>考公打卡</strong></a>
+      <dl><div><dt>图号</dt><dd>KGC-09</dd></div><div><dt>版本</dt><dd>v<span data-release="version">0.7.0</span></dd></div><div><dt>比例</dt><dd>1:1</dd></div></dl>
+    </header>
+
+    <main id="main-content">
+      <section class="system-sheet" aria-labelledby="sheet-title">
+        <div class="sheet-copy" data-enter style="--enter-order:1">
+          <p class="drawing-label">学习系统总装图 / revision 07</p>
+          <h1 id="sheet-title">每天的任务，按模块运行。</h1>
+          <p>手机处理计划、计时与背诵。Windows 伴侣提供可选的局域网同步、APK 分发和版本检测。</p>
+          <a href="#update-flow">查看版本检测线路 <span aria-hidden="true">↓</span></a>
+        </div>
+
+        <div class="assembly" data-enter style="--enter-order:2" aria-label="Android 与 Windows 组件关系图">
+          <div class="measure measure-top"><span>420 mm</span></div>
+          <div class="module module-phone">
+            <span class="module-id">A-01</span>
+            <strong>Android 主机</strong>
+            <ul><li>今日计划</li><li>专注计时</li><li>背诵训练</li></ul>
+            <button type="button" data-callout="phone">查看输入</button>
+          </div>
+          <div class="bus" aria-hidden="true"><span>LAN / 可关闭</span><i></i></div>
+          <div class="module module-desktop">
+            <span class="module-id">W-02</span>
+            <strong>Windows 伴侣</strong>
+            <ul><li>本地备份</li><li>APK 分发</li><li>版本端点</li></ul>
+            <button type="button" data-callout="desktop">查看输出</button>
+          </div>
+          <aside class="callout" data-callout-panel aria-live="polite"><span>标注 00</span><strong>选择组件读取参数</strong><p>所有数据默认停留在 Android 本机。</p></aside>
+          <div class="measure measure-bottom"><span>可信局域网边界</span></div>
+        </div>
+      </section>
+
+      <section class="module-register" aria-labelledby="register-title">
+        <header><p>表 01 / 功能模块</p><h2 id="register-title">输入、处理、输出</h2></header>
+        <div class="register-row"><span>01</span><div><small>输入</small><strong>今日任务</strong></div><p>任务、子任务和未完成结转进入同一日程。</p><em>LOCAL</em></div>
+        <div class="register-row"><span>02</span><div><small>处理</small><strong>25:00 专注</strong></div><p>开始、暂停与复位都在设备上完成，不依赖电脑。</p><em>TIMER</em></div>
+        <div class="register-row"><span>03</span><div><small>校验</small><strong>背诵训练</strong></div><p>先回忆再翻面，按照掌握程度安排下一轮。</p><em>MEMORY</em></div>
+        <div class="register-row"><span>04</span><div><small>可选输出</small><strong>电脑同步</strong></div><p>总开关关闭时，发现、连接、重连和局域网更新全部停止。</p><em>SWITCHED</em></div>
+      </section>
+
+      <section class="update-lab" id="update-flow" aria-labelledby="update-title" data-update-lab>
+        <div class="lab-heading">
+          <p>流程 02 / 局域网版本检测</p>
+          <h2 id="update-title">找到电脑，读取版本，显示更新。</h2>
+          <p>只自动检查，不自动下载。每一步都有明确的输入和结果。</p>
+          <button type="button" data-run-update>运行检测演示</button>
+        </div>
+        <ol class="flow-diagram">
+          <li data-flow-step><span>01</span><strong>发现服务器</strong><small>UDP 8322</small></li>
+          <li data-flow-step><span>02</span><strong>读取 APK 元数据</strong><small>/api/update/latest</small></li>
+          <li data-flow-step><span>03</span><strong>比较三段版本</strong><small>LAN ↔ GitHub ↔ 当前</small></li>
+          <li data-flow-step><span>04</span><strong>显示可用更新</strong><small>由用户确认下载</small></li>
+        </ol>
+        <output class="flow-output" data-flow-output aria-live="polite">检测器待机</output>
+      </section>
+
+      <section class="control-boundary" aria-labelledby="boundary-title">
+        <header><p>安全边界 03</p><h2 id="boundary-title">同步开关是总断路器。</h2></header>
+        <div class="boundary-map">
+          <div class="breaker"><span>电脑同步</span><strong>OFF</strong><i aria-hidden="true"></i></div>
+          <ul><li><span>REST</span><strong>停止</strong></li><li><span>WebSocket</span><strong>关闭</strong></li><li><span>UDP 发现</span><strong>停止</strong></li><li><span>LAN 更新</span><strong>取消</strong></li></ul>
+          <p>本地数据与待同步队列保留。重新开启后，新的连接代次才可以运行。</p>
+        </div>
+      </section>
+
+      <section class="parts-list" id="downloads" aria-labelledby="parts-title">
+        <header><p>材料清单 04</p><h2 id="parts-title">发布组件</h2></header>
+        <div class="table-wrap"><table>
+          <thead><tr><th>编号</th><th>平台</th><th>文件</th><th>要求</th><th>大小</th><th>操作</th></tr></thead>
+          <tbody>
+            <tr><td>A-01</td><td>Android</td><td class="release-file" data-release="android-file">kaogong-checkin-v0.7.0.apk</td><td>Android 7+</td><td data-release="android-size">3.27 MiB</td><td><a data-release-link="android" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk">下载 APK</a></td></tr>
+            <tr><td>W-02</td><td>Windows</td><td class="release-file" data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.7.0.exe</td><td>Windows 10/11 x64</td><td data-release="windows-size">91.38 MiB</td><td><a data-release-link="windows" href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe">下载安装器</a></td></tr>
+          </tbody>
+        </table></div>
+        <dl class="hashes"><div><dt>Android SHA-256</dt><dd class="release-sha" data-release="android-sha">2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A</dd></div><div><dt>Windows SHA-256</dt><dd class="release-sha" data-release="windows-sha">BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18</dd></div></dl>
+      </section>
+    </main>
+
+    <footer><span>图纸结束 / KGC-09</span><a href="https://github.com/Alexued/kaogong-checkin">GitHub 源码</a></footer>
+
+    <details class="style-switcher"><summary>风格 09 / 科研蓝图</summary><nav aria-label="页面风格"><ol>
+      <li><a data-style-link data-transition-color="#f4efe5" href="../ancient/"><span>01</span><strong>古风长卷</strong></a></li><li><a data-style-link data-transition-color="#081116" href="../cyber/"><span>02</span><strong>赛博朋克</strong></a></li><li><a data-style-link data-transition-color="#f5f5f7" href="../../"><span>03</span><strong>Apple</strong></a></li><li><a data-style-link data-transition-color="#070907" href="../terminal/"><span>04</span><strong>终端控制台</strong></a></li><li><a data-style-link data-transition-color="#f4f0e8" href="../government/"><span>05</span><strong>政府严肃型</strong></a></li><li><a data-style-link data-transition-color="#f3f1ea" href="../sprint/"><span>06</span><strong>冲刺仪表</strong></a></li><li><a data-style-link data-transition-color="#f1ead7" href="../bauhaus/"><span>07</span><strong>包豪斯</strong></a></li><li><a data-style-link data-transition-color="#f8f7f2" href="../stationery/"><span>08</span><strong>日系文具</strong></a></li><li><a data-style-link data-transition-color="#f4f7f8" href="./" aria-current="page"><span>09</span><strong>科研蓝图</strong></a></li><li><a data-style-link data-transition-color="#f2f0e9" href="../newspaper/"><span>10</span><strong>墨水报刊</strong></a></li>
+    </ol></nav></details>
+  </body>
+</html>

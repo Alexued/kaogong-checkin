@@ -973,27 +973,32 @@ code,
   min-height: 920px;
   padding-top: 132px;
   padding-bottom: 112px;
-  background: var(--black);
-  color: var(--white-soft);
+  background: #f1f3f6;
+  color: var(--ink);
 }
 
-.section-heading-light {
+.focus-heading {
   margin-bottom: 40px;
 }
 
-.section-heading-light .section-index {
-  color: #73b7ff;
+.focus-heading .section-index {
+  color: var(--blue);
 }
 
-.section-heading-light > p:last-child {
-  color: #a1a1a6;
+.focus-heading > p:last-child {
+  color: var(--muted);
 }
 
 .timer-stage {
   display: grid;
   min-height: 560px;
+  padding: 64px 32px;
   place-items: center;
   align-content: center;
+  border-radius: var(--radius-large);
+  background: var(--black);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16), 0 32px 80px rgba(0, 0, 0, 0.18);
+  color: var(--white-soft);
   text-align: center;
 }
 
@@ -1738,8 +1743,8 @@ code,
 
 .download-section {
   padding: 152px 24px 108px;
-  background: var(--black);
-  color: var(--white-soft);
+  background: #f4f6f8;
+  color: var(--ink);
 }
 
 .download-heading {
@@ -1747,7 +1752,7 @@ code,
 }
 
 .download-heading .section-index {
-  color: #73b7ff;
+  color: var(--blue);
 }
 
 .download-heading h2 {
@@ -1757,7 +1762,7 @@ code,
 
 .download-heading > p {
   margin-bottom: 34px;
-  color: #a1a1a6;
+  color: var(--muted);
 }
 
 .button-download {
@@ -1778,8 +1783,8 @@ code,
   display: grid;
   margin-top: 84px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--dark-line);
-  border-bottom: 1px solid var(--dark-line);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .platform-download {
@@ -1790,7 +1795,7 @@ code,
 .platform-download + .platform-download {
   padding-right: 0;
   padding-left: 44px;
-  border-left: 1px solid var(--dark-line);
+  border-left: 1px solid var(--line);
 }
 
 .platform-download-heading {
@@ -1819,7 +1824,7 @@ code,
 }
 
 .platform-download-heading strong {
-  color: var(--white-soft);
+  color: var(--ink);
   font-size: 20px;
 }
 
@@ -1830,8 +1835,9 @@ code,
   flex: 0 0 auto;
   place-items: center;
   border-radius: var(--radius-small);
-  background: var(--dark-step);
-  color: #73b7ff;
+  background: var(--surface);
+  color: var(--blue);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   font-family: var(--font-mono);
   font-size: 16px;
   font-weight: 750;
@@ -1864,7 +1870,7 @@ code,
   display: grid;
   margin-top: 54px;
   grid-template-columns: repeat(2, 1fr);
-  border-bottom: 1px solid var(--dark-line);
+  border-bottom: 1px solid var(--line);
 }
 
 .download-note div {
@@ -1877,16 +1883,16 @@ code,
 .download-note div + div {
   padding-right: 0;
   padding-left: 28px;
-  border-left: 1px solid var(--dark-line);
+  border-left: 1px solid var(--line);
 }
 
 .download-note strong {
-  color: var(--white-soft);
+  color: var(--ink);
   font-size: 14px;
 }
 
 .download-note span {
-  color: #8e8e93;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1969,13 +1975,33 @@ code,
   display: flex;
   margin: 44px 0 0;
   gap: 10px;
-  color: #a1a1a6;
+  color: var(--muted);
   font-size: 13px;
 }
 
 .release-links a {
-  color: #73b7ff;
+  color: var(--blue);
   text-decoration: none;
+}
+
+.download-section .release-details {
+  border-color: var(--line);
+}
+
+.download-section .release-details dt,
+.download-section .checksum span {
+  color: var(--muted);
+}
+
+.download-section .release-details dd,
+.download-section .checksum code {
+  color: var(--ink-soft);
+}
+
+.download-section .button-copy {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), inset 0 0 0 1px var(--line);
 }
 
 .site-footer {
@@ -2352,7 +2378,7 @@ code,
   }
 
   .platform-download + .platform-download {
-    border-top: 1px solid var(--dark-line);
+    border-top: 1px solid var(--line);
     border-left: 0;
   }
 
@@ -2770,7 +2796,7 @@ code,
   .release-details div:nth-last-child(-n + 2) {
     padding-right: 0;
     border-right: 0;
-    border-bottom: 1px solid var(--dark-line);
+    border-bottom: 1px solid var(--line);
   }
 
   .release-details div:last-child {

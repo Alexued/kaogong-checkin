@@ -1,0 +1,334 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  class="no-js"
+  style="
+    background: #081116;
+    --page-bg: #081116;
+    --page-ink: #e5f0ed;
+    --focus-color: #40e0d0;
+    color-scheme: dark;
+  "
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>考公打卡 · 夜行考场</title>
+    <meta
+      name="description"
+      content="考公打卡赛博朋克风格页面：任务遥测、专注能源、局域网雷达和版本更新。"
+    />
+    <meta name="theme-color" content="#081116" />
+    <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v070-release" />
+    <script>
+      document.documentElement.className = "js";
+    </script>
+    <script src="../shared/release-data.js?v=20260807-v070-release" defer></script>
+    <script src="../shared/style-switcher.js?v=20260807-v070-release" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body data-style="cyber">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <header class="cyber-header">
+      <div class="header-inner">
+        <a class="cyber-brand" href="../../" aria-label="回到考公打卡首页"
+          ><span class="brand-glyph" aria-hidden="true">K</span
+          ><span><b>KAOGONG</b><small>CHECKIN / NODE 07</small></span></a
+        >
+        <div class="header-readout">
+          <span class="signal-dot" aria-hidden="true"></span
+          ><span data-network-state>LOCAL / STANDBY</span>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" class="cyber-console">
+      <section
+        class="cyber-hero"
+        aria-labelledby="hero-title"
+        data-enter
+        style="--enter-order: 0"
+      >
+        <div class="hero-grid-label">
+          <span>01</span><span>ENTRY / 07</span>
+        </div>
+        <div class="hero-main">
+          <p class="system-label">夜行考场 · 私有学习节点</p>
+          <h1 id="hero-title" style="letter-spacing: 0">
+            把今天，<br /><strong>跑完。</strong>
+          </h1>
+          <p class="hero-copy">
+            四个任务、一台手机、一个可选的局域网节点。考公打卡把分散的复习动作变成可追踪的执行流。
+          </p>
+          <div class="hero-actions">
+            <a class="cyber-button cyber-button-primary" href="#radar"
+              >接入任务流 <span aria-hidden="true">↗</span></a
+            ><a class="cyber-text-link" href="#release">查看版本信号</a>
+          </div>
+        </div>
+        <div class="hero-readouts" aria-label="当前状态">
+          <div>
+            <span>SESSION</span><strong>24:18</strong
+            ><small>FOCUS REMAINING</small>
+          </div>
+          <div>
+            <span>QUEUE</span><strong>02/04</strong
+            ><small>TASKS COMPLETE</small>
+          </div>
+          <div>
+            <span>SYNC</span><strong class="cyan">OFF</strong
+            ><small>LOCAL ONLY</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="telemetry-band" aria-labelledby="telemetry-title">
+        <div class="section-tag">02 / TELEMETRY</div>
+        <div class="telemetry-heading">
+          <h2 id="telemetry-title">任务遥测</h2>
+          <p>每一次勾选都只改变本地状态；连接电脑是可选的第二条通道。</p>
+        </div>
+        <div class="telemetry-grid">
+          <article class="telemetry-block">
+            <span class="metric-label">TODAY / COMPLETION</span
+            ><strong>50<span>%</span></strong>
+            <div class="metric-bar"><i style="--value: 50%"></i></div>
+            <p>2 of 4 task packets acknowledged</p>
+          </article>
+          <article class="telemetry-block">
+            <span class="metric-label">FOCUS / ENERGY</span
+            ><strong>78<span>u</span></strong>
+            <div class="energy-columns" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <p>steady state · 25 min session</p>
+          </article>
+          <article class="telemetry-block">
+            <span class="metric-label">MEMORY / CACHE</span
+            ><strong>128<span> items</span></strong>
+            <div class="cache-row">
+              <b></b><b></b><b></b><b></b><b></b><b></b>
+            </div>
+            <p>flashcards ready on device</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="radar-section" id="radar" aria-labelledby="radar-title">
+        <div class="radar-copy">
+          <div class="section-tag">03 / LAN RADAR</div>
+          <h2 id="radar-title">附近的节点，<br /><em>由你决定。</em></h2>
+          <p>
+            打开电脑同步后，手机才会开始寻找同一局域网里的 Windows
+            伴侣。扫描不会上传学习内容。
+          </p>
+          <button class="cyber-button" type="button" data-radar-toggle>
+            <span data-radar-label>扫描局域网</span
+            ><span aria-hidden="true">⌁</span>
+          </button>
+          <p class="radar-status" data-radar-status aria-live="polite">
+            雷达静默 · 电脑同步已关闭
+          </p>
+        </div>
+        <div
+          class="radar-visual"
+          data-radar-visual
+          aria-label="局域网雷达示意图"
+        >
+          <span class="radar-ring ring-one"></span
+          ><span class="radar-ring ring-two"></span
+          ><span class="radar-ring ring-three"></span
+          ><span class="radar-cross cross-x"></span
+          ><span class="radar-cross cross-y"></span
+          ><span class="radar-sweep" aria-hidden="true"></span
+          ><span class="radar-center">LOCAL<br />ONLY</span
+          ><span class="node node-phone">ANDROID</span
+          ><span class="node node-server" data-radar-node
+            >WINDOWS<br /><small>OFFLINE</small></span
+          >
+        </div>
+      </section>
+
+      <section class="module-section" aria-labelledby="module-title">
+        <div class="module-intro">
+          <div class="section-tag">04 / MODULES</div>
+          <h2 id="module-title">今晚加载什么？</h2>
+          <p>
+            点击模块，把注意力聚焦在一条任务通道。页面不会自动播放任何动效。
+          </p>
+        </div>
+        <div class="module-stack">
+          <button class="module-row is-active" type="button" data-module="plan">
+            <span>01</span><strong>PLAN / 今日计划</strong
+            ><small>4 tasks · 2 done</small><b aria-hidden="true">+</b>
+          </button>
+          <div class="module-panel is-open" data-module-panel="plan">
+            <p>晨读申论范文 → 判断推理巩固 → 资料分析限时练 → 错题回看。</p>
+          </div>
+          <button class="module-row" type="button" data-module="focus">
+            <span>02</span><strong>FOCUS / 专注计时</strong
+            ><small>25:00 session</small><b aria-hidden="true">+</b>
+          </button>
+          <div class="module-panel" data-module-panel="focus">
+            <p>25 分钟专注、5 分钟休息；计时状态保留在本机。</p>
+          </div>
+          <button class="module-row" type="button" data-module="drill">
+            <span>03</span><strong>DRILL / 背诵训练</strong
+            ><small>128 cards ready</small><b aria-hidden="true">+</b>
+          </button>
+          <div class="module-panel" data-module-panel="drill">
+            <p>先回忆再翻卡，记录“再来一次”与“记住了”。</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="release-section"
+        id="release"
+        aria-labelledby="release-title"
+      >
+        <div class="release-top">
+          <div>
+            <div class="section-tag">05 / UPDATE SIGNAL</div>
+            <h2 id="release-title">版本信号</h2>
+          </div>
+          <span class="release-badge"
+            >v<span data-release="version">0.7.0</span> / CURRENT</span
+          >
+        </div>
+        <div class="release-console">
+          <p>
+            <span class="prompt">$</span> kgc update --sources
+            local-network,github
+          </p>
+          <p class="console-ok">[ready] local-network is opt-in</p>
+          <p class="console-ok">
+            [ready] current package
+            <strong>v<span data-release="version">0.7.0</span></strong>
+          </p>
+          <p class="console-muted">
+            [info] newer versions appear here before download
+          </p>
+        </div>
+        <div class="download-rail">
+          <a
+            class="cyber-button cyber-button-primary"
+            data-release-link="android"
+            href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk"
+            >下载 Android APK
+            <small data-release="android-size">3.27 MiB</small></a
+          ><a
+            class="cyber-button"
+            data-release-link="windows"
+            href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe"
+            >下载 Windows 伴侣
+            <small data-release="windows-size">91.38 MiB</small></a
+          >
+        </div>
+        <div class="hash-line">
+          <span>Android payload</span
+          ><code class="release-file" data-release="android-file"
+            >kaogong-checkin-v0.7.0.apk</code
+          ><span>APK SHA-256</span
+          ><code class="release-sha" data-release="android-sha">2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A</code
+          ><span>Windows payload</span
+          ><code class="release-file" data-release="windows-file"
+            >kaogong-checkin-windows-x64-setup-v0.7.0.exe</code
+          ><span>Windows SHA-256</span
+          ><code class="release-sha" data-release="windows-sha"
+            >BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18</code
+          >
+        </div>
+      </section>
+    </main>
+    <footer class="cyber-footer">
+      <span>KAOGONG / PRIVATE STUDY NODE</span><a href="../../">APPLE VIEW</a>
+    </footer>
+
+    <details class="style-switcher">
+      <summary>风格 02 / 赛博朋克</summary>
+      <nav aria-label="页面风格">
+        <ol>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4efe5"
+              href="../ancient/"
+              ><span>01</span><strong>古风长卷</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#081116"
+              href="./"
+              aria-current="page"
+              ><span>02</span><strong>赛博朋克</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#f5f5f7" href="../../"
+              ><span>03</span><strong>Apple</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#070907"
+              href="../terminal/"
+              ><span>04</span><strong>终端控制台</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4f0e8"
+              href="../government/"
+              ><span>05</span><strong>政府严肃型</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#f3f1ea" href="../sprint/"
+              ><span>06</span><strong>冲刺仪表</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f1ead7"
+              href="../bauhaus/"
+              ><span>07</span><strong>包豪斯</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f8f7f2"
+              href="../stationery/"
+              ><span>08</span><strong>日系文具</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4f7f8"
+              href="../blueprint/"
+              ><span>09</span><strong>科研蓝图</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f2f0e9"
+              href="../newspaper/"
+              ><span>10</span><strong>墨水报刊</strong></a
+            >
+          </li>
+        </ol>
+      </nav>
+    </details>
+  </body>
+</html>

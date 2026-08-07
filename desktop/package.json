@@ -1,13 +1,14 @@
 {
   "name": "kaogong-checkin-desktop",
   "productName": "考公打卡电脑伴侣",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "考公打卡 Windows 电脑同步伴侣",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/renderer.js",
+    "check": "node --check src/main.js && node --check src/apk-selection.js && node --check src/preload.js && node --check src/renderer/renderer.js",
+    "test": "node --test test/*.test.js",
     "pack": "electron-builder --dir --win --x64",
     "dist": "electron-builder --win nsis --x64"
   },

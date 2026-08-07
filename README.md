@@ -4,12 +4,12 @@
 
 产品介绍页：[https://alexued.github.io/kaogong-checkin/](https://alexued.github.io/kaogong-checkin/)
 
-## 下载 v0.6.0
+## 下载 v0.7.0
 
 | 平台 | 文件 | 大小 | 系统要求 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| Android | [kaogong-checkin-v0.6.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-v0.6.0.apk) | 4.18 MiB | Android 7.0 或更高版本 | EF7510E71A8BDA18BCDD46E6E9643C8E3573FBBD8034D919729BDC1D2F6B4CC6 |
-| Windows | [kaogong-checkin-windows-x64-setup-v0.6.0.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-windows-x64-setup-v0.6.0.exe) | 92.16 MiB | Windows 10/11 x64 | 34A9F9E6114ECE19B01D23BEB42E5A9BE18788EEFE4F8DAC42B3E665D6F67812 |
+| Android | [kaogong-checkin-v0.7.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk) | 3.27 MiB | Android 7.0 或更高版本 | 2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A |
+| Windows | [kaogong-checkin-windows-x64-setup-v0.7.0.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe) | 91.38 MiB | Windows 10/11 x64 | BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18 |
 
 本项目目前没有代码签名证书。首次运行 Windows 安装程序时，SmartScreen 可能显示“Windows 已保护你的电脑”。确认文件来自本仓库发布页并核对 SHA-256 后，可点击“更多信息”继续运行。
 
@@ -30,6 +30,8 @@
 
 Windows 电脑伴侣还会显示一个局域网二维码。手机扫码后可以下载其内置的 Android APK，再由 Android 系统确认安装。
 
+电脑同步开启且发现已配置电脑后，Android 应用会自动比较局域网 APK、GitHub Release 和当前版本。检查只显示更高版本及来源，不会自动下载或安装；下载和系统安装仍需用户确认。
+
 ## 电脑同步开关
 
 新安装默认关闭电脑同步。关闭时，应用不会进行以下行为：
@@ -38,7 +40,7 @@ Windows 电脑伴侣还会显示一个局域网二维码。手机扫码后可以
 - 不进行自动重连或 UDP 局域网发现
 - 不通过局域网服务器检查更新
 
-关闭同步不会删除手机数据，也不会清空待同步队列。重新开启后，需要用户主动扫描并完成配对，应用才会恢复电脑连接。
+关闭同步不会删除手机数据，也不会清空待同步队列。重新开启后，应用会重新发现已配置的电脑；只有首次使用或配对令牌失效时才需再次输入六位码。
 
 服务使用六位配对码交换客户端令牌。之后的 REST 请求使用 Bearer 令牌，WebSocket 使用客户端令牌鉴权。请只在可信专用网络中运行电脑伴侣。
 
@@ -47,8 +49,8 @@ Windows 电脑伴侣还会显示一个局域网二维码。手机扫码后可以
 PowerShell：
 
 ```powershell
-Get-FileHash .\kaogong-checkin-v0.6.0.apk -Algorithm SHA256
-Get-FileHash .\kaogong-checkin-windows-x64-setup-v0.6.0.exe -Algorithm SHA256
+Get-FileHash .\kaogong-checkin-v0.7.0.apk -Algorithm SHA256
+Get-FileHash .\kaogong-checkin-windows-x64-setup-v0.7.0.exe -Algorithm SHA256
 ```
 
 输出应与发布页和上方下载表一致。

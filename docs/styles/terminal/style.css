@@ -1,0 +1,560 @@
+:root {
+  --page-bg: #070907;
+  --page-ink: #e9f0df;
+  --focus-color: #a8f070;
+  --terminal-bg: #070907;
+  --terminal-panel: #0d110d;
+  --terminal-raised: #141a13;
+  --terminal-ink: #e9f0df;
+  --terminal-muted: #879381;
+  --terminal-green: #a8f070;
+  --terminal-amber: #f0c96f;
+  --terminal-line: #2b3729;
+  --mono:
+    "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--terminal-bg);
+  color: var(--terminal-ink);
+  font-family: var(--mono);
+  line-height: 1.6;
+}
+
+.terminal-bar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 2rem;
+  padding: 0 max(1rem, calc((100% - 1240px) / 2));
+  border-bottom: 1px solid var(--terminal-line);
+  background: var(--terminal-bg);
+  font-size: 0.75rem;
+}
+
+.terminal-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--terminal-ink);
+  text-decoration: none;
+}
+
+.terminal-brand span,
+.terminal-bar > a:last-child,
+.ok {
+  color: var(--terminal-green);
+}
+
+.terminal-brand strong {
+  font-weight: 600;
+}
+
+.terminal-bar p {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--terminal-muted);
+}
+
+.terminal-bar > a:last-child {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.status-light {
+  width: 7px;
+  height: 7px;
+  background: var(--terminal-green);
+}
+
+main {
+  width: min(1240px, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+.boot-session {
+  min-height: 42vh;
+  display: grid;
+  align-content: center;
+  padding: clamp(4rem, 9vw, 7rem) 0;
+  border-bottom: 1px solid var(--terminal-line);
+}
+
+.prompt-line,
+.executed {
+  color: var(--terminal-muted);
+  overflow-wrap: anywhere;
+}
+
+.prompt-line span:first-child,
+.executed span {
+  color: var(--terminal-green);
+}
+
+.prompt-line b {
+  margin-inline: 0.3rem;
+  color: var(--terminal-ink);
+  font-weight: 400;
+}
+
+.status-output {
+  margin: 1.5rem 0 2.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--terminal-line);
+  color: var(--terminal-muted);
+  font-size: 0.78rem;
+}
+
+.status-output p {
+  margin: 0.25rem 0;
+}
+
+.status-output span {
+  width: 3.5rem;
+  display: inline-block;
+}
+
+.warn {
+  color: var(--terminal-amber);
+}
+
+.dim {
+  color: var(--terminal-muted);
+}
+
+.boot-session h1 {
+  max-width: 920px;
+  font-size: clamp(2.4rem, 6vw, 5.5rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.command-session {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 620px;
+  margin: 3rem 0 6rem;
+  border: 1px solid var(--terminal-line);
+  background: var(--terminal-panel);
+}
+
+.command-menu {
+  padding: 1.2rem;
+  border-right: 1px solid var(--terminal-line);
+  background: var(--terminal-bg);
+}
+
+.command-menu > p {
+  margin-bottom: 1rem;
+  color: var(--terminal-muted);
+  font-size: 0.66rem;
+}
+
+.command-menu button {
+  width: 100%;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  align-items: center;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--terminal-muted);
+  text-align: left;
+}
+
+.command-menu button span {
+  font-size: 0.62rem;
+}
+
+.command-menu button:hover,
+.command-menu button[aria-selected="true"] {
+  border-left-color: var(--terminal-green);
+  background: var(--terminal-raised);
+  color: var(--terminal-green);
+}
+
+.command-workspace {
+  min-width: 0;
+}
+
+.workspace-titlebar {
+  min-height: 48px;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid var(--terminal-line);
+  color: var(--terminal-muted);
+  font-size: 0.7rem;
+}
+
+.command-pane {
+  min-height: 570px;
+  padding: clamp(1.5rem, 4vw, 3.2rem);
+}
+
+.js .command-pane {
+  display: none;
+}
+
+.js .command-pane.is-active {
+  display: block;
+}
+
+.command-pane h2 {
+  margin: 2rem 0;
+  color: var(--terminal-green);
+  font-size: clamp(1.5rem, 4vw, 2.7rem);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.executed {
+  font-size: 0.78rem;
+}
+
+.task-output {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--terminal-line);
+  list-style: none;
+}
+
+.task-output li {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--terminal-line);
+}
+
+.task-output span,
+.task-output em {
+  color: var(--terminal-muted);
+  font-style: normal;
+  font-size: 0.74rem;
+}
+
+.task-output strong {
+  font-weight: 400;
+}
+
+.task-output .done strong,
+.task-output .done span {
+  color: var(--terminal-green);
+}
+
+.result {
+  margin-top: 2rem;
+  color: var(--terminal-amber);
+  font-size: 0.75rem;
+}
+
+.focus-clock {
+  display: block;
+  color: var(--terminal-ink);
+  font-size: clamp(4rem, 12vw, 8rem);
+  line-height: 1;
+}
+
+.plain-output {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 2.5rem;
+  border-block: 1px solid var(--terminal-line);
+}
+
+.plain-output div {
+  padding: 1rem;
+  border-right: 1px solid var(--terminal-line);
+}
+
+.plain-output div:last-child {
+  border-right: 0;
+}
+
+.plain-output dt {
+  color: var(--terminal-muted);
+  font-size: 0.65rem;
+}
+
+.plain-output dd {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+}
+
+.drill-line {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) 2fr 4rem;
+  align-items: center;
+  gap: 1.2rem;
+  border-bottom: 1px solid var(--terminal-line);
+}
+
+.drill-line i {
+  height: 6px;
+  display: block;
+  background: var(--terminal-line);
+}
+
+.drill-line b {
+  height: 100%;
+  display: block;
+  background: var(--terminal-green);
+}
+
+.drill-line strong {
+  color: var(--terminal-amber);
+  font-weight: 400;
+  text-align: right;
+}
+
+.sync-readout {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2rem;
+  padding: 2rem;
+  border: 1px solid var(--terminal-line);
+}
+
+.sync-readout > div > span {
+  display: block;
+  color: var(--terminal-amber);
+  font-size: 3rem;
+}
+
+.sync-readout p {
+  color: var(--terminal-muted);
+}
+
+.sync-readout button,
+.package-row a {
+  min-height: 44px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--terminal-green);
+  background: transparent;
+  color: var(--terminal-green);
+  text-decoration: none;
+}
+
+.sync-readout button:hover,
+.package-row a:hover {
+  background: var(--terminal-green);
+  color: var(--terminal-bg);
+}
+
+.source-table {
+  border-top: 1px solid var(--terminal-line);
+}
+
+.source-table > div {
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--terminal-line);
+}
+
+.source-table span,
+.source-table em {
+  color: var(--terminal-muted);
+  font-style: normal;
+}
+
+.source-table strong {
+  color: var(--terminal-green);
+  font-weight: 400;
+}
+
+.package-row {
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  border-top: 1px solid var(--terminal-line);
+}
+
+.package-row:last-of-type {
+  border-bottom: 1px solid var(--terminal-line);
+}
+
+.package-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.package-row strong {
+  color: var(--terminal-green);
+  font-weight: 400;
+}
+
+.package-row code,
+.package-row small {
+  color: var(--terminal-muted);
+  font-size: 0.68rem;
+}
+
+.checksum-output {
+  margin-top: 1.5rem;
+  color: var(--terminal-muted);
+}
+
+.checksum-output summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--terminal-amber);
+}
+
+.checksum-output p {
+  margin-top: 1rem;
+  font-size: 0.65rem;
+}
+
+.checksum-output code {
+  display: block;
+  color: var(--terminal-ink);
+  font-size: 0.68rem;
+}
+
+.no-js .command-pane + .command-pane {
+  border-top: 1px solid var(--terminal-line);
+}
+
+.terminal-footer {
+  min-height: 58px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 max(1rem, calc((100% - 1240px) / 2));
+  border-top: 1px solid var(--terminal-line);
+  color: var(--terminal-muted);
+  font-size: 0.68rem;
+}
+
+.terminal-footer a {
+  color: var(--terminal-green);
+}
+
+@media (max-width: 760px) {
+  .terminal-bar {
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+  }
+
+  .terminal-bar p {
+    display: none;
+  }
+
+  .command-session {
+    grid-template-columns: 1fr;
+  }
+
+  .command-menu {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 0.6rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--terminal-line);
+  }
+
+  .command-menu > p {
+    display: none;
+  }
+
+  .command-menu button {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    text-align: center;
+  }
+
+  .command-menu button span {
+    display: none;
+  }
+
+  .command-menu button:hover,
+  .command-menu button[aria-selected="true"] {
+    border-left-color: transparent;
+    border-bottom-color: var(--terminal-green);
+  }
+
+  .workspace-titlebar {
+    display: none;
+  }
+
+  .command-pane {
+    min-height: 530px;
+  }
+
+  .task-output li {
+    grid-template-columns: 2rem 1fr;
+  }
+
+  .task-output em {
+    grid-column: 2;
+  }
+
+  .plain-output {
+    grid-template-columns: 1fr;
+  }
+
+  .plain-output div {
+    border-right: 0;
+    border-bottom: 1px solid var(--terminal-line);
+  }
+
+  .plain-output div:last-child {
+    border-bottom: 0;
+  }
+
+  .drill-line {
+    grid-template-columns: 1fr 3rem;
+  }
+
+  .drill-line i {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .sync-readout,
+  .package-row {
+    grid-template-columns: 1fr;
+    padding-block: 1.2rem;
+  }
+
+  .source-table > div {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding-block: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .command-menu button,
+  .sync-readout button,
+  .package-row a {
+    transition: none;
+  }
+}

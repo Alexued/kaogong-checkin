@@ -1,0 +1,430 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  class="no-js"
+  style="
+    background: #070907;
+    --page-bg: #070907;
+    --page-ink: #e9f0df;
+    --focus-color: #a8f070;
+    color-scheme: dark;
+  "
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>执行控制台｜考公打卡</title>
+    <meta
+      name="description"
+      content="以可读命令会话介绍考公打卡的计划、专注、背诵、局域网同步与版本安装。"
+    />
+    <meta name="theme-color" content="#070907" />
+    <link rel="icon" type="image/png" href="../../assets/app-icon.png" />
+    <script>
+      document.documentElement.className = "js";
+    </script>
+    <link rel="stylesheet" href="../shared/reset.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../shared/style-switcher.css?v=20260807-v070-release" />
+    <script src="../shared/release-data.js?v=20260807-v070-release" defer></script>
+    <script src="../shared/style-switcher.js?v=20260807-v070-release" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <header class="terminal-bar">
+      <a class="terminal-brand" href="../../"
+        ><span aria-hidden="true">&gt;_</span><strong>考公打卡</strong></a
+      >
+      <p>
+        <span class="status-light" aria-hidden="true"></span>device: android /
+        mode: local
+      </p>
+      <a href="#install-output">install</a>
+    </header>
+
+    <main id="main-content" class="terminal-session">
+      <section
+        class="boot-session"
+        aria-labelledby="terminal-title"
+        data-enter
+        style="--enter-order: 0"
+      >
+        <div class="prompt-line">
+          <span>candidate@kaogong</span><b>:</b><span>~/today</span><b>$</b> kgc
+          status
+        </div>
+        <div class="status-output">
+          <p><span class="ok">OK</span> local database ready</p>
+          <p><span class="ok">OK</span> 2 of 4 tasks complete</p>
+          <p><span class="warn">OFF</span> computer sync disabled by user</p>
+          <p>
+            <span class="dim">INFO</span> release v<span data-release="version"
+              >0.7.0</span
+            >
+          </p>
+        </div>
+        <h1 id="terminal-title">今天不是一句口号，<br />是六条可执行命令。</h1>
+      </section>
+
+      <section class="command-session" aria-label="考公打卡命令会话">
+        <aside
+          class="command-menu"
+          role="tablist"
+          aria-label="选择命令"
+          aria-orientation="vertical"
+        >
+          <p>COMMANDS</p>
+          <button
+            id="tab-plan"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="plan-output"
+            data-command="plan"
+          >
+            <span>01</span>plan
+          </button>
+          <button
+            id="tab-focus"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="focus-output"
+            data-command="focus"
+            tabindex="-1"
+          >
+            <span>02</span>focus
+          </button>
+          <button
+            id="tab-drill"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="drill-output"
+            data-command="drill"
+            tabindex="-1"
+          >
+            <span>03</span>drill
+          </button>
+          <button
+            id="tab-sync"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="sync-output"
+            data-command="sync"
+            tabindex="-1"
+          >
+            <span>04</span>sync
+          </button>
+          <button
+            id="tab-update"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="update-output"
+            data-command="update"
+            tabindex="-1"
+          >
+            <span>05</span>update
+          </button>
+          <button
+            id="tab-install"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="install-output"
+            data-command="install"
+            tabindex="-1"
+          >
+            <span>06</span>install
+          </button>
+        </aside>
+
+        <div class="command-workspace">
+          <div class="workspace-titlebar">
+            <span>kgc-console</span
+            ><span data-active-command>~/today $ kgc plan</span>
+          </div>
+
+          <section
+            class="command-pane is-active"
+            id="plan-output"
+            role="tabpanel"
+            data-command-panel="plan"
+            aria-labelledby="tab-plan"
+          >
+            <p class="executed"><span>$</span> kgc plan --today</p>
+            <h2>今日任务队列</h2>
+            <ol class="task-output">
+              <li class="done">
+                <span>[x]</span><strong>申论晨读摘录</strong><em>18 min</em>
+              </li>
+              <li class="done">
+                <span>[x]</span><strong>判断推理巩固</strong><em>32 items</em>
+              </li>
+              <li>
+                <span>[ ]</span><strong>资料分析限时练</strong><em>50 min</em>
+              </li>
+              <li>
+                <span>[ ]</span><strong>常识错题复盘</strong><em>25 min</em>
+              </li>
+            </ol>
+            <p class="result">2 completed, 2 remaining. exit code 0</p>
+          </section>
+
+          <section
+            class="command-pane"
+            id="focus-output"
+            role="tabpanel"
+            data-command-panel="focus"
+            aria-labelledby="tab-focus"
+          >
+            <p class="executed"><span>$</span> kgc focus --minutes 25</p>
+            <h2>专注会话已就绪</h2>
+            <output class="focus-clock">25:00</output>
+            <dl class="plain-output">
+              <div>
+                <dt>task</dt>
+                <dd>资料分析限时练</dd>
+              </div>
+              <div>
+                <dt>interruptions</dt>
+                <dd>0</dd>
+              </div>
+              <div>
+                <dt>storage</dt>
+                <dd>device only</dd>
+              </div>
+            </dl>
+            <p class="result">
+              timer waits for explicit start in the Android app.
+            </p>
+          </section>
+
+          <section
+            class="command-pane"
+            id="drill-output"
+            role="tabpanel"
+            data-command-panel="drill"
+            aria-labelledby="tab-drill"
+          >
+            <p class="executed"><span>$</span> kgc drill --weak-first</p>
+            <h2>记忆缓存</h2>
+            <div class="drill-line">
+              <span>增长量比较</span
+              ><i aria-label="64% 掌握度"><b style="width: 64%"></b></i
+              ><strong>64%</strong>
+            </div>
+            <div class="drill-line">
+              <span>公文写作结构</span
+              ><i aria-label="72% 掌握度"><b style="width: 72%"></b></i
+              ><strong>72%</strong>
+            </div>
+            <div class="drill-line">
+              <span>基期量公式</span
+              ><i aria-label="86% 掌握度"><b style="width: 86%"></b></i
+              ><strong>86%</strong>
+            </div>
+            <p class="result">next: 增长量比较 / 12 cards due</p>
+          </section>
+
+          <section
+            class="command-pane"
+            id="sync-output"
+            role="tabpanel"
+            data-command-panel="sync"
+            aria-labelledby="tab-sync"
+          >
+            <p class="executed"><span>$</span> kgc sync status</p>
+            <h2>电脑同步：用户控制</h2>
+            <div class="sync-readout" data-sync-root>
+              <div>
+                <span data-sync-indicator>OFF</span>
+                <p data-sync-detail>
+                  REST、WebSocket、UDP 发现与局域网更新均未运行。
+                </p>
+              </div>
+              <button type="button" data-sync-toggle aria-pressed="false">
+                切换为 ON
+              </button>
+            </div>
+            <p class="result" data-sync-result aria-live="polite">
+              local records remain available. no server contacted.
+            </p>
+          </section>
+
+          <section
+            class="command-pane"
+            id="update-output"
+            role="tabpanel"
+            data-command-panel="update"
+            aria-labelledby="tab-update"
+          >
+            <p class="executed">
+              <span>$</span> kgc update --sources local-network,github
+            </p>
+            <h2>版本源比较</h2>
+            <div class="source-table" role="table" aria-label="版本来源">
+              <div role="row">
+                <span role="cell">current</span
+                ><strong role="cell"
+                  >v<span data-release="version">0.7.0</span></strong
+                ><em role="cell">installed</em>
+              </div>
+              <div role="row">
+                <span role="cell">local-network</span
+                ><strong role="cell">requires sync ON</strong
+                ><em role="cell">opt-in</em>
+              </div>
+              <div role="row">
+                <span role="cell">github</span
+                ><strong role="cell">manual check</strong
+                ><em role="cell">available</em>
+              </div>
+            </div>
+            <p class="result">
+              same version prefers local-network. download never starts
+              automatically.
+            </p>
+          </section>
+
+          <section
+            class="command-pane"
+            id="install-output"
+            role="tabpanel"
+            data-command-panel="install"
+            aria-labelledby="tab-install"
+          >
+            <p class="executed"><span>$</span> kgc install --choose-platform</p>
+            <h2>可执行载荷</h2>
+            <div class="package-row">
+              <div>
+                <strong>android/apk</strong
+                ><code class="release-file" data-release="android-file"
+                  >kaogong-checkin-v0.7.0.apk</code
+                ><small data-release="android-size">3.27 MiB</small>
+              </div>
+              <a
+                data-release-link="android"
+                href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk"
+                >download</a
+              >
+            </div>
+            <div class="package-row">
+              <div>
+                <strong>windows/x64</strong
+                ><code class="release-file" data-release="windows-file"
+                  >kaogong-checkin-windows-x64-setup-v0.7.0.exe</code
+                ><small data-release="windows-size">91.38 MiB</small>
+              </div>
+              <a
+                data-release-link="windows"
+                href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe"
+                >download</a
+              >
+            </div>
+            <details class="checksum-output">
+              <summary>show sha256</summary>
+              <p>android</p>
+              <code class="release-sha" data-release="android-sha"
+                >2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A</code
+              >
+              <p>windows</p>
+              <code class="release-sha" data-release="windows-sha"
+                >BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18</code
+              >
+            </details>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <footer class="terminal-footer">
+      <span>session complete / data remains yours</span
+      ><a href="https://github.com/Alexued/kaogong-checkin">source</a>
+    </footer>
+
+    <details class="style-switcher">
+      <summary>风格 04 / 终端控制台</summary>
+      <nav aria-label="页面风格">
+        <ol>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4efe5"
+              href="../ancient/"
+              ><span>01</span><strong>古风长卷</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#081116" href="../cyber/"
+              ><span>02</span><strong>赛博朋克</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#f5f5f7" href="../../"
+              ><span>03</span><strong>Apple</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#070907"
+              href="./"
+              aria-current="page"
+              ><span>04</span><strong>终端控制台</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4f0e8"
+              href="../government/"
+              ><span>05</span><strong>政府严肃型</strong></a
+            >
+          </li>
+          <li>
+            <a data-style-link data-transition-color="#f3f1ea" href="../sprint/"
+              ><span>06</span><strong>冲刺仪表</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f1ead7"
+              href="../bauhaus/"
+              ><span>07</span><strong>包豪斯</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f8f7f2"
+              href="../stationery/"
+              ><span>08</span><strong>日系文具</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f4f7f8"
+              href="../blueprint/"
+              ><span>09</span><strong>科研蓝图</strong></a
+            >
+          </li>
+          <li>
+            <a
+              data-style-link
+              data-transition-color="#f2f0e9"
+              href="../newspaper/"
+              ><span>10</span><strong>墨水报刊</strong></a
+            >
+          </li>
+        </ol>
+      </nav>
+    </details>
+  </body>
+</html>

@@ -126,6 +126,7 @@ test('factory protects state, rate-limits pairing, persists tokens, and restarts
   assert.equal(firstStatus.serverId, 'server-lifecycle-test');
   assert.equal(firstStatus.protocolVersion, PROTOCOL_VERSION);
   assert.equal(firstStatus.apkFileName, apkName);
+  assert.equal(firstStatus.apkVersion, '0.6.0');
   assert.equal(
     firstStatus.apkDownloadUrl,
     `http://192.168.50.7:${firstStatus.httpPort}/updates/${apkName}`,
@@ -153,6 +154,9 @@ test('factory protects state, rate-limits pairing, persists tokens, and restarts
   );
   assert.equal(Object.hasOwn(info, 'pairingCode'), false);
   assert.equal(Object.hasOwn(info, 'token'), false);
+  assert.equal(info.apkAvailable, true);
+  assert.equal(info.apkFileName, apkName);
+  assert.equal(info.apkVersion, '0.6.0');
 
   const preflight = await fetch(`${baseUrl}/api/state`, { method: 'OPTIONS' });
   assert.equal(preflight.status, 204);
@@ -383,6 +387,7 @@ test('WebSocket authentication, mutation acknowledgements, replay, and revocatio
 
 test('HTTP port fallback and UDP discovery expose only public identity fields', async (t) => {
   const dataDir = temporaryDirectory(t, 'kaogong-network-data-');
+  fs.writeFileSync(path.join(dataDir, 'kaogong-checkin-v0.7.0.apk'), 'apk');
   const blocker = net.createServer();
   await new Promise((resolve, reject) => {
     blocker.once('error', reject);
@@ -440,6 +445,9 @@ test('HTTP port fallback and UDP discovery expose only public identity fields', 
     name: os.hostname(),
     httpPort: status.httpPort,
     pairingRequired: true,
+    protocolVersion: PROTOCOL_VERSION,
+    apkAvailable: true,
+    apkVersion: '0.7.0',
   });
   assert.equal(Object.hasOwn(payload, 'pairingCode'), false);
   assert.equal(Object.hasOwn(payload, 'token'), false);

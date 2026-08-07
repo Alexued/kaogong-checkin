@@ -8,6 +8,7 @@ import {
 import { initializeLocalState, startSync, stopSync } from './sync';
 import { isSyncEnabled, persistSyncEnabled } from './sync-preference';
 import { savePairingToken } from './pairing-storage';
+import { cancelActiveLanAppUpdate, cancelLanUpdateRequests } from './update';
 
 let controlGeneration = 0;
 let controlChain: Promise<void> = Promise.resolve();
@@ -28,8 +29,12 @@ export function initializeComputerSync(): Promise<void> {
   initializeLocalState();
   const generation = ++controlGeneration;
   if (!isSyncEnabled()) {
+    cancelLanUpdateRequests();
     stopSync();
-    return stopDiscovery();
+    return Promise.all([
+      stopDiscovery(),
+      cancelActiveLanAppUpdate().catch(() => false),
+    ]).then(() => {});
   }
   return serialize(() => startBoth(generation));
 }
@@ -38,18 +43,23 @@ export function setComputerSyncEnabled(enabled: boolean): Promise<void> {
   persistSyncEnabled(enabled);
   const generation = ++controlGeneration;
   // Invalidate HTTP/WS callbacks immediately; UDP cleanup completes in the serialized step.
+  cancelLanUpdateRequests();
+  const downloadCancellation = enabled
+    ? Promise.resolve()
+    : cancelActiveLanAppUpdate().catch(() => {});
   pairingAbortController?.abort();
   pairingAbortController = null;
   stopSync();
   const discoveryStop = stopDiscovery();
   return serialize(async () => {
-    await discoveryStop;
+    await Promise.all([discoveryStop, downloadCancellation]);
     await startBoth(generation);
   });
 }
 
 export function restartComputerSync(): Promise<void> {
   const generation = ++controlGeneration;
+  cancelLanUpdateRequests();
   pairingAbortController?.abort();
   pairingAbortController = null;
   stopSync();
@@ -66,6 +76,7 @@ export function configureComputerServer(url: string, serverId?: string): Promise
 }
 
 export async function pairComputerServer(code: string, serverId?: string) {
+  if (!isSyncEnabled()) throw new DOMException('Computer sync is disabled', 'AbortError');
   const generation = controlGeneration;
   pairingAbortController?.abort();
   const controller = new AbortController();

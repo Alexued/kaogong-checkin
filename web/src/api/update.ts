@@ -11,7 +11,7 @@ import { isSyncEnabled } from './sync-preference';
 export { compareVersions } from './update-selection';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.7.0';
 
 export interface ReleaseInfo {
   version: string;
@@ -28,20 +28,50 @@ async function fetchWithTimeout(
   input: string,
   init: RequestInit,
   timeoutMs: number,
+  signals: AbortSignal[] = [],
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  const abort = (signal: AbortSignal) => controller.abort(signal.reason);
+  const activeSignals = signals.filter(Boolean);
+  const abortListeners = new Map<AbortSignal, () => void>();
+  for (const signal of activeSignals) {
+    if (signal.aborted) abort(signal);
+    else {
+      const listener = () => abort(signal);
+      abortListeners.set(signal, listener);
+      signal.addEventListener('abort', listener, { once: true });
+    }
+  }
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } finally {
     window.clearTimeout(timer);
+    for (const [signal, listener] of abortListeners) signal.removeEventListener('abort', listener);
   }
 }
 
-export async function fetchReleaseHistory(limit = 10): Promise<ReleaseInfo[]> {
+const lanUpdateControllers = new Set<AbortController>();
+
+function abortError(message: string): DOMException {
+  return new DOMException(message, 'AbortError');
+}
+
+function assertLanUpdateAllowed(signal?: AbortSignal) {
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : abortError('LAN update check was cancelled');
+  if (!isSyncEnabled()) throw abortError('Computer sync is disabled');
+}
+
+/** Abort every in-flight LAN metadata request without affecting GitHub checks. */
+export function cancelLanUpdateRequests() {
+  for (const controller of lanUpdateControllers) controller.abort(abortError('LAN update check was cancelled'));
+  lanUpdateControllers.clear();
+}
+
+export async function fetchReleaseHistory(limit = 10, signal?: AbortSignal): Promise<ReleaseInfo[]> {
   const r = await fetchWithTimeout(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${limit}`, {
     headers: { Accept: 'application/vnd.github+json' },
-  }, 8000);
+  }, 8000, signal ? [signal] : []);
   if (!r.ok) throw new Error(`GitHub API ${r.status}`);
   const releases = await r.json() as Array<Record<string, any>>;
   return releases.filter((release) => !release.draft).map(parseRelease);
@@ -89,7 +119,7 @@ interface NativeAppUpdatePlugin {
     downloadId: number | null;
     status: 'permissionRequired' | 'installing';
   }>;
-  cancelDownload(options?: { downloadId?: number | string }): Promise<AppUpdateDownloadStatus>;
+  cancelDownload(options?: { downloadId?: number | string }): Promise<AppUpdateDownloadStatus | undefined>;
   addListener(
     eventName: 'downloadProgress',
     listenerFunc: (status: AppUpdateDownloadStatus) => void,
@@ -97,12 +127,46 @@ interface NativeAppUpdatePlugin {
 }
 
 const NativeAppUpdate = registerPlugin<NativeAppUpdatePlugin>('AppUpdate');
+const ACTIVE_UPDATE_SOURCE_KEY = 'kgc-active-update-source';
+const ACTIVE_UPDATE_STOP_FAILED_KEY = 'kgc-active-update-stop-failed';
+let pendingNativeDownload: Promise<AppUpdateDownloadStatus> | null = null;
+let cancelLanWhenStarted = false;
+const activeUpdateStopFailureListeners = new Set<(failed: boolean) => void>();
+
+export function getActiveAppUpdateSource(): ReleaseInfo['source'] | null {
+  const source = localStorage.getItem(ACTIVE_UPDATE_SOURCE_KEY);
+  return source === 'lan' || source === 'github' ? source : null;
+}
+
+export function clearActiveAppUpdateSource() {
+  localStorage.setItem(ACTIVE_UPDATE_SOURCE_KEY, '');
+  rememberActiveAppUpdateStopFailure(false);
+}
+
+export function hasActiveAppUpdateStopFailure(): boolean {
+  return localStorage.getItem(ACTIVE_UPDATE_STOP_FAILED_KEY) === 'true';
+}
+
+export function subscribeActiveAppUpdateStopFailure(listener: (failed: boolean) => void): () => void {
+  activeUpdateStopFailureListeners.add(listener);
+  listener(hasActiveAppUpdateStopFailure());
+  return () => activeUpdateStopFailureListeners.delete(listener);
+}
+
+function rememberActiveAppUpdateStopFailure(failed: boolean) {
+  localStorage.setItem(ACTIVE_UPDATE_STOP_FAILED_KEY, failed ? 'true' : '');
+  for (const listener of activeUpdateStopFailureListeners) listener(failed);
+}
+
+function rememberActiveAppUpdateSource(source: ReleaseInfo['source']) {
+  localStorage.setItem(ACTIVE_UPDATE_SOURCE_KEY, source);
+}
 
 /** 比较语义化版本号：a > b 返回正数，相等 0，a < b 负数（忽略 v 前缀） */
-export async function fetchLatestGitHubRelease(): Promise<ReleaseInfo> {
+export async function fetchLatestGitHubRelease(signal?: AbortSignal): Promise<ReleaseInfo> {
   const r = await fetchWithTimeout(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
     headers: { Accept: 'application/vnd.github+json' },
-  }, 8000);
+  }, 8000, signal ? [signal] : []);
   if (!r.ok) throw new Error(`GitHub API ${r.status}`);
   return parseRelease(await r.json());
 }
@@ -112,39 +176,51 @@ function serverHttpBase(serverUrl: string): string {
   return withProtocol.replace(/\/+$/, '');
 }
 
-export async function fetchLatestLanRelease(serverUrl = getServerUrl()): Promise<ReleaseInfo> {
+export async function fetchLatestLanRelease(serverUrl = getServerUrl(), signal?: AbortSignal): Promise<ReleaseInfo> {
+  assertLanUpdateAllowed(signal);
   if (!serverUrl.trim()) throw new Error('LAN server is not configured');
-  const baseUrl = serverHttpBase(serverUrl.trim());
-  const r = await fetchWithTimeout(`${baseUrl}/api/update/latest`, {
-    headers: { Accept: 'application/json' },
-  }, 3000);
-  if (!r.ok) throw new Error(`LAN update API ${r.status}`);
-  const release = await r.json() as Partial<ReleaseInfo>;
-  const version = release.version;
-  const rawApkUrl = release.apkUrl;
-  if (!version || !/^\d+\.\d+\.\d+$/.test(version) || !rawApkUrl) {
-    throw new Error('LAN update API returned invalid metadata');
+  const controller = new AbortController();
+  lanUpdateControllers.add(controller);
+  try {
+    const baseUrl = serverHttpBase(serverUrl.trim());
+    const r = await fetchWithTimeout(`${baseUrl}/api/update/latest`, {
+      headers: { Accept: 'application/json' },
+    }, 3000, signal ? [controller.signal, signal] : [controller.signal]);
+    assertLanUpdateAllowed(signal);
+    if (!r.ok) throw new Error(`LAN update API ${r.status}`);
+    const release = await r.json() as Partial<ReleaseInfo>;
+    assertLanUpdateAllowed(signal);
+    const version = release.version;
+    const rawApkUrl = release.apkUrl;
+    if (!version || !/^\d+\.\d+\.\d+$/.test(version) || !rawApkUrl) {
+      throw new Error('LAN update API returned invalid metadata');
+    }
+    const apkUrl = new URL(rawApkUrl, `${baseUrl}/`).toString();
+    if (!/^https?:\/\//i.test(apkUrl)) throw new Error('LAN update API returned an invalid APK URL');
+    return {
+      version,
+      name: release.name || `kaogong-checkin v${version}`,
+      apkUrl,
+      pageUrl: release.pageUrl ? new URL(release.pageUrl, `${baseUrl}/`).toString() : apkUrl,
+      notes: release.notes || '',
+      publishedAt: release.publishedAt || '',
+      source: 'lan',
+    };
+  } finally {
+    lanUpdateControllers.delete(controller);
   }
-  const apkUrl = new URL(rawApkUrl, `${baseUrl}/`).toString();
-  if (!/^https?:\/\//i.test(apkUrl)) throw new Error('LAN update API returned an invalid APK URL');
-  return {
-    version,
-    name: release.name || `kaogong-checkin v${version}`,
-    apkUrl,
-    pageUrl: release.pageUrl ? new URL(release.pageUrl, `${baseUrl}/`).toString() : apkUrl,
-    notes: release.notes || '',
-    publishedAt: release.publishedAt || '',
-    source: 'lan',
-  };
 }
 
-export async function fetchLatestRelease(): Promise<ReleaseInfo> {
+export async function fetchLatestRelease(options: { signal?: AbortSignal } = {}): Promise<ReleaseInfo> {
+  const { signal } = options;
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : abortError('Update check was cancelled');
   const serverUrl = getServerUrl();
-  if (!shouldUseLanUpdate(isSyncEnabled(), serverUrl)) return fetchLatestGitHubRelease();
+  if (!shouldUseLanUpdate(isSyncEnabled(), serverUrl)) return fetchLatestGitHubRelease(signal);
   const [lanResult, githubResult] = await Promise.allSettled([
-    fetchLatestLanRelease(serverUrl),
-    fetchLatestGitHubRelease(),
+    fetchLatestLanRelease(serverUrl, signal),
+    fetchLatestGitHubRelease(signal),
   ]);
+  if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : abortError('Update check was cancelled');
   const lan = isSyncEnabled() && lanResult.status === 'fulfilled' ? lanResult.value : null;
   const github = githubResult.status === 'fulfilled' ? githubResult.value : null;
   const selected = selectPreferredRelease(lan, github);
@@ -175,14 +251,73 @@ export function getAppUpdateStatus(): Promise<AppUpdateDownloadStatus> {
   return NativeAppUpdate.getDownloadStatus();
 }
 
-export function startAppUpdateDownload(url: string, fileName?: string): Promise<AppUpdateDownloadStatus> {
-  return NativeAppUpdate.startDownload({ url, fileName });
+export async function startAppUpdateDownload(
+  url: string,
+  fileName?: string,
+  source: ReleaseInfo['source'] = 'github',
+): Promise<AppUpdateDownloadStatus> {
+  if (pendingNativeDownload || getActiveAppUpdateSource()) {
+    throw new Error('An app update download is already active');
+  }
+  rememberActiveAppUpdateSource(source);
+  rememberActiveAppUpdateStopFailure(false);
+  cancelLanWhenStarted = false;
+  const nativeStart = NativeAppUpdate.startDownload({ url, fileName });
+  let operation: Promise<AppUpdateDownloadStatus>;
+  operation = (async () => {
+    try {
+      let status = await nativeStart;
+      if (source === 'lan' && cancelLanWhenStarted) {
+        const cancelled = await NativeAppUpdate.cancelDownload(
+          status.downloadId == null ? undefined : { downloadId: status.downloadId },
+        );
+        if (!cancelled || cancelled.status === 'cancelled' || cancelled.status === 'idle') {
+          clearActiveAppUpdateSource();
+        }
+        if (cancelled) status = cancelled;
+      }
+      return status;
+    } catch (error) {
+      if (!cancelLanWhenStarted) clearActiveAppUpdateSource();
+      throw error;
+    } finally {
+      if (pendingNativeDownload === operation) {
+        pendingNativeDownload = null;
+        cancelLanWhenStarted = false;
+      }
+    }
+  })();
+  pendingNativeDownload = operation;
+  return operation;
 }
 
 export function installAppUpdate(downloadId?: number | null) {
   return NativeAppUpdate.installDownloadedApk(downloadId == null ? undefined : { downloadId });
 }
 
-export function cancelAppUpdate(downloadId?: number | null): Promise<AppUpdateDownloadStatus> {
+export function cancelAppUpdate(downloadId?: number | null): Promise<AppUpdateDownloadStatus | undefined> {
   return NativeAppUpdate.cancelDownload(downloadId == null ? undefined : { downloadId });
+}
+
+export async function cancelActiveLanAppUpdate(downloadId?: number | null): Promise<boolean> {
+  if (getActiveAppUpdateSource() !== 'lan') return false;
+  try {
+    cancelLanWhenStarted = true;
+    if (pendingNativeDownload) {
+      try {
+        await pendingNativeDownload;
+        rememberActiveAppUpdateStopFailure(false);
+        return true;
+      } catch {
+        // The initial cancellation can race native startup. Retry once against DownloadManager.
+      }
+    }
+    const status = await cancelAppUpdate(downloadId);
+    if (!status || status.status === 'cancelled' || status.status === 'idle') clearActiveAppUpdateSource();
+    rememberActiveAppUpdateStopFailure(false);
+    return true;
+  } catch (error) {
+    rememberActiveAppUpdateStopFailure(true);
+    throw error;
+  }
 }

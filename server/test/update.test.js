@@ -5,6 +5,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+const { findLatestApk, parseApkFileName } = require('../src/update');
+
 async function waitForServer(url) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
@@ -43,10 +45,22 @@ function startServer(t, updateDir) {
 test('LAN update API selects and downloads the highest valid APK', async (t) => {
   const updateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kaogong-updates-'));
   t.after(() => fs.rmSync(updateDir, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(updateDir, 'kaogong-checkin-v0.5.2.apk'), 'older');
-  fs.writeFileSync(path.join(updateDir, 'kaogong-checkin-v0.12.0.apk'), 'latest-apk');
+  const lowerVersionPath = path.join(updateDir, 'kaogong-checkin-v0.5.2.apk');
+  const highestVersionPath = path.join(updateDir, 'kaogong-checkin-v0.12.0.apk');
+  fs.writeFileSync(lowerVersionPath, 'older');
+  fs.writeFileSync(highestVersionPath, 'latest-apk');
   fs.writeFileSync(path.join(updateDir, 'kaogong-checkin-vbad.apk'), 'ignored');
+  fs.writeFileSync(path.join(updateDir, 'kaogong-checkin-v00.99.0.apk'), 'ignored');
+  fs.writeFileSync(path.join(updateDir, 'KAOGONG-CHECKIN-v99.0.0.APK'), 'ignored');
   fs.writeFileSync(path.join(updateDir, 'other-v99.0.0.apk'), 'ignored');
+  fs.utimesSync(lowerVersionPath, new Date('2030-01-01T00:00:00Z'), new Date('2030-01-01T00:00:00Z'));
+  fs.utimesSync(highestVersionPath, new Date('2020-01-01T00:00:00Z'), new Date('2020-01-01T00:00:00Z'));
+
+  const selected = findLatestApk(updateDir);
+  assert.equal(selected.fileName, 'kaogong-checkin-v0.12.0.apk');
+  assert.equal(selected.version, '0.12.0');
+  assert.equal(parseApkFileName('kaogong-checkin-v01.2.3.apk'), null);
+  assert.equal(parseApkFileName('KAOGONG-CHECKIN-v1.2.3.APK'), null);
 
   const baseUrl = startServer(t, updateDir);
   await waitForServer(`${baseUrl}/api/update/latest`);
@@ -66,6 +80,7 @@ test('LAN update API selects and downloads the highest valid APK', async (t) => 
   assert.match(downloadResponse.headers.get('content-disposition') || '', /kaogong-checkin-v0\.12\.0\.apk/i);
   assert.equal(await downloadResponse.text(), 'latest-apk');
 
+  assert.equal((await fetch(`${baseUrl}/updates/kaogong-checkin-v0.5.2.apk`)).status, 404);
   assert.equal((await fetch(`${baseUrl}/updates/not-an-update.apk`)).status, 404);
   assert.equal((await fetch(`${baseUrl}/updates/%2e%2e%2fkaogong-checkin-v0.12.0.apk`)).status, 404);
 });

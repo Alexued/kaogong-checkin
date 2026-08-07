@@ -19,8 +19,11 @@
     <script>
       document.documentElement.className = 'js';
     </script>
-    <link rel="stylesheet" href="styles.css?v=20260805-platform3" />
-    <script src="app.js?v=20260805-platform3" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260807-v070-release" />
+    <link rel="stylesheet" href="styles/shared/style-switcher.css?v=20260807-v070-release" />
+    <script src="app.js?v=20260807-v070-release" defer></script>
+    <script src="styles/shared/release-data.js?v=20260807-v070-release" defer></script>
+    <script src="styles/shared/style-switcher.js?v=20260807-v070-release" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -41,7 +44,8 @@
           <a class="nav-windows" href="#windows">Windows</a>
           <a
             class="nav-download"
-            href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-v0.6.0.apk"
+            data-release-link="android"
+            href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk"
           >
             下载 APK
           </a>
@@ -66,7 +70,8 @@
           <div class="hero-actions" data-enter style="--enter-order: 4">
             <a
               class="button button-primary"
-              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-v0.6.0.apk"
+              data-release-link="android"
+              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk"
             >
               <span aria-hidden="true">↓</span>
               下载 Android APK
@@ -80,7 +85,7 @@
               了解 Windows 伴侣
             </a>
           </div>
-          <p class="hero-meta" data-enter style="--enter-order: 5">v0.6.0 <span aria-hidden="true">·</span> Android 7+ <span aria-hidden="true">·</span> Windows 10/11</p>
+          <p class="hero-meta" data-enter style="--enter-order: 5">v<span data-release="version">0.7.0</span> <span aria-hidden="true">·</span> Android 7+ <span aria-hidden="true">·</span> Windows 10/11</p>
         </div>
 
         <div class="hero-stage" data-enter data-scene-part="visual" style="--enter-order: 6" aria-label="原生渲染的今日计划界面">
@@ -220,10 +225,10 @@
         aria-labelledby="focus-title"
         data-scene
         data-scene-label="专注计时"
-        style="--scene-color: #000000"
+        style="--scene-color: #f1f3f6"
       >
         <div class="focus-shell">
-          <div class="section-heading section-heading-light" data-reveal data-scene-part="copy">
+          <div class="section-heading focus-heading" data-reveal data-scene-part="copy">
             <p class="section-index">02 / 专注计时</p>
             <h2 id="focus-title">25 分钟，只做一件事。</h2>
             <p>开始、暂停、继续。时间放在画面中央，其他内容都退到后面。</p>
@@ -243,7 +248,7 @@
             <p class="timer-status" data-timer-status aria-live="polite">准备开始</p>
           </div>
         </div>
-        <a class="scene-next scene-next-light" href="#drill" data-scene-part="next"><span>03 / 背诵训练</span><span aria-hidden="true">↓</span></a>
+        <a class="scene-next" href="#drill" data-scene-part="next"><span>03 / 背诵训练</span><span aria-hidden="true">↓</span></a>
       </section>
 
       <section
@@ -309,7 +314,8 @@
             <p>安装一次，局域网服务、数据目录和手机安装入口都在一个窗口里。无需 Node.js，也不用打开命令行。</p>
             <a
               class="button button-primary windows-download-link"
-              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-windows-x64-setup-v0.6.0.exe"
+              data-release-link="windows"
+              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe"
             >
               <span aria-hidden="true">↓</span>
               下载 Windows 版
@@ -384,7 +390,7 @@
           <div class="section-heading sync-heading" data-reveal data-scene-part="copy">
             <p class="section-index">05 / 电脑同步</p>
             <h2 id="sync-title">连接，由你决定。</h2>
-            <p>默认先保存在手机。需要电脑备份时再打开同步，不需要时就彻底停止局域网发现、连接和上传。</p>
+            <p>默认先保存在手机。需要电脑备份时再打开同步，不需要时就彻底停止局域网发现、连接和上传。开启并发现电脑后，应用会比较电脑 APK、GitHub 与当前版本，只提示可用更新；下载和系统安装仍由你确认。</p>
           </div>
 
           <div class="sync-control" data-reveal data-scene-part="visual" data-sync-control>
@@ -442,11 +448,11 @@
         aria-labelledby="download-title"
         data-scene
         data-scene-label="下载与校验"
-        style="--scene-color: #000000"
+        style="--scene-color: #f4f6f8"
       >
         <div class="download-shell">
           <div class="download-heading" data-reveal data-scene-part="copy">
-            <p class="section-index">v0.6.0 / Android + Windows</p>
+            <p class="section-index">v<span data-release="version">0.7.0</span> / Android + Windows</p>
             <h2 id="download-title">从今天开始。</h2>
             <p>手机写下第一项任务，电脑在需要时接手本地备份。两个安装包来自同一个版本。</p>
           </div>
@@ -457,16 +463,17 @@
                 <p><span class="platform-mark" aria-hidden="true">A</span><span><small>移动端</small><strong>Android APK</strong></span></p>
                 <a
                   class="button button-download"
-                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-v0.6.0.apk"
+                  data-release-link="android"
+                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-v0.7.0.apk"
                 ><span aria-hidden="true">↓</span>下载 APK</a>
               </div>
               <dl class="release-details">
                 <div><dt>系统</dt><dd>Android 7+</dd></div>
-                <div><dt>大小</dt><dd data-apk-size>4.18 MiB</dd></div>
-                <div class="release-file"><dt>文件</dt><dd>kaogong-checkin-v0.6.0.apk</dd></div>
+                <div><dt>大小</dt><dd data-apk-size data-release="android-size">3.27 MiB</dd></div>
+                <div class="release-file"><dt>文件</dt><dd data-release="android-file">kaogong-checkin-v0.7.0.apk</dd></div>
               </dl>
               <div class="checksum">
-                <div><span>SHA-256</span><code id="apk-checksum">EF7510E71A8BDA18BCDD46E6E9643C8E3573FBBD8034D919729BDC1D2F6B4CC6</code></div>
+                <div><span>SHA-256</span><code id="apk-checksum" data-release="android-sha">2B52ECF3B0781494C4A55969EA90EA640628D903FAC86884CFDD6C45032A699A</code></div>
                 <button class="button button-copy" type="button" data-copy-checksum data-copy-target="apk-checksum" data-original-label="复制 APK 校验值">复制校验值</button>
               </div>
             </article>
@@ -476,16 +483,17 @@
                 <p><span class="platform-mark" aria-hidden="true">W</span><span><small>电脑端</small><strong>Windows 伴侣</strong></span></p>
                 <a
                   class="button button-download button-download-light"
-                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.6.0/kaogong-checkin-windows-x64-setup-v0.6.0.exe"
+                  data-release-link="windows"
+                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.0/kaogong-checkin-windows-x64-setup-v0.7.0.exe"
                 ><span aria-hidden="true">↓</span>下载安装程序</a>
               </div>
               <dl class="release-details">
                 <div><dt>系统</dt><dd>Windows 10/11 x64</dd></div>
-                <div><dt>大小</dt><dd data-windows-size>92.16 MiB</dd></div>
-                <div class="release-file"><dt>文件</dt><dd>kaogong-checkin-windows-x64-setup-v0.6.0.exe</dd></div>
+                <div><dt>大小</dt><dd data-windows-size data-release="windows-size">91.38 MiB</dd></div>
+                <div class="release-file"><dt>文件</dt><dd data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.7.0.exe</dd></div>
               </dl>
               <div class="checksum">
-                <div><span>SHA-256</span><code id="windows-checksum">34A9F9E6114ECE19B01D23BEB42E5A9BE18788EEFE4F8DAC42B3E665D6F67812</code></div>
+                <div><span>SHA-256</span><code id="windows-checksum" data-release="windows-sha">BAA82D5395F05ECD364AFEC662F05B6A304A12BF7386F9A538DF92C74DFBFC18</code></div>
                 <button class="button button-copy" type="button" data-copy-checksum data-copy-target="windows-checksum" data-original-label="复制 Windows 校验值">复制校验值</button>
               </div>
             </article>
@@ -500,7 +508,7 @@
           </div>
 
           <p class="release-links" data-reveal>
-            <a href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.6.0" target="_blank" rel="noreferrer">查看 v0.6.0 发布说明</a>
+            <a href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.7.0" target="_blank" rel="noreferrer">查看 v0.7.0 发布说明</a>
             <span aria-hidden="true">·</span>
             <a href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">查看源代码</a>
           </p>
@@ -515,5 +523,23 @@
         <a href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">源码仓库</a>
       </nav>
     </footer>
+
+    <details class="style-switcher">
+      <summary>风格 03 / Apple</summary>
+      <nav aria-label="页面风格">
+        <ol>
+          <li><a data-style-link data-transition-color="#f4efe5" href="styles/ancient/"><span>01</span><strong>古风长卷</strong></a></li>
+          <li><a data-style-link data-transition-color="#081116" href="styles/cyber/"><span>02</span><strong>赛博朋克</strong></a></li>
+          <li><a data-style-link data-transition-color="#f5f5f7" href="./" aria-current="page"><span>03</span><strong>Apple</strong></a></li>
+          <li><a data-style-link data-transition-color="#070907" href="styles/terminal/"><span>04</span><strong>终端控制台</strong></a></li>
+          <li><a data-style-link data-transition-color="#f4f0e8" href="styles/government/"><span>05</span><strong>政府严肃型</strong></a></li>
+          <li><a data-style-link data-transition-color="#f3f1ea" href="styles/sprint/"><span>06</span><strong>冲刺仪表</strong></a></li>
+          <li><a data-style-link data-transition-color="#f1ead7" href="styles/bauhaus/"><span>07</span><strong>包豪斯</strong></a></li>
+          <li><a data-style-link data-transition-color="#f8f7f2" href="styles/stationery/"><span>08</span><strong>日系文具</strong></a></li>
+          <li><a data-style-link data-transition-color="#f4f7f8" href="styles/blueprint/"><span>09</span><strong>科研蓝图</strong></a></li>
+          <li><a data-style-link data-transition-color="#f2f0e9" href="styles/newspaper/"><span>10</span><strong>墨水报刊</strong></a></li>
+        </ol>
+      </nav>
+    </details>
   </body>
 </html>

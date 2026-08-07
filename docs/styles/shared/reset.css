@@ -1,0 +1,163 @@
+@view-transition {
+  navigation: auto;
+}
+
+:root {
+  --motion-control: 180ms;
+  --motion-material: 520ms;
+  --motion-scene: 680ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --style-target: var(--page-bg, #f5f5f7);
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--page-bg, #f5f5f7);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+  background: var(--page-bg, #f5f5f7);
+  color: var(--page-ink, #1d1d1f);
+}
+
+body::after {
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  background: var(--style-target);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition:
+    opacity var(--motion-control) ease-in,
+    transform var(--motion-control) ease-in;
+}
+
+html.is-style-leaving body::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+button,
+a,
+summary,
+input {
+  font: inherit;
+  touch-action: manipulation;
+}
+
+button,
+summary {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+figure,
+blockquote {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+input:focus-visible {
+  outline: 3px solid var(--focus-color, #0071e3);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 10001;
+  top: 8px;
+  left: 8px;
+  padding: 10px 14px;
+  background: #111;
+  color: #fff;
+  transform: translateY(-160%);
+  transition: transform var(--motion-control) var(--motion-ease);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.release-sha,
+.release-file {
+  overflow-wrap: anywhere;
+}
+
+.js [data-enter] {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.js.style-ready [data-enter] {
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity var(--motion-scene) var(--motion-ease),
+    transform var(--motion-scene) var(--motion-ease);
+  transition-delay: calc(var(--enter-order, 0) * 70ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  :root {
+    --motion-control: 80ms;
+    --motion-material: 80ms;
+    --motion-scene: 0.01ms;
+  }
+
+  .js [data-enter],
+  .js.style-ready [data-enter] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  body::after {
+    transform: none;
+  }
+}

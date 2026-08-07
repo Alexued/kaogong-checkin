@@ -9,7 +9,7 @@ const { EventEmitter } = require('node:events');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 
-const { findLatestApk, resolveApkFile } = require('./update');
+const { findLatestApk } = require('./update');
 
 const PROTOCOL_VERSION = 2;
 const DEFAULT_HTTP_PORT = 8321;
@@ -521,6 +521,7 @@ function createKgcServer(options = {}) {
       legacyMode: allowLegacy,
       apkAvailable: Boolean(apk),
       apkFileName: apk ? apk.fileName : null,
+      apkVersion: apk ? apk.version : null,
     };
   }
 
@@ -646,9 +647,9 @@ function createKgcServer(options = {}) {
     });
 
     app.get('/updates/:fileName', (request, response) => {
-      const filePath = resolveApkFile(updateDir, request.params.fileName);
-      if (!filePath) return response.sendStatus(404);
-      return response.download(filePath, request.params.fileName, {
+      const apk = latestApk();
+      if (!apk || request.params.fileName !== apk.fileName) return response.sendStatus(404);
+      return response.download(apk.filePath, apk.fileName, {
         headers: { 'Content-Type': 'application/vnd.android.package-archive' },
       });
     });
@@ -840,11 +841,15 @@ function createKgcServer(options = {}) {
   }
 
   function udpPayload() {
+    const apk = latestApk();
     return Buffer.from(JSON.stringify({
       serverId: ensureSecurityLoaded().serverId,
       name: serverName,
       httpPort: actualHttpPort,
       pairingRequired: !allowLegacy,
+      protocolVersion: PROTOCOL_VERSION,
+      apkAvailable: Boolean(apk),
+      apkVersion: apk ? apk.version : null,
     }));
   }
 
@@ -1151,5 +1156,6 @@ function createKgcServer(options = {}) {
 module.exports = {
   PROTOCOL_VERSION,
   createKgcServer,
+  findLatestApk,
   isValidState,
 };
