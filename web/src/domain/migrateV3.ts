@@ -41,6 +41,12 @@ function timestamp(value: unknown, fallback: string): string {
   return candidate;
 }
 
+function milliseconds(value: unknown): number {
+  const candidate = Number(value);
+  if (!Number.isFinite(candidate) || candidate < 0) return 0;
+  return Math.min(Number.MAX_SAFE_INTEGER, Math.round(candidate));
+}
+
 function localDate(value: string): string {
   const candidate = value.slice(0, 10);
   const [year, month, day] = candidate.split('-').map(Number);
@@ -127,8 +133,10 @@ function mapTimer(source: JsonRecord): TimerSessionV3 {
     taskId: source.taskId === null || source.taskId === undefined ? null : String(source.taskId),
     date: localDate(`${String(source.date || createdAt.slice(0, 10))}T00:00:00.000Z`),
     startedAt: timestamp(source.startedAt, createdAt),
-    durationMs: Number(source.durationMs),
-    laps: Array.isArray(source.laps) ? source.laps.map((lap) => ({ elapsedMs: Number(lap.elapsedMs), splitMs: Number(lap.splitMs) })) : [],
+    durationMs: milliseconds(source.durationMs),
+    laps: Array.isArray(source.laps)
+      ? source.laps.map((lap) => ({ elapsedMs: milliseconds(lap.elapsedMs), splitMs: milliseconds(lap.splitMs) }))
+      : [],
     mode: source.mode === 'countdown' ? 'countdown' : 'stopwatch',
     createdAt,
     updatedAt: timestamp(source.updatedAt, createdAt),

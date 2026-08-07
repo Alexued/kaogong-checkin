@@ -113,10 +113,10 @@ function scheduleV3Persist() {
   if (v3PersistTimer) clearTimeout(v3PersistTimer);
   v3PersistTimer = setTimeout(() => {
     v3PersistTimer = null;
-    const snapshot = toV3(currentState());
     v3PersistChain = v3PersistChain.then(async () => {
       if (!v3Repository || useAppStore().recoveryRequired) return;
       try {
+        const snapshot = toV3(currentState());
         await v3Repository.commit(snapshot);
       } catch {
         useAppStore().recoveryRequired = true;

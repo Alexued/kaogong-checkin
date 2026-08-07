@@ -40,6 +40,27 @@ test('v2 parent and subtask records map deterministically to one daily snapshot'
   assert.doesNotThrow(() => domain.validateDomainState(result.state));
 });
 
+test('legacy timer performance fractions are rounded before v3 validation', () => {
+  const source = legacyState();
+  source.timers = [{
+    id: 'timer-fractional',
+    label: 'stopwatch',
+    taskId: null,
+    date: '2026-08-01',
+    startedAt: '2026-08-01T03:00:00.000Z',
+    durationMs: 12362.100000023842,
+    laps: [{ elapsedMs: 12362.100000023842, splitMs: 12362.100000023842 }],
+    createdAt: '2026-08-01T03:00:00.000Z',
+    updatedAt: '2026-08-01T03:30:00.000Z',
+    deleted: false,
+    mode: 'stopwatch',
+  }];
+  const result = migration.migrateLegacyToV3(JSON.stringify(source));
+  assert.equal(result.state.timerSessions[0].durationMs, 12362);
+  assert.deepEqual(result.state.timerSessions[0].laps[0], { elapsedMs: 12362, splitMs: 12362 });
+  assert.doesNotThrow(() => domain.validateDomainState(result.state));
+});
+
 test('orphan progress is fatal instead of being silently dropped', () => {
   const source = legacyState();
   source.checkins.push({ id: 'orphan', taskId: 'missing', date: '2026-08-01', createdAt: '2026-08-01T01:00:00.000Z', updatedAt: '2026-08-01T01:00:00.000Z', deleted: false, progress: 1, targetSnapshot: 1, unitSnapshot: '' });
