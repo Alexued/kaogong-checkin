@@ -142,9 +142,9 @@ function moveFocus(event: KeyboardEvent, index: number) {
 }
 
 .month-head {
-  min-height: 40px;
+  min-height: 44px;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 8px;
 }
@@ -159,8 +159,8 @@ function moveFocus(event: KeyboardEvent, index: number) {
 }
 
 .month-nav {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -195,7 +195,7 @@ function moveFocus(event: KeyboardEvent, index: number) {
 }
 
 .calendar-grid {
-  min-height: 276px;
+  min-height: 298px;
   margin-top: 8px;
 }
 
@@ -203,7 +203,7 @@ function moveFocus(event: KeyboardEvent, index: number) {
 .month-week {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: clamp(2px, 1vw, 6px);
+  gap: 2px;
 }
 
 .weekday-row {
@@ -217,9 +217,9 @@ function moveFocus(event: KeyboardEvent, index: number) {
 
 .month-weeks {
   display: grid;
-  grid-template-rows: repeat(6, minmax(36px, 1fr));
-  gap: clamp(2px, 1vw, 6px);
-  height: 252px;
+  grid-template-rows: repeat(6, 44px);
+  gap: 2px;
+  height: 274px;
   animation: month-settle 180ms cubic-bezier(.16, 1, .3, 1) both;
 }
 
@@ -321,22 +321,12 @@ function moveFocus(event: KeyboardEvent, index: number) {
 }
 
 @media (max-width: 360px) {
-  .month-weeks {
-    grid-template-rows: repeat(6, minmax(34px, 1fr));
-    height: 240px;
-  }
-  .calendar-grid { min-height: 264px; }
   .day-cell, .day-spacer { border-radius: 6px; }
   .record-dot { inset-inline-end: 3px; inset-block-end: 3px; }
 }
 
 @media (max-height: 420px) and (orientation: landscape) {
-  .month-weeks {
-    grid-template-rows: repeat(6, 34px);
-    height: 224px;
-    gap: 4px;
-  }
-  .calendar-grid { min-height: 248px; }
+  .month-weeks { gap: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

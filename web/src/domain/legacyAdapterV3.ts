@@ -166,6 +166,7 @@ export function fromV3(state: DomainStateV3): AppState {
     drills,
     formulaDrills,
     settings: {
+      appMode: state.settings.appMode,
       planEndDate: state.settings.planEndDate,
       theme: state.settings.theme,
       markDate: state.settings.markDate,

@@ -3,19 +3,19 @@
     <Transition name="editor-sheet">
       <div v-if="form" class="sheet-mask" data-back-dismiss data-back-priority="100" @click.self="close">
         <div class="sheet card">
-        <h2 class="sheet-title">{{ form.id ? '编辑任务' : '新建任务' }}</h2>
+        <h2 class="sheet-title">{{ form.id ? (isGeneral ? '编辑打卡项' : '编辑任务') : (isGeneral ? '新建打卡项' : '新建任务') }}</h2>
         <label class="field">
           <span>标题</span>
-          <input v-model="form.title" class="input" placeholder="如：行测刷题 50 道" />
+          <input v-model="form.title" class="input" :placeholder="isGeneral ? '如：喝水 8 杯、拉伸 10 分钟' : '如：行测刷题 50 道'" />
         </label>
         <label class="field">
           <span>类型</span>
           <div class="seg">
             <button :class="{ on: form.type === 'daily' }" @click="form!.type = 'daily'">
-              每日重复
+              {{ isGeneral ? '每日' : '每日重复' }}
             </button>
             <button :class="{ on: form.type === 'deadline' }" @click="form!.type = 'deadline'">
-              截止型
+              {{ isGeneral ? '一次性' : '截止型' }}
             </button>
           </div>
         </label>
@@ -51,16 +51,16 @@
         </label>
         <div v-if="form.target > 1" class="quantity-fields">
           <label class="field">
-            <span>每日目标</span>
+            <span>{{ isGeneral ? '目标数量' : '每日目标' }}</span>
             <input v-model.number="form.target" class="input" type="number" min="2" step="1" inputmode="numeric" />
           </label>
           <label class="field">
             <span>单位（可空）</span>
-            <input v-model="form.unit" class="input" maxlength="12" placeholder="如：题、页、分钟" />
+            <input v-model="form.unit" class="input" maxlength="12" :placeholder="isGeneral ? '如：杯、次、分钟' : '如：题、页、分钟'" />
           </label>
         </div>
         <label class="field">
-          <span>子任务（可空，在今日页点主任务展开）</span>
+          <span>{{ isGeneral ? '步骤（可空，在今日页点打卡项展开）' : '子任务（可空，在今日页点主任务展开）' }}</span>
           <div v-for="(s, i) in form.subs" :key="i" class="sub-edit-row">
             <input v-model="s.title" class="input" placeholder="子任务标题" />
             <button class="sub-del" type="button" aria-label="删除子任务" @click="form!.subs.splice(i, 1)">
@@ -69,7 +69,7 @@
             </button>
           </div>
           <button class="sub-add" type="button" @click="addSubtask">
-            ＋ 添加子任务
+            ＋ {{ isGeneral ? '添加步骤' : '添加子任务' }}
           </button>
         </label>
         <div class="sheet-actions">
@@ -94,6 +94,7 @@ import { computed, ref, watch } from 'vue';
 import type { Task, Subtask } from '../types';
 import DatePickerSheet from './DatePickerSheet.vue';
 import { formatCn } from '../lib/date';
+import { useAppStore } from '../stores/app';
 
 interface SubEdit {
   id?: string;
@@ -119,6 +120,8 @@ const emit = defineEmits<{
 
 const form = ref<TaskEditState | null>(null);
 const datePickerOpen = ref(false);
+const store = useAppStore();
+const isGeneral = computed(() => store.settings.appMode === 'general');
 
 watch(
   () => props.open,
@@ -168,7 +171,7 @@ function addSubtask() {
   const current = form.value;
   if (!current) return;
   if (current.subs.length === 0 && current.target > 1) {
-    const confirmed = window.confirm('添加子任务会把数量目标重置为清单模式，是否继续？');
+    const confirmed = window.confirm(`${isGeneral.value ? '添加步骤' : '添加子任务'}会把数量目标重置为清单模式，是否继续？`);
     if (!confirmed) return;
     current.target = 1;
     current.unit = '';
@@ -333,8 +336,8 @@ function save() {
 
 .sub-del {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--card-border);
   background: transparent;
   color: var(--danger);
@@ -345,6 +348,7 @@ function save() {
 }
 
 .sub-add {
+  min-height: 44px;
   border: 1px dashed var(--card-border);
   background: transparent;
   color: var(--text-2);

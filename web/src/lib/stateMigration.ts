@@ -1,4 +1,4 @@
-import type { AppState, Checkin, Task } from '../types';
+import type { AppMode, AppState, Checkin, Task } from '../types';
 
 export const STATE_SCHEMA_VERSION = 2 as const;
 export const V1_BACKUP_KEY = 'kgc-state-v1-backup';
@@ -30,6 +30,12 @@ export function normalizeTarget(value: unknown): number {
 export function normalizeUnit(value: unknown): string {
   if (typeof value !== 'string') return '';
   return Array.from(value.trim()).slice(0, 12).join('');
+}
+
+export function normalizeAppMode(value: unknown): AppMode {
+  if (value === undefined) return 'exam';
+  if (value === 'exam' || value === 'general') return value;
+  throw new Error('invalid app mode');
 }
 
 export function normalizeTaskRecord(value: unknown): Task {
@@ -101,6 +107,7 @@ export function migrateAppState(input: unknown): AppState {
       theme: 'light',
       markDate: null,
       ...(settingsValue ? cloneJson(settingsValue) : {}),
+      appMode: normalizeAppMode(settingsValue?.appMode),
     },
   };
 

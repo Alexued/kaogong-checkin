@@ -51,9 +51,9 @@
       <Transition name="timer-sheet">
         <div v-if="finishing" class="sheet-mask" data-back-dismiss data-back-priority="100" @click.self="finishing = false">
           <div class="sheet card">
-            <div class="sheet-heading"><h2 class="sheet-title">保存{{ mode === 'countdown' ? '倒计时' : '计时' }}记录</h2><PixelGrid v-if="mode === 'countdown' && countdown.completed" preset="spiral" label="倒计时完成" /></div>
-            <label class="field"><span>备注标签（如：资料分析 20 题）</span><input v-model="label" class="input" placeholder="这次在做什么？" /></label>
-            <label class="field"><span>关联任务（可空）</span><select v-model="taskId" class="input"><option value="">不关联</option><option v-for="t in linkableTasks" :key="t.id" :value="t.id">{{ t.title }}</option></select></label>
+            <div class="sheet-heading"><h2 class="sheet-title">保存{{ mode === 'countdown' ? '倒计时' : '计时' }}记录</h2><PixelGrid v-if="mode === 'countdown' && countdown.completed" preset="spiral" label="倒计时完成" once /></div>
+            <label class="field"><span>备注标签（如：{{ isGeneral ? '阅读、运动或冥想' : '资料分析 20 题' }}）</span><input v-model="label" class="input" placeholder="这次在做什么？" /></label>
+            <label class="field"><span>关联{{ isGeneral ? '打卡项' : '任务' }}（可空）</span><select v-model="taskId" class="input"><option value="">不关联</option><option v-for="t in linkableTasks" :key="t.id" :value="t.id">{{ t.title }}</option></select></label>
             <div class="save-summary">{{ mode === 'countdown' ? '已用时' : '总时长' }} <strong>{{ fmtDuration(activeElapsedForSave) }}</strong><span v-if="mode === 'stopwatch'"> · {{ sw.lapsElapsed.length }} 次打点</span></div>
             <div class="row-end"><button class="btn ghost" @click="finishing = false">再想想</button><div class="gap"></div><button class="btn danger" @click="discard">丢弃</button><button class="btn" @click="save">保存记录</button></div>
           </div>
@@ -71,6 +71,7 @@ import { toLocalDateStr } from '../lib/date';
 import PixelGrid from '../components/PixelGrid.vue';
 
 const store = useAppStore();
+const isGeneral = computed(() => store.settings.appMode === 'general');
 const mode = ref<'stopwatch' | 'countdown'>(countdown.startedAt ? 'countdown' : 'stopwatch');
 const countdownMinutes = ref(25);
 const countdownSeconds = ref(0);
@@ -141,10 +142,10 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 
 <style scoped>
 .timer-page { display: flex; flex-direction: column; }
-.timer-heading { display: flex; align-items: center; justify-content: flex-start; min-height: 40px; }
+.timer-heading { display: flex; align-items: center; justify-content: flex-start; min-height: 44px; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .timer-mode { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: var(--accent-soft); }
-.timer-mode button { border: 0; border-radius: 9px; background: transparent; color: var(--text-2); padding: 7px 10px; font-size: 12px; font-weight: 700; }
+.timer-mode button { min-width: 44px; min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--text-2); padding: 7px 10px; font-size: 12px; font-weight: 700; }
 .timer-mode button.on { background: var(--card); color: var(--accent-solid); box-shadow: var(--shadow); }
 .timer-mode button:disabled { opacity: .65; }
 .timer-stage { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; padding: 12px 0; }

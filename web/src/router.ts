@@ -40,6 +40,13 @@ export const router = createRouter({
       meta: { parentPath: '/settings', rootTab: '/settings' },
       beforeEnter: (to) => resolveStatsDayNavigation(to.params.date),
     },
+    {
+      path: '/review/day/:date',
+      name: 'review-day',
+      component: DayDetailView,
+      meta: { parentPath: '/drill', rootTab: '/drill' },
+      beforeEnter: (to) => resolveStatsDayNavigation(to.params.date),
+    },
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/:pathMatch(.*)*', redirect: resolveUnknownRoute },
   ],

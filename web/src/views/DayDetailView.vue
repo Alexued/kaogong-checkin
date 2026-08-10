@@ -1,6 +1,6 @@
 <template>
   <div class="page day-detail-page">
-    <button class="overview-back" type="button" @click="returnToOverview"><span aria-hidden="true">‹</span> 返回概览</button>
+    <button class="overview-back" type="button" @click="returnToOverview"><span aria-hidden="true">‹</span> 返回{{ isGeneral ? '复盘' : '概览' }}</button>
     <div class="day-nav">
       <button class="arrow" @click="go(-1)" aria-label="前一天">‹</button>
       <div class="day-title">
@@ -11,7 +11,7 @@
     </div>
 
     <!-- 任务打卡 -->
-    <div class="section-title">任务打卡</div>
+    <div class="section-title">{{ isGeneral ? '打卡记录' : '任务打卡' }}</div>
     <div class="card block">
       <template v-if="doneItems.length || missedItems.length">
         <div v-for="c in doneItems" :key="c.id" class="line">
@@ -41,6 +41,7 @@
     </div>
 
     <!-- 百化分 -->
+    <template v-if="!isGeneral">
     <div class="section-title">百化分</div>
     <div class="card block">
       <template v-if="drillSessions.length">
@@ -69,6 +70,7 @@
       </template>
       <div v-else class="empty">无记录</div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -80,15 +82,19 @@ import { generatePlan } from '../lib/plan';
 import { addDays, formatCn, formatTime, toLocalDateStr, weekdayCn } from '../lib/date';
 import { fmtDuration } from '../lib/stopwatch';
 import { runViewTransition } from '../lib/motion';
+import { effectivePlanEnd } from '../lib/appMode';
+import { resolveDayDetailSiblingPath } from '../lib/routeValidation';
 
 const store = useAppStore();
 const route = useRoute();
 const router = useRouter();
+const isGeneral = computed(() => store.settings.appMode === 'general');
+const parentPath = computed(() => typeof route.meta.parentPath === 'string' ? route.meta.parentPath : '/settings');
 
 const date = computed(() => String(route.params.date));
 
 function go(n: number) {
-  router.push(`/stats/day/${addDays(date.value, n)}`);
+  router.push(resolveDayDetailSiblingPath(route.name, addDays(date.value, n)));
 }
 
 async function returnToOverview() {
@@ -98,9 +104,11 @@ async function returnToOverview() {
   if (root) root.style.viewTransitionName = 'day-detail-origin';
   try {
     await runViewTransition(async () => {
-      await router.push('/settings');
+      await router.push(parentPath.value);
       await nextTick();
-      destination = document.querySelector<HTMLElement>(`[data-heat-date="${targetDate}"]`);
+      destination = parentPath.value === '/settings'
+        ? document.querySelector<HTMLElement>(`[data-heat-date="${targetDate}"]`)
+        : null;
       if (destination) destination.style.viewTransitionName = 'day-detail-origin';
     });
   } finally {
@@ -116,14 +124,16 @@ const doneItems = computed(() =>
     .map((c) => ({
       id: c.id,
       createdAt: c.createdAt,
-      title: store.tasks.find((t) => t.id === c.taskId)?.title || '（已删除任务）',
+      title: store.tasks.find((t) => t.id === c.taskId)?.title
+        || store.subtasks.find((subtask) => subtask.id === c.taskId)?.title
+        || '（已删除任务）',
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 );
 
 /** 当天应做但未完成（借 plan.ts 计算） */
 const missedItems = computed(() => {
-  const plan = generatePlan(store.tasks, store.checkins, date.value, store.settings.planEndDate);
+  const plan = generatePlan(store.tasks, store.checkins, date.value, effectivePlanEnd(store.settings));
   return plan.today.filter((x) => !x.done).map((x) => ({ id: x.task.id, title: x.task.title }));
 });
 
@@ -192,8 +202,8 @@ function rateClass(rate: number) {
   border: 1px solid var(--card-border);
   background: var(--card);
   color: var(--text-2);
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   font-size: 20px;
   cursor: pointer;

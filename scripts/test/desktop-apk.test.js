@@ -14,8 +14,8 @@ const {
 } = require('../desktop-apk');
 
 const EXPECTED = Object.freeze({
-  version: '0.9.0',
-  versionCode: 12,
+  version: '0.10.0',
+  versionCode: 13,
   applicationId: 'com.wjy.kaogong',
 });
 
@@ -27,7 +27,7 @@ function fixture(t) {
 
 test('parses package identity from aapt badging output', () => {
   assert.deepEqual(
-    parseAaptBadging("package: name='com.wjy.kaogong' versionCode='12' versionName='0.9.0' platformBuildVersionName='16'"),
+    parseAaptBadging("package: name='com.wjy.kaogong' versionCode='13' versionName='0.10.0' platformBuildVersionName='16'"),
     EXPECTED,
   );
 });
@@ -36,7 +36,7 @@ test('valid source replaces stale APKs with one canonical embedded artifact', (t
   const directory = fixture(t);
   const source = path.join(directory, 'app-debug.apk');
   const destination = path.join(directory, 'embedded');
-  fs.writeFileSync(source, 'version 0.9.0');
+  fs.writeFileSync(source, 'version 0.10.0');
   fs.mkdirSync(destination);
   fs.writeFileSync(path.join(destination, 'kaogong-checkin-v0.7.1.apk'), 'old');
   fs.writeFileSync(path.join(destination, '.gitkeep'), '');
@@ -48,7 +48,7 @@ test('valid source replaces stale APKs with one canonical embedded artifact', (t
   });
 
   assert.equal(prepared.fileName, canonicalApkName(EXPECTED.version));
-  assert.equal(fs.readFileSync(prepared.filePath, 'utf8'), 'version 0.9.0');
+  assert.equal(fs.readFileSync(prepared.filePath, 'utf8'), 'version 0.10.0');
   assert.deepEqual(
     fs.readdirSync(destination).sort(),
     ['.gitkeep', canonicalApkName(EXPECTED.version)].sort(),

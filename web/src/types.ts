@@ -42,7 +42,10 @@ export interface Subtask {
   updatedAt: string;
 }
 
+export type AppMode = 'exam' | 'general';
+
 export interface Settings {
+  appMode: AppMode;
   planEndDate: string | null;
   theme: 'light' | 'dark';
   /** 标记的重要日（如考试日），null 表示未设置 */

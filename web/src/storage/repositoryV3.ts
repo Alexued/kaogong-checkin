@@ -79,6 +79,28 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function addMissingAppMode(envelope: unknown): boolean {
+  if (!isRecord(envelope) || !isRecord(envelope.state) || !isRecord(envelope.state.settings)) return false;
+  if (Object.prototype.hasOwnProperty.call(envelope.state.settings, 'appMode')) return false;
+  envelope.state.settings.appMode = 'exam';
+  return true;
+}
+
+function upgradeStoredRecord(record: unknown): boolean {
+  if (!isRecord(record)) return false;
+  let upgraded = addMissingAppMode(record.envelope);
+  if (Array.isArray(record.outbox)) {
+    for (const item of record.outbox) {
+      if (isRecord(item)) upgraded = addMissingAppMode(item.envelope) || upgraded;
+    }
+  }
+  return upgraded;
+}
+
 function deviceId(): string {
   return globalThis.crypto?.randomUUID?.() || `device-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
@@ -191,7 +213,11 @@ export class RepositoryV3 {
         this.writeLock(invalidLock);
         throw new MigrationLockedError(invalidLock);
       }
-      try { validateRecord(record); } catch (error) {
+      try {
+        const upgraded = upgradeStoredRecord(record);
+        validateRecord(record);
+        if (upgraded) this.writeRecord(record);
+      } catch (error) {
         const code = error instanceof RepositoryError ? error.code : 'INVALID_REPOSITORY';
         const sourceDigest = await sha256Utf8(primary);
         const invalidLock: MigrationLockV3 = { formatVersion: 1, sourceDigest, sourceBytesRef: `${REPOSITORY_KEY}:${sourceDigest}`, errorCode: code, firstFailedAt: now() };

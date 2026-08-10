@@ -4,6 +4,7 @@ import { enqueue } from '../api/sync';
 import { buildProgressCheckin } from '../lib/plan';
 import {
   STATE_SCHEMA_VERSION,
+  normalizeAppMode,
   normalizeCheckinRecord,
   normalizeTarget,
   normalizeTaskRecord,
@@ -27,7 +28,8 @@ function applyMsg(state: AppState, msg: SyncMessage) {
   const { kind, entity, payload } = msg;
   if (entity === 'settings') {
     if (kind === 'upsert' && (state.settings.updatedAt || '') <= (payload.updatedAt || '')) {
-      state.settings = { ...state.settings, ...payload };
+      const next = { ...state.settings, ...payload };
+      state.settings = { ...next, appMode: normalizeAppMode(next.appMode) };
     }
     return;
   }
@@ -65,7 +67,7 @@ export const useAppStore = defineStore('app', {
     timers: [] as TimerRecord[],
     drills: [] as DrillRecord[],
     formulaDrills: [] as FormulaDrillRecord[],
-    settings: { planEndDate: null, theme: 'light', markDate: null } as Settings,
+    settings: { appMode: 'exam', planEndDate: null, theme: 'light', markDate: null } as Settings,
     online: false,
     pendingSyncCount: 0,
     syncPhase: 'local' as 'local' | 'connecting' | 'pairing' | 'offline' | 'online',
@@ -80,6 +82,13 @@ export const useAppStore = defineStore('app', {
   }),
   actions: {
     applySnapshot(s: AppState) {
+      const settings = s.settings
+        ? {
+            ...this.settings,
+            ...s.settings,
+            appMode: normalizeAppMode((s.settings as Partial<Settings>).appMode),
+          }
+        : this.settings;
       this.schemaVersion = STATE_SCHEMA_VERSION;
       this.tasks = s.tasks || [];
       this.subtasks = s.subtasks || [];
@@ -87,7 +96,7 @@ export const useAppStore = defineStore('app', {
       this.timers = s.timers || [];
       this.drills = s.drills || [];
       this.formulaDrills = s.formulaDrills || [];
-      if (s.settings) this.settings = s.settings;
+      this.settings = settings;
     },
     /** 应用服务器广播的变更（其他客户端产生） */
     applyRemote(msg: SyncMessage) {

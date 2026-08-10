@@ -53,7 +53,7 @@ test('full-state replacement preserves UTF-8 strings', async (t) => {
     timers: [{ id: '计时一', label: '测试计时', updatedAt: '2026-08-02T00:00:00.000Z' }],
     drills: [],
     formulaDrills: [],
-    settings: { theme: 'light', planEndDate: null, note: '中文设置' },
+    settings: { appMode: 'general', theme: 'light', planEndDate: null, note: '中文设置' },
   };
 
   const put = await fetch(url, {

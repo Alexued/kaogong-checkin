@@ -19,6 +19,16 @@ function normalizeUnit(value) {
   return Array.from(value.trim()).slice(0, 12).join('');
 }
 
+function normalizeAppMode(value) {
+  if (value === undefined) return 'exam';
+  if (value === 'exam' || value === 'general') return value;
+  throw new Error('invalid app mode');
+}
+
+function isValidAppMode(value) {
+  return value === undefined || value === 'exam' || value === 'general';
+}
+
 function normalizeTask(value) {
   if (!isRecord(value)) throw new Error('invalid task record');
   return { ...cloneJson(value), target: normalizeTarget(value.target), unit: normalizeUnit(value.unit) };
@@ -59,6 +69,11 @@ function migrateStoredState(value, defaultSettings) {
   const parentIds = new Set(
     subtasks.filter(isRecord).map((subtask) => subtask.taskId).filter((id) => typeof id === 'string'),
   );
+  const sourceSettings = value.settings ? cloneJson(value.settings) : {};
+  const settings = sourceVersion === 1 || value.settings === undefined
+    ? { ...cloneJson(defaultSettings), ...sourceSettings }
+    : sourceSettings;
+  settings.appMode = normalizeAppMode(sourceSettings.appMode);
   return {
     ...cloned,
     schemaVersion: STATE_SCHEMA_VERSION,
@@ -71,9 +86,7 @@ function migrateStoredState(value, defaultSettings) {
     timers: cloneJson(stateCollection(cloned, 'timers')),
     drills: cloneJson(stateCollection(cloned, 'drills')),
     formulaDrills: cloneJson(stateCollection(cloned, 'formulaDrills')),
-    settings: sourceVersion === 1 || value.settings === undefined
-      ? { ...cloneJson(defaultSettings), ...(value.settings ? cloneJson(value.settings) : {}) }
-      : cloneJson(value.settings),
+    settings,
   };
 }
 
@@ -87,6 +100,7 @@ function isValidV2State(value) {
       value.schemaVersion === STATE_SCHEMA_VERSION &&
       COLLECTIONS.every((key) => Array.isArray(value[key])) &&
       isRecord(value.settings) &&
+      isValidAppMode(value.settings.appMode) &&
       value.tasks.every((task) =>
         isRecord(task) && Number.isSafeInteger(task.target) && task.target > 0 && validUnit(task.unit)) &&
       value.checkins.every((checkin) =>
@@ -105,6 +119,7 @@ module.exports = {
   STATE_SCHEMA_VERSION,
   isValidV2State,
   migrateStoredState,
+  normalizeAppMode,
   normalizeCheckin,
   normalizeTask,
 };

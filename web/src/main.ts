@@ -29,6 +29,16 @@ watch(
   (t) => applyTheme(t)
 );
 
+function applyAppMode(mode: string) {
+  document.documentElement.dataset.appMode = mode === 'general' ? 'general' : 'exam';
+  document.title = '格记';
+}
+applyAppMode(store.settings.appMode);
+watch(
+  () => store.settings.appMode,
+  (mode) => applyAppMode(mode),
+);
+
 // 安卓返回键/返回手势：二级页回明确父页，Tab 根页退到桌面。
 if (Capacitor.isNativePlatform()) {
   void CapApp.addListener('backButton', () => {

@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createKgcServer } = require('../src/server');
+const { isValidV2State, migrateStoredState } = require('../src/stateSchema');
 
 const silentLogger = { info() {}, warn() {}, error() {} };
 
@@ -36,12 +37,30 @@ test('server upgrades legacy disk state and advertises the v2 state protocol', a
   assert.equal(info.minimumClientStateSchemaVersion, 2);
   const state = await (await fetch(`${baseUrl}/api/state`)).json();
   assert.equal(state.schemaVersion, 2);
+  assert.equal(state.settings.appMode, 'exam');
   assert.equal(state.tasks[0].target, 1);
   assert.equal(state.tasks[0].unit, '');
   assert.equal(state.checkins[0].progress, 1);
   assert.equal(state.checkins[0].targetSnapshot, 1);
   assert.equal(state.checkins[0].unitSnapshot, '');
   assert.equal(JSON.parse(fs.readFileSync(path.join(dataDir, 'data.json'), 'utf8')).schemaVersion, 2);
+});
+
+test('server state migration defaults missing modes, preserves general, and rejects invalid values', () => {
+  const base = {
+    schemaVersion: 2,
+    tasks: [], subtasks: [], checkins: [], timers: [], drills: [], formulaDrills: [],
+    settings: { theme: 'light' },
+  };
+  assert.equal(isValidV2State(base), true);
+  assert.equal(migrateStoredState(base, { appMode: 'exam' }).settings.appMode, 'exam');
+  assert.equal(
+    migrateStoredState({ ...base, settings: { ...base.settings, appMode: 'general' } }, { appMode: 'exam' }).settings.appMode,
+    'general',
+  );
+  const invalid = { ...base, settings: { ...base.settings, appMode: 'focus' } };
+  assert.equal(isValidV2State(invalid), false);
+  assert.throws(() => migrateStoredState(invalid, { appMode: 'exam' }), /app mode/i);
 });
 
 test('unsupported stored schema fails startup without overwriting source bytes', async (t) => {
@@ -88,6 +107,17 @@ test('missing-schema full replacement is rejected without changing persisted v2 
   });
   assert.equal(invalidV2.status, 400);
   assert.equal((await invalidV2.json()).code, 'INVALID_STATE');
+  assert.deepEqual(fs.readFileSync(dataFile), before);
+
+  current.tasks = [];
+  current.settings.appMode = 'focus';
+  const invalidMode = await fetch(`${baseUrl}/api/state`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(current),
+  });
+  assert.equal(invalidMode.status, 400);
+  assert.equal((await invalidMode.json()).code, 'INVALID_STATE');
   assert.deepEqual(fs.readFileSync(dataFile), before);
 });
 

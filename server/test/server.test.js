@@ -225,7 +225,7 @@ test('factory protects state, rate-limits pairing, persists tokens, and restarts
     timers: [],
     drills: [],
     formulaDrills: [],
-    settings: { theme: 'light', note: '本地优先', updatedAt: '2026-08-05T00:00:00.000Z' },
+    settings: { appMode: 'general', theme: 'light', note: '本地优先', updatedAt: '2026-08-05T00:00:00.000Z' },
   };
   const putState = await fetch(`${baseUrl}/api/state`, {
     method: 'PUT',
@@ -364,6 +364,28 @@ test('WebSocket authentication, mutation acknowledgements, replay, and revocatio
   assert.equal(replayAck.kind, 'ack');
   assert.equal(replayAck.clientMutationId, 'mutation-1');
 
+  messagePromise = nextJsonMessage(socket);
+  socket.send(JSON.stringify({
+    kind: 'upsert',
+    entity: 'settings',
+    payload: { appMode: 'general', updatedAt: '2099-08-05T02:00:00.000Z' },
+    clientMutationId: 'settings-general',
+  }));
+  assert.equal((await messagePromise).applied, true);
+
+  messagePromise = nextJsonMessage(socket);
+  socket.send(JSON.stringify({
+    kind: 'upsert',
+    entity: 'settings',
+    payload: { appMode: 'focus', updatedAt: '2099-08-05T03:00:00.000Z' },
+    clientMutationId: 'settings-invalid',
+  }));
+  assert.deepEqual(await messagePromise, {
+    kind: 'error',
+    code: 'INVALID_MUTATION',
+    clientMutationId: 'settings-invalid',
+  });
+
   const stateResponse = await fetch(`${baseUrl}/api/state`, {
     headers: authHeaders(credentials.token),
   });
@@ -371,6 +393,7 @@ test('WebSocket authentication, mutation acknowledgements, replay, and revocatio
   const state = await stateResponse.json();
   assert.equal(state.tasks.length, 1);
   assert.equal(state.tasks[0].id, 'mutation-task');
+  assert.equal(state.settings.appMode, 'general');
 
   const closed = new Promise((resolve) => socket.once('close', (code) => resolve(code)));
   const reset = service.regeneratePairing();
@@ -547,6 +570,7 @@ test('backup recovery and explicit legacy mode preserve old clients', async (t) 
   assert.equal(stateResponse.status, 200);
   const state = await stateResponse.json();
   assert.equal(state.tasks[0].id, 'recovered');
+  assert.equal(state.settings.appMode, 'exam');
   for (const collection of ['subtasks', 'timers', 'drills', 'formulaDrills']) {
     assert.deepEqual(state[collection], []);
   }

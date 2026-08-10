@@ -1,5 +1,6 @@
 <template>
-  <div class="page">
+  <StatsView v-if="isGeneral" />
+  <div v-else class="page">
     <h1 class="page-title">背诵</h1>
     <p class="page-sub">资料分析速算基本功</p>
 
@@ -17,10 +18,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import PercentPanel from '../components/drill/PercentPanel.vue';
 import FormulaPanel from '../components/drill/FormulaPanel.vue';
+import StatsView from './StatsView.vue';
+import { useAppStore } from '../stores/app';
 
+const store = useAppStore();
+const isGeneral = computed(() => store.settings.appMode === 'general');
 const module = ref<'percent' | 'formula'>('percent');
 </script>
 

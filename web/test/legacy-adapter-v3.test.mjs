@@ -56,6 +56,7 @@ function legacyState() {
       createdAt: '2026-08-04T06:00:00.000Z', updatedAt: '2026-08-04T06:00:00.000Z', deleted: true,
     }],
     settings: {
+      appMode: 'general',
       planEndDate: '2026-12-31', theme: 'dark', markDate: '2026-11-30',
       updatedAt: '2026-08-04T07:00:00.000Z',
     },
@@ -90,6 +91,7 @@ test('toV3 preserves current v2 business fields without mutating the UI state', 
     ],
   );
   assert.equal(state.settings.theme, 'dark');
+  assert.equal(state.settings.appMode, 'general');
   assert.equal(state.settings.markDate, '2026-11-30');
 });
 
@@ -115,7 +117,7 @@ test('fromV3 returns every legacy UI collection and preserves record semantics',
   assert.deepEqual(legacy.timers, legacyState().timers);
   assert.deepEqual(legacy.drills, legacyState().drills);
   assert.deepEqual(legacy.formulaDrills, legacyState().formulaDrills);
-  assert.deepEqual(legacy.settings, { planEndDate: '2026-12-31', theme: 'dark', markDate: '2026-11-30' });
+  assert.deepEqual(legacy.settings, { appMode: 'general', planEndDate: '2026-12-31', theme: 'dark', markDate: '2026-11-30' });
 });
 
 test('a child-only completion survives a v2 to v3 to UI to v3 round trip', () => {
@@ -137,6 +139,8 @@ test('a child-only completion survives a v2 to v3 to UI to v3 round trip', () =>
   assert.equal(secondProgress.completed, 0);
   assert.equal(secondProgress.deletedAt, null);
   assert.equal(secondProgress.subtaskSnapshot[0].done, true);
+  assert.equal(second.settings.appMode, 'general');
+  assert.deepEqual(second.drillAttempts, first.drillAttempts);
 });
 
 test('fromV3 hides task and subtask tombstones but retains legacy record tombstones', () => {

@@ -123,7 +123,7 @@ function confirm() {
 .date-sheet {
   width: 100%;
   max-width: 640px;
-  padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  padding: 18px 12px calc(18px + env(safe-area-inset-bottom));
   border-radius: 20px 20px 0 0;
   animation: date-sheet-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -181,7 +181,7 @@ function confirm() {
 
 .date-day {
   aspect-ratio: 1;
-  min-height: 38px;
+  min-height: 44px;
   border: 0;
   border-radius: 11px;
   background: transparent;
@@ -206,7 +206,7 @@ function confirm() {
 }
 
 .quick-row button {
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--card-border);
   border-radius: 11px;
   background: var(--accent-soft);

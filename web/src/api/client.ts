@@ -181,7 +181,7 @@ export async function pairServer(
   const response = await fetch(httpBase() + '/api/pair', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: code.trim(), clientName: '考公打卡 Android', protocolVersion: 2 }),
+    body: JSON.stringify({ code: code.trim(), clientName: '格记 Android', protocolVersion: 2 }),
     signal,
   });
   const result = await responseJson<PairingResult>(response, 'POST /api/pair');

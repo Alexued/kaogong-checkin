@@ -276,7 +276,7 @@ const perFormulaStats = computed(() => {
 
 .category-select {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
 }
 
 .start-btn {
@@ -291,6 +291,7 @@ const perFormulaStats = computed(() => {
 }
 
 .exit-btn {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 4px;

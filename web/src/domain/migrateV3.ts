@@ -1,5 +1,5 @@
 import type { AppState, Checkin, SyncMessage } from '../types';
-import { migrateAppState, normalizeTarget, normalizeUnit } from '../lib/stateMigration';
+import { migrateAppState, normalizeAppMode, normalizeTarget, normalizeUnit } from '../lib/stateMigration';
 import {
   emptyDomainState,
   validateDomainState,
@@ -222,6 +222,7 @@ export function migrateLegacyToV3(rawState: string, rawQueue = ''): LegacyMigrat
   output.timerSessions = state.timers.map((timer) => mapTimer(timer as unknown as JsonRecord));
   output.drillAttempts = mapAttempts(state);
   output.settings = {
+    appMode: normalizeAppMode(state.settings.appMode),
     planEndDate: state.settings.planEndDate || null,
     theme: state.settings.theme === 'dark' ? 'dark' : 'light',
     markDate: state.settings.markDate || null,

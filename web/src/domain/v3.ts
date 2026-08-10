@@ -1,3 +1,5 @@
+import type { AppMode } from '../types';
+
 export const DOMAIN_SCHEMA_VERSION = 3 as const;
 
 export interface SubtaskV3 {
@@ -72,6 +74,7 @@ export interface DrillAttemptV3 {
 }
 
 export interface SettingsV3 {
+  appMode: AppMode;
   planEndDate: string | null;
   theme: 'light' | 'dark';
   markDate: string | null;
@@ -268,6 +271,7 @@ export function validateDomainState(state: DomainStateV3): void {
   }
   if (state.settings.planEndDate !== null) requireDate(state.settings.planEndDate, 'SETTINGS_PLAN_DATE');
   if (state.settings.markDate !== null) requireDate(state.settings.markDate, 'SETTINGS_MARK_DATE');
+  if (state.settings.appMode !== 'exam' && state.settings.appMode !== 'general') fail('SETTINGS_APP_MODE');
   if (state.settings.theme !== 'light' && state.settings.theme !== 'dark') fail('SETTINGS_THEME');
   if (typeof state.settings.startupAnimationEnabled !== 'boolean') fail('SETTINGS_ANIMATION');
   if (!Number.isSafeInteger(state.settings.timerLapFontSize) || state.settings.timerLapFontSize < 13 || state.settings.timerLapFontSize > 24) fail('SETTINGS_FONT_SIZE');
@@ -280,6 +284,7 @@ export function emptyDomainState(): DomainStateV3 {
     timerSessions: [],
     drillAttempts: [],
     settings: {
+      appMode: 'exam',
       planEndDate: null,
       theme: 'light',
       markDate: null,

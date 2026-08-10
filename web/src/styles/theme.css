@@ -55,6 +55,28 @@ html[data-theme='dark'] {
   color-scheme: dark;
 }
 
+html[data-theme='light'][data-app-mode='general'] {
+  --accent-from: #16a34a;
+  --accent-to: #0891b2;
+  --accent-solid: #16836d;
+  --accent-soft: rgba(22, 131, 109, 0.12);
+  --heat-1: #c6e5d5;
+  --heat-2: #70bf9d;
+  --heat-3: #16836d;
+  --heat-4: #0e7490;
+}
+
+html[data-theme='dark'][data-app-mode='general'] {
+  --accent-from: #4ade80;
+  --accent-to: #22d3ee;
+  --accent-solid: #5ee0ac;
+  --accent-soft: rgba(94, 224, 172, 0.14);
+  --heat-1: #174c3b;
+  --heat-2: #16745a;
+  --heat-3: #39c58c;
+  --heat-4: #22b8cf;
+}
+
 html,
 body,
 #app {

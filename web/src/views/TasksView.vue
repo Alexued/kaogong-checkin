@@ -5,12 +5,12 @@
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
       </button>
       <div>
-        <h1 class="page-title">任务管理</h1>
-        <p class="page-sub">每日重复或截止型任务</p>
+        <h1 class="page-title">{{ isGeneral ? '打卡项目' : '任务管理' }}</h1>
+        <p class="page-sub">{{ isGeneral ? '管理习惯、行动和阶段目标' : '每日重复或截止型任务' }}</p>
       </div>
     </header>
 
-    <button class="btn add-btn" @click="openEditor()">+ 新建任务</button>
+    <button class="btn add-btn" @click="openEditor()">+ {{ isGeneral ? '新建打卡项' : '新建任务' }}</button>
 
     <div
       v-for="(t, i) in activeTasks"
@@ -27,7 +27,7 @@
       <div class="row-body">
         <div class="row-title">{{ t.title }}</div>
         <div class="row-meta">
-          <span class="badge">{{ t.type === 'daily' ? '每日' : '截止' }}</span>
+          <span class="badge">{{ t.type === 'daily' ? '每日' : (isGeneral ? '一次性' : '截止') }}</span>
           <span v-if="t.target > 1" class="badge quantity">{{ t.target }}{{ t.unit || '次' }}</span>
           <span v-else-if="store.subtasks.some((subtask) => subtask.taskId === t.id)" class="badge">
             清单
@@ -57,7 +57,7 @@
       </div>
     </template>
 
-    <div v-if="!store.tasks.length" class="empty">还没有任务，点上方按钮新建一个</div>
+    <div v-if="!store.tasks.length" class="empty">{{ isGeneral ? '还没有打卡项，从一个容易完成的小行动开始吧' : '还没有任务，点上方按钮新建一个' }}</div>
 
     <TaskEditorSheet
       v-model:open="sheetOpen"
@@ -78,6 +78,7 @@ import type { Task } from '../types';
 
 const store = useAppStore();
 const router = useRouter();
+const isGeneral = computed(() => store.settings.appMode === 'general');
 
 const activeTasks = computed(() =>
   store.tasks.filter((t) => !t.archived).sort((a, b) => a.order - b.order)
@@ -122,7 +123,7 @@ function onSave(form: {
 }
 
 function onDelete(t: Task) {
-  if (window.confirm(`确定删除任务「${t.title}」？相关打卡记录会保留。`)) {
+  if (window.confirm(`确定删除${isGeneral.value ? '打卡项' : '任务'}「${t.title}」？相关打卡进度会一并删除，计时记录会保留但取消关联。`)) {
     store.deleteTask(t.id);
   }
 }
@@ -207,6 +208,8 @@ function onDelete(t: Task) {
 }
 
 .mini {
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--card-border);
   background: transparent;
   color: var(--text-2);

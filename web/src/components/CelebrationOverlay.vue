@@ -1,65 +1,147 @@
 <template>
   <teleport to="body">
-    <div v-if="show" class="mask" data-back-dismiss data-back-priority="200" @click="$emit('close')">
+    <div
+      v-if="show"
+      ref="mask"
+      class="mask"
+      :class="{ paused: pageHidden }"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="celebration-message"
+      aria-describedby="celebration-hint"
+      tabindex="-1"
+      data-back-dismiss
+      data-back-priority="200"
+      @click="emit('close')"
+      @keydown.esc="emit('close')"
+    >
       <div
-        v-motion
         class="card celebrate"
-        :initial="{ opacity: 0, scale: 0.5, y: 40 }"
-        :enter="{
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          transition: { type: 'spring', stiffness: 320, damping: 17 },
-        }"
       >
-        <div class="emoji">🎉</div>
-        <div class="msg">{{ message }}</div>
-        <div class="hint">点击任意处关闭</div>
+        <PixelGrid preset="spiral" :size="52" once decorative />
+        <div id="celebration-message" class="msg">{{ message }}</div>
+        <div id="celebration-hint" class="hint">点击任意处关闭</div>
       </div>
     </div>
   </teleport>
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import confetti from 'canvas-confetti';
+import { useAppStore } from '../stores/app';
+import type { AppMode } from '../types';
+import PixelGrid from './PixelGrid.vue';
 
-const props = defineProps<{ show: boolean }>();
+const props = defineProps<{ show: boolean; appMode?: AppMode }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
+const store = useAppStore();
+const resolvedMode = computed(() => props.appMode ?? store.settings.appMode);
+const mask = ref<HTMLElement | null>(null);
+const pageHidden = ref(document.hidden);
 
-const MESSAGES = [
-  '今日任务全部完成！保持住，离上岸又近一步 🎉',
-  '全部搞定！今天的你没有辜负自己 💪',
-  '任务清零！这份坚持，终将上岸 🌟',
-  '今日圆满收官，明天继续冲 🚀',
-];
+const MESSAGES: Record<AppMode, readonly string[]> = {
+  exam: [
+    '今日计划清零，离目标又近了一步。',
+    '今日任务全部完成，稳稳推进一程。',
+    '今日圆满收官，把节奏保持住。',
+    '该做的都做完了，明天继续。',
+  ],
+  general: [
+    '今日习惯全部完成，节律很稳。',
+    '今天的每一项都落地了。',
+    '今日清单清零，好好收尾。',
+    '节奏已经记下，明天继续。',
+  ],
+};
 
-const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+const message = ref(MESSAGES.exam[0]);
 
 let timer: ReturnType<typeof setTimeout> | null = null;
+let remaining = 3000;
+let timerStartedAt = 0;
+let confettiStarted = false;
+let previousFocus: HTMLElement | null = null;
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-/** 大规模多发连射 */
-function barrage() {
-  const colors = ['#14b8a6', '#3b82f6', '#f59e0b', '#f472b6', '#a78bfa'];
-  confetti({ particleCount: 160, spread: 100, startVelocity: 42, origin: { y: 0.6 }, colors });
-  const end = Date.now() + 1200;
-  const iv = setInterval(() => {
-    confetti({ particleCount: 40, angle: 60, spread: 60, origin: { x: 0, y: 0.7 }, colors });
-    confetti({ particleCount: 40, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors });
-    if (Date.now() > end) clearInterval(iv);
-  }, 200);
+function clearTimer() {
+  if (timer) clearTimeout(timer);
+  timer = null;
+}
+
+function startConfetti() {
+  if (confettiStarted || motionQuery.matches || pageHidden.value) return;
+  confettiStarted = true;
+  confetti({
+    particleCount: 72,
+    spread: 76,
+    startVelocity: 32,
+    scalar: 0.82,
+    ticks: 150,
+    origin: { y: 0.62 },
+    colors: ['#14b8a6', '#3b82f6', '#f59e0b', '#ef5da8'],
+    disableForReducedMotion: true,
+  });
+}
+
+function scheduleClose() {
+  if (!props.show || pageHidden.value || remaining <= 0) return;
+  timerStartedAt = performance.now();
+  timer = setTimeout(() => {
+    remaining = 0;
+    timer = null;
+    emit('close');
+  }, remaining);
+}
+
+function handleVisibilityChange() {
+  pageHidden.value = document.hidden;
+  if (pageHidden.value) {
+    if (timer) remaining = Math.max(0, remaining - (performance.now() - timerStartedAt));
+    clearTimer();
+    confetti.reset();
+  } else if (props.show) {
+    startConfetti();
+    scheduleClose();
+  }
+}
+
+function handleMotionPreference(event: MediaQueryListEvent) {
+  if (event.matches) confetti.reset();
 }
 
 watch(
   () => props.show,
-  (v) => {
-    if (timer) clearTimeout(timer);
-    if (v) {
-      barrage();
-      timer = setTimeout(() => emit('close'), 3000);
+  async (visible) => {
+    clearTimer();
+    if (visible) {
+      const choices = MESSAGES[resolvedMode.value];
+      message.value = choices[Math.floor(Math.random() * choices.length)];
+      remaining = 3000;
+      confettiStarted = false;
+      previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      await nextTick();
+      mask.value?.focus({ preventScroll: true });
+      startConfetti();
+      scheduleClose();
+    } else {
+      confetti.reset();
+      previousFocus?.focus({ preventScroll: true });
+      previousFocus = null;
     }
-  }
+  },
+  { immediate: true },
 );
+
+document.addEventListener('visibilitychange', handleVisibilityChange);
+motionQuery.addEventListener('change', handleMotionPreference);
+
+onBeforeUnmount(() => {
+  clearTimer();
+  confetti.reset();
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  motionQuery.removeEventListener('change', handleMotionPreference);
+});
 </script>
 
 <style scoped>
@@ -73,26 +155,45 @@ watch(
 }
 
 .celebrate {
-  padding: 34px 40px;
+  display: grid;
+  justify-items: center;
+  width: min(320px, calc(100vw - 40px));
+  padding: 30px 32px 26px;
   text-align: center;
-  max-width: 320px;
   box-shadow: var(--shadow-lg);
-}
-
-.emoji {
-  font-size: 46px;
+  animation: celebrate-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .msg {
   font-size: 17px;
   font-weight: 700;
   line-height: 1.6;
-  margin-top: 12px;
+  margin-top: 18px;
 }
 
 .hint {
   font-size: 12px;
   color: var(--text-3);
   margin-top: 14px;
+}
+
+@keyframes celebrate-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mask.paused .celebrate {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebrate {
+    animation: celebrate-fade 120ms ease-out both;
+  }
+
+  @keyframes celebrate-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 </style>

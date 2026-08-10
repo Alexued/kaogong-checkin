@@ -49,6 +49,7 @@ test('v1 state migrates to v2 without mutating input or dropping unknown fields'
   assert.equal(JSON.stringify(input), before);
   assert.notEqual(migrated, input);
   assert.equal(migrated.schemaVersion, STATE_SCHEMA_VERSION);
+  assert.equal(migrated.settings.appMode, 'exam');
   assert.equal(migrated.customRoot.keep, true);
   assert.equal(migrated.tasks[0].target, 1);
   assert.equal(migrated.tasks[0].unit, '');
@@ -72,6 +73,7 @@ test('migration is idempotent and normalizes invalid v2 quantities deterministic
   const first = migrateAppState({
     ...legacyState(),
     schemaVersion: 2,
+    settings: { ...legacyState().settings, appMode: 'general' },
     tasks: [{ ...legacyState().tasks[0], target: -20, unit: '一二三四五六七八九十一二三四' }],
     checkins: [{
       ...legacyState().checkins[0],
@@ -83,6 +85,7 @@ test('migration is idempotent and normalizes invalid v2 quantities deterministic
   const second = migrateAppState(first);
 
   assert.deepEqual(second, first);
+  assert.equal(first.settings.appMode, 'general');
   assert.equal(first.tasks[0].target, 1);
   assert.equal(first.tasks[0].unit, '一二三四五六七八九十一二');
   assert.equal(first.checkins[0].progress, 3);
@@ -117,6 +120,10 @@ test('corrupt, invalid-shaped, and future-version state is rejected', () => {
   assert.throws(() => migrateAppState(null), /state/i);
   assert.throws(() => migrateAppState({ tasks: {}, checkins: [] }), /tasks/i);
   assert.throws(() => migrateAppState({ schemaVersion: 3, tasks: [], checkins: [] }), /version/i);
+  assert.throws(
+    () => migrateAppState({ ...legacyState(), schemaVersion: 2, settings: { appMode: 'focus' } }),
+    /app mode/i,
+  );
 });
 
 test('local hydration backs up v1 before replacing it and blocks writes after migration failure', async () => {

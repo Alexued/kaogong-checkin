@@ -1,15 +1,36 @@
 <template>
   <div class="page settings-page">
     <h1 class="page-title">设置</h1>
-    <p class="page-sub">学习概览与设备</p>
+    <p class="page-sub">{{ copy.overviewSubtitle }}</p>
 
-    <div class="section-title">学习概览</div>
+    <div class="section-title">使用模式</div>
+    <section class="card mode-card" aria-labelledby="mode-title">
+      <div class="mode-head">
+        <div>
+          <strong id="mode-title">格记</strong>
+          <span>{{ isGeneral ? '记录任何值得坚持的行动' : '保留完整的考公计划与背诵工具' }}</span>
+        </div>
+        <PixelGrid v-if="modeSwitching" preset="spiral" :label="modeAnnouncement" once />
+      </div>
+      <div class="mode-seg" role="radiogroup" aria-label="使用模式">
+        <button type="button" role="radio" :aria-checked="!isGeneral" :class="{ on: !isGeneral }" @click="setMode('exam')">
+          <span>考公</span><small>计划与背诵</small>
+        </button>
+        <button type="button" role="radio" :aria-checked="isGeneral" :class="{ on: isGeneral }" @click="setMode('general')">
+          <span>通用</span><small>习惯与行动</small>
+        </button>
+      </div>
+      <p class="mode-note">切换只改变界面和统计口径，任务、打卡、计时与训练记录都会保留。</p>
+      <span class="sr-only" aria-live="polite">{{ modeAnnouncement }}</span>
+    </section>
+
+    <div class="section-title">{{ copy.overviewTitle }}</div>
     <div class="card overview-card">
       <div class="overview-grid">
         <div class="metric"><strong>{{ streak }}</strong><span>连续天数</span></div>
         <div class="metric"><strong>{{ total }}</strong><span>总完成</span></div>
         <div class="metric"><strong>{{ timerTotalText }}</strong><span>计时</span></div>
-        <div class="metric"><strong>{{ drillTotal }}</strong><span>背诵</span></div>
+        <div class="metric"><strong>{{ isGeneral ? activityDays : drillTotal }}</strong><span>{{ isGeneral ? '活跃天' : '背诵' }}</span></div>
       </div>
       <div class="heat" data-swipe-ignore>
         <button
@@ -32,14 +53,14 @@
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 19V9M10 19V5M16 19v-7M22 19V3" />
         </svg>
-        <span>查看完整统计</span>
+        <span>{{ isGeneral ? '查看完整复盘' : '查看完整统计' }}</span>
         <svg class="stats-link-arrow" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
       </router-link>
     </div>
 
     <div class="section-title">计划与外观</div>
     <div class="card block">
-      <div class="setting-row">
+      <div v-if="!isGeneral" class="setting-row">
         <div><strong>计划结束日</strong><span>超过后不再生成新任务</span></div>
         <button class="value-button" type="button" @click="planPickerOpen = true">
           {{ planEnd ? formatCn(planEnd) : '未设置' }}
@@ -253,7 +274,7 @@
     <DatePickerSheet
       v-model:open="planPickerOpen"
       :model-value="planEnd"
-      title="选择计划结束日"
+      title="选择备考计划结束日"
       @update:model-value="setPlanEnd"
     />
   </div>
@@ -315,9 +336,13 @@ import {
 import DatePickerSheet from '../components/DatePickerSheet.vue';
 import PixelGrid from '../components/PixelGrid.vue';
 import { runViewTransition } from '../lib/motion';
+import { effectivePlanEnd, modeCopy } from '../lib/appMode';
+import type { AppMode } from '../types';
 
 const store = useAppStore();
 const router = useRouter();
+const isGeneral = computed(() => store.settings.appMode === 'general');
+const copy = computed(() => modeCopy(store.settings.appMode));
 const planEnd = ref(store.settings.planEndDate || '');
 const planPickerOpen = ref(false);
 const serverUrlInput = ref(getServerUrl());
@@ -332,6 +357,9 @@ const syncMessage = ref('');
 const discoveredServers = ref<DiscoveredServer[]>([]);
 const scanning = ref(false);
 let unsubscribeDiscovery: (() => void) | null = null;
+const modeSwitching = ref(false);
+const modeAnnouncement = ref('');
+let modeSwitchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const mainCheckins = computed(() => {
   const subtaskIds = new Set(store.subtasks.map((subtask) => subtask.id));
@@ -346,10 +374,14 @@ const timerTotalText = computed(() => {
   return `${minutes}m`;
 });
 const drillTotal = computed(() => store.drills.filter((record) => !record.deleted).length);
+const activityDays = computed(() => new Set([
+  ...mainCheckins.value.filter((record) => !record.deleted && record.progress > 0).map((record) => record.date),
+  ...store.timers.filter((record) => !record.deleted).map((record) => record.date),
+]).size);
 const heatCells = computed(() =>
   Array.from({ length: 30 }, (_, index) => addDays(todayStr(), index - 29)).map((date) => ({
     date,
-    ...completionForDate(store.tasks, mainCheckins.value, date, store.settings.planEndDate),
+    ...completionForDate(store.tasks, mainCheckins.value, date, effectivePlanEnd(store.settings)),
   }))
 );
 
@@ -667,6 +699,18 @@ function setPlanEnd(value: string) {
   store.saveSettings({ planEndDate: value || null });
 }
 
+function setMode(mode: AppMode) {
+  if (store.settings.appMode === mode) return;
+  store.saveSettings({ appMode: mode });
+  modeAnnouncement.value = `已切换到${mode === 'general' ? '通用模式' : '考公模式'}`;
+  modeSwitching.value = true;
+  if (modeSwitchTimer) clearTimeout(modeSwitchTimer);
+  modeSwitchTimer = setTimeout(() => {
+    modeSwitching.value = false;
+    modeSwitchTimer = null;
+  }, 520);
+}
+
 function setTheme(theme: 'light' | 'dark') {
   store.saveSettings({ theme });
 }
@@ -842,6 +886,7 @@ onUnmounted(() => {
   updateCoordinator.dispose();
   cancelVersionHold();
   clearDownloadStallTimer();
+  if (modeSwitchTimer) clearTimeout(modeSwitchTimer);
   unsubscribeDiscovery?.();
   unsubscribeUpdateStopFailure?.();
   void updateListener?.remove();
@@ -851,12 +896,26 @@ onUnmounted(() => {
 <style scoped>
 .settings-page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .overview-card, .block { padding: 16px; }
+.mode-card { padding: 16px; }
+.mode-head { min-height: 42px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.mode-head strong, .mode-head span { display: block; }
+.mode-head strong { font-size: 16px; }
+.mode-head span { margin-top: 4px; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+.mode-head .pixel-grid { flex: none; margin-top: 3px; color: var(--accent-solid); }
+.mode-seg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
+.mode-seg button { min-height: 58px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--bg-elev); color: var(--text-2); }
+.mode-seg button span, .mode-seg button small { display: block; }
+.mode-seg button span { font-size: 14px; font-weight: 750; }
+.mode-seg button small { margin-top: 3px; color: var(--text-3); font-size: 10px; }
+.mode-seg button.on { border-color: var(--accent-solid); background: var(--accent-soft); color: var(--accent-solid); box-shadow: inset 0 0 0 1px var(--accent-solid); }
+.mode-seg button:focus-visible { outline: 2px solid var(--accent-solid); outline-offset: 2px; }
+.mode-note { margin: 11px 0 0; color: var(--text-3); font-size: 11px; line-height: 1.55; }
 .overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .metric { min-width: 0; padding: 10px 4px; text-align: center; border-radius: 10px; background: var(--accent-soft); }
 .metric strong { display: block; font-size: 19px; color: var(--accent-solid); white-space: nowrap; }
 .metric span { display: block; margin-top: 2px; font-size: 10px; color: var(--text-2); }
-.heat { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; margin-top: 14px; }
-.heat-cell { aspect-ratio: 1; min-width: 0; border: 0; border-radius: 4px; padding: 0; cursor: pointer; transition: transform 160ms cubic-bezier(.22,1,.36,1), filter 160ms ease; }
+.heat { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 14px -4px 0; }
+.heat-cell { min-width: 44px; min-height: 44px; border: 0; border-radius: 4px; padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px var(--card); transition: transform 160ms cubic-bezier(.22,1,.36,1), filter 160ms ease; }
 .heat-cell:active { transform: scale(.82); filter: brightness(1.08); }
 .lv0 { background: var(--heat-0); } .lv1 { background: var(--heat-1); }
 .lv2 { background: var(--heat-2); } .lv3 { background: var(--heat-3); } .lv4 { background: var(--heat-4); }
@@ -869,18 +928,18 @@ onUnmounted(() => {
 .setting-row:last-child { border-bottom: 0; }
 .setting-row strong { display: block; font-size: 14px; }
 .setting-row span { display: block; margin-top: 3px; font-size: 12px; color: var(--text-3); }
-.value-button { min-height: 42px; border: 1px solid var(--card-border); border-radius: 11px; padding: 0 13px; background: var(--bg-elev); color: var(--accent-solid); font-weight: 700; }
-.seg { display: flex; gap: 6px; }.seg button { min-height: 38px; min-width: 64px; border: 1px solid var(--card-border); border-radius: 10px; background: transparent; color: var(--text-2); }
+.value-button { min-height: 44px; border: 1px solid var(--card-border); border-radius: 11px; padding: 0 13px; background: var(--bg-elev); color: var(--accent-solid); font-weight: 700; }
+.seg { display: flex; gap: 6px; }.seg button { min-height: 44px; min-width: 64px; border: 1px solid var(--card-border); border-radius: 10px; background: transparent; color: var(--text-2); }
 .seg button.on { border-color: var(--accent-solid); background: var(--accent-soft); color: var(--accent-solid); font-weight: 700; }
-.switch { position: relative; display: inline-flex; flex: none; width: 48px; height: 28px; }
-.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.switch-track { width: 100%; height: 100%; border-radius: 14px; background: var(--text-3); transition: background 180ms ease; }
+.switch { position: relative; display: inline-flex; align-items: center; flex: none; width: 52px; height: 44px; }
+.switch input { position: absolute; inset: 0; z-index: 1; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.switch-track { width: 48px; height: 28px; border-radius: 14px; background: var(--text-3); transition: background 180ms ease; }
 .switch-track::after { content: ''; display: block; width: 22px; height: 22px; margin: 3px; border-radius: 50%; background: #fff; transition: transform 180ms ease; }
 .switch input:checked + .switch-track { background: var(--accent-solid); }
 .switch input:checked + .switch-track::after { transform: translateX(20px); }
 .status-line.online { color: var(--accent-solid); }.status-line.pending { color: var(--warn); }
 .server-heading { display: flex; align-items: center; justify-content: space-between; margin: 13px 0 4px; font-size: 12px; color: var(--text-2); }
-.server-heading button { min-height: 38px; border: 0; border-radius: 10px; padding: 0 12px; background: var(--accent-soft); color: var(--accent-solid); font-weight: 700; }
+.server-heading button { min-height: 44px; border: 0; border-radius: 10px; padding: 0 12px; background: var(--accent-soft); color: var(--accent-solid); font-weight: 700; }
 .server-option { width: 100%; min-height: 58px; display: flex; align-items: center; gap: 11px; border: 0; border-top: 1px solid var(--card-border); background: transparent; color: var(--text); text-align: left; }
 .radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--text-3); }
 .server-option.selected .radio { border: 6px solid var(--accent-solid); }
@@ -911,8 +970,8 @@ onUnmounted(() => {
 .up-notes { max-height: 150px; overflow-y: auto; margin: 8px 0 12px; color: var(--text-2); font-size: 12px; white-space: pre-line; }
 .update-download-row { display: grid; grid-template-columns: minmax(0, 1fr) 82px; align-items: center; gap: 14px; margin-top: 12px; min-height: 82px; }
 .update-actions { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; align-items: center; }
-.download-primary { min-height: 42px; padding-inline: 13px; }
-.browser-download { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--card-border); border-radius: 12px; padding: 0 10px; background: var(--bg-elev); color: var(--text-2); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.download-primary { min-height: 44px; padding-inline: 13px; }
+.browser-download { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid var(--card-border); border-radius: 12px; padding: 0 10px; background: var(--bg-elev); color: var(--text-2); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .cancel-download { grid-column: 1 / -1; justify-self: start; border: 0; background: transparent; color: var(--text-3); font-size: 11px; padding: 2px 4px; }
 .download-progress-compact { width: 82px; display: grid; justify-items: center; gap: 4px; color: var(--text-3); font-size: 10px; text-align: center; }
 .download-progress-compact .progress-ring { width: 68px; height: 68px; }
@@ -930,7 +989,7 @@ onUnmounted(() => {
 .history-sheet { width: 100%; max-width: 640px; max-height: 82vh; display: flex; flex-direction: column; border-radius: 20px 20px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
 .history-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .history-head h2 { margin: 0; font-size: 19px; }.history-head p { margin: 3px 0 0; color: var(--text-3); font-size: 12px; }
-.history-head button { width: 36px; height: 36px; border: 1px solid var(--card-border); border-radius: 50%; background: var(--bg-elev); color: var(--text-2); font-size: 24px; line-height: 1; }
+.history-head button { width: 44px; height: 44px; border: 1px solid var(--card-border); border-radius: 50%; background: var(--bg-elev); color: var(--text-2); font-size: 24px; line-height: 1; }
 .history-state { min-height: 160px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-3); font-size: 13px; }.history-state.bad { color: var(--danger); }
 .release-list { overflow-y: auto; overscroll-behavior: contain; }
 .release-item { padding: 13px 2px; border-top: 1px solid var(--card-border); }
@@ -938,6 +997,6 @@ onUnmounted(() => {
 .release-item p { margin: 7px 0; color: var(--text-2); font-size: 12px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; word-break: break-word; }
 .release-item button { border: 0; background: transparent; color: var(--accent-solid); padding: 4px 0; font-size: 12px; font-weight: 700; }
 .history-sheet-enter-active,.history-sheet-leave-active { transition: background-color 260ms cubic-bezier(.22,1,.36,1); }.history-sheet-enter-active .history-sheet,.history-sheet-leave-active .history-sheet { transition: transform 320ms cubic-bezier(.22,1,.36,1), opacity 220ms ease; }.history-sheet-enter-from,.history-sheet-leave-to { background-color: transparent; }.history-sheet-enter-from .history-sheet,.history-sheet-leave-to .history-sheet { transform: translateY(72px); opacity: 0; }
-@media (max-width: 380px) { .overview-grid { grid-template-columns: 1fr 1fr; }.server-actions { grid-template-columns: 1fr; }.update-download-row { grid-template-columns: minmax(0,1fr) 72px; gap: 9px; }.update-actions { grid-template-columns: 1fr; }.browser-download { width: 100%; }.download-progress-compact { width: 72px; }.download-progress-compact .progress-ring { width: 62px; height: 62px; } }
+@media (max-width: 380px) { .overview-card { padding-inline: 2px; }.overview-grid,.legend,.stats-link { margin-inline: 14px; }.overview-grid { grid-template-columns: 1fr 1fr; }.server-actions { grid-template-columns: 1fr; }.update-download-row { grid-template-columns: minmax(0,1fr) 72px; gap: 9px; }.update-actions { grid-template-columns: 1fr; }.browser-download { width: 100%; }.download-progress-compact { width: 72px; }.download-progress-compact .progress-ring { width: 62px; height: 62px; } }
 @media (prefers-reduced-motion: reduce) { .history-sheet-enter-active,.history-sheet-leave-active,.history-sheet-enter-active .history-sheet,.history-sheet-leave-active .history-sheet { transition-duration: .01ms; } }
 </style>

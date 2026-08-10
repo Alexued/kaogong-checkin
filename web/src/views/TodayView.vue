@@ -7,20 +7,31 @@
           <span class="weekday-part">周{{ weekdayCn(selectedDate) }}</span>
         </h1>
         <p class="page-sub">
-          {{ isToday ? '今天的计划' : '查看历史' }}
+          {{ isToday ? copy.todayPlan : '查看历史' }}
           <button v-if="!isToday" class="back-today" type="button" @click="selectedDate = todayStr()">
             回到今天
           </button>
         </p>
       </div>
       <div class="head-actions">
+        <button
+          class="head-btn icon-only"
+          :class="{ 'empty-landscape-add': !hasPlannedItems }"
+          type="button"
+          :aria-label="isGeneral ? '新增打卡项' : '新增任务'"
+          @click="openNewTask"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
         <button class="head-btn" :class="{ on: reordering }" type="button" @click="reordering = !reordering">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M8 6h12M8 12h12M8 18h12" /><path d="M3 6h.01M3 12h.01M3 18h.01" />
           </svg>
           <span>{{ reordering ? '完成' : '排序' }}</span>
         </button>
-        <router-link to="/tasks" class="head-btn" aria-label="管理任务">
+        <router-link to="/tasks" class="head-btn" :aria-label="isGeneral ? '管理打卡项目' : '管理任务'">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 5h16v14H4z" /><path d="M8 9h8M8 13h5" />
           </svg>
@@ -33,21 +44,21 @@
       本地数据需要恢复，当前已进入只读模式。原始数据未被覆盖。
     </div>
 
-    <section class="progress-overview" aria-label="今日完成进度">
+    <section class="progress-overview" :aria-label="isGeneral ? '今日打卡进度' : '今日完成进度'">
       <ProgressRing :percent="progress">
         <div class="ring-text">
           <strong>{{ doneCount }}</strong><span>/{{ plan.today.length }}</span>
         </div>
       </ProgressRing>
       <div class="progress-copy">
-        <strong>{{ isToday ? '今日进度' : '当天进度' }}</strong>
+        <strong>{{ isToday ? (isGeneral ? '今日节律' : '今日进度') : '当天进度' }}</strong>
         <span>{{ plan.today.length ? `${Math.round(progress * 100)}% 已完成` : '暂无计划' }}</span>
       </div>
     </section>
 
     <!-- 重要日倒计时 -->
     <div v-if="markCountdown" class="mark-banner card">
-      <span class="mark-flag">重要日</span>
+      <span class="mark-flag">{{ copy.markDate }}</span>
       <span class="mark-text">
         {{ formatCn(markCountdown.date) }} 周{{ weekdayCn(markCountdown.date) }}
       </span>
@@ -73,6 +84,7 @@
           :key="item.task.id + '@' + item.date"
           :item="item"
           :index="plan.today.length + i"
+          :general="isGeneral"
           :expanded="expandedItems.has(itemKey(item))"
           @toggle="onToggle"
           @toggle-source="onToggleSource"
@@ -85,13 +97,14 @@
 
     <!-- 今日任务 -->
     <template v-if="plan.today.length">
-      <div class="section-title">今日任务</div>
+      <div class="section-title">{{ copy.todaySection }}</div>
       <div class="task-grid">
         <TaskCard
           v-for="(item, i) in plan.today"
           :key="item.task.id + '@' + item.date"
           :item="item"
           :index="i"
+          :general="isGeneral"
           :reorder="reordering"
           :first="i === 0"
           :last="i === plan.today.length - 1"
@@ -108,17 +121,26 @@
     </template>
 
     <div v-if="!plan.today.length && !plan.carried.length" class="empty">
-      这一天没有任务，点右下角 + 添加吧
+      {{ isGeneral ? '这一天还没有打卡项，点右下角 + 安排一个' : '这一天没有任务，点右下角 + 添加吧' }}
     </div>
 
     <!-- 右下角快速新增任务（teleport 出滑动轨道，保持相对视口固定；仅今日页激活时显示） -->
     <teleport to="body">
-      <button v-if="isActiveTab" class="fab" type="button" aria-label="新增任务" @click="openNewTask">
+      <button v-if="isActiveTab && !hasPlannedItems" class="fab" type="button" :aria-label="isGeneral ? '新增打卡项' : '新增任务'" @click="openNewTask">
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
           stroke-width="2.6" stroke-linecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
+    </teleport>
+    <teleport to="body">
+      <PixelGrid
+        v-if="pixelFeedback"
+        class="pixel-check-feedback"
+        :style="{ left: `${pixelFeedback.x}px`, top: `${pixelFeedback.y}px` }"
+        preset="pulse"
+        label="打卡完成"
+      />
     </teleport>
     <TaskEditorSheet
       v-model:open="sheetOpen"
@@ -132,9 +154,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import confetti from 'canvas-confetti';
 import { useAppStore } from '../stores/app';
 import { generatePlan, selectProgressSource, type PlanItem, type ProgressSource } from '../lib/plan';
 import { completionForDate } from '../lib/completion';
@@ -144,7 +165,9 @@ import ProgressRing from '../components/ProgressRing.vue';
 import CelebrationOverlay from '../components/CelebrationOverlay.vue';
 import CalendarStrip from '../components/CalendarStrip.vue';
 import TaskEditorSheet from '../components/TaskEditorSheet.vue';
+import PixelGrid from '../components/PixelGrid.vue';
 import type { Task } from '../types';
+import { effectivePlanEnd, modeCopy } from '../lib/appMode';
 
 const store = useAppStore();
 const route = useRoute();
@@ -153,6 +176,11 @@ const showCelebration = ref(false);
 const reordering = ref(false);
 const sheetOpen = ref(false);
 const editingTask = ref<Task | null>(null);
+const isGeneral = computed(() => store.settings.appMode === 'general');
+const copy = computed(() => modeCopy(store.settings.appMode));
+const planEndDate = computed(() => effectivePlanEnd(store.settings));
+const pixelFeedback = ref<{ x: number; y: number } | null>(null);
+let pixelFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Tab 页常驻轨道后，FAB 只在今日页为当前路由时显示 */
 const isActiveTab = computed(() => route.path === '/');
@@ -202,18 +230,19 @@ function onToggleSub(sub: SubItem) {
 const isToday = computed(() => selectedDate.value === todayStr());
 
 const plan = computed(() =>
-  generatePlan(store.tasks, store.checkins, selectedDate.value, store.settings.planEndDate)
+  generatePlan(store.tasks, store.checkins, selectedDate.value, planEndDate.value)
 );
+const hasPlannedItems = computed(() => plan.value.today.length > 0 || plan.value.carried.length > 0);
 
 const completion = computed(() =>
-  completionForDate(store.tasks, store.checkins, selectedDate.value, store.settings.planEndDate)
+  completionForDate(store.tasks, store.checkins, selectedDate.value, planEndDate.value)
 );
 const doneCount = computed(() => completion.value.done);
 const progress = computed(() => completion.value.ratio);
 
 /** 任务日期的完成度色阶，与统计页共用 --heat-0 ~ --heat-4。 */
 function completionLevel(date: string): number {
-  return completionForDate(store.tasks, store.checkins, date, store.settings.planEndDate).level;
+  return completionForDate(store.tasks, store.checkins, date, planEndDate.value).level;
 }
 
 /** 重要日倒计时（已过去的标记日不再提示） */
@@ -328,19 +357,18 @@ function checkAllDone() {
 
 /** canvas-confetti 粒子爆发（以点击位置为原点） */
 function celebrate(ev: MouseEvent) {
-  confetti({
-    particleCount: 90,
-    spread: 75,
-    startVelocity: 34,
-    gravity: 0.9,
-    ticks: 180,
-    origin: {
-      x: ev.clientX / window.innerWidth,
-      y: ev.clientY / window.innerHeight,
-    },
-    colors: ['#14b8a6', '#3b82f6', '#f59e0b', '#f472b6', '#a78bfa'],
-  });
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  pixelFeedback.value = { x: ev.clientX, y: ev.clientY };
+  if (pixelFeedbackTimer) clearTimeout(pixelFeedbackTimer);
+  pixelFeedbackTimer = setTimeout(() => {
+    pixelFeedback.value = null;
+    pixelFeedbackTimer = null;
+  }, 520);
 }
+
+onBeforeUnmount(() => {
+  if (pixelFeedbackTimer) clearTimeout(pixelFeedbackTimer);
+});
 </script>
 
 <style scoped>
@@ -412,7 +440,7 @@ function celebrate(ev: MouseEvent) {
   font-size: 12px;
   font-weight: 600;
   border-radius: 999px;
-  min-height: 36px;
+  min-height: 44px;
   padding: 5px 11px;
   margin-left: 6px;
   cursor: pointer;
@@ -518,6 +546,21 @@ function celebrate(ev: MouseEvent) {
   transform: scale(0.9);
 }
 
+.head-btn.icon-only {
+  width: 48px;
+  min-width: 48px;
+  padding: 0;
+}
+
+.pixel-check-feedback {
+  position: fixed;
+  z-index: 190;
+  color: var(--accent-solid);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.35);
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent-solid) 45%, transparent));
+}
+
 /* 平板 / 宽屏：任务双列，FAB 对齐内容列右缘 */
 @media (min-width: 768px) {
   .task-grid {
@@ -535,7 +578,12 @@ function celebrate(ev: MouseEvent) {
 }
 
 @media (max-height: 420px) and (orientation: landscape) {
+  .head-btn.empty-landscape-add {
+    display: inline-flex;
+  }
+
   .fab {
+    display: none;
     bottom: calc(66px + env(safe-area-inset-bottom));
     width: 48px;
     height: 48px;

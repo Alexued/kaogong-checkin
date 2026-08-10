@@ -6,6 +6,7 @@ const {
   INVALID_STATS_DATE_REDIRECT,
   UNKNOWN_ROUTE_REDIRECT,
   isValidStatsDateParam,
+  resolveDayDetailSiblingPath,
   resolveStatsDayNavigation,
   resolveUnknownRoute,
 } = await importTypeScript(new URL('../src/lib/routeValidation.ts', import.meta.url));
@@ -38,6 +39,12 @@ test('statistics day routes accept only real zero-padded calendar dates', () => 
       replace: true,
     });
   }
+});
+
+test('day detail sibling navigation preserves its review or settings context', () => {
+  assert.equal(resolveDayDetailSiblingPath('review-day', '2026-08-11'), '/review/day/2026-08-11');
+  assert.equal(resolveDayDetailSiblingPath('stats-day', '2026-08-11'), '/stats/day/2026-08-11');
+  assert.equal(resolveDayDetailSiblingPath(undefined, '2026-08-11'), '/stats/day/2026-08-11');
 });
 
 test('invalid detail dates and unknown paths use stable explicit parents', () => {

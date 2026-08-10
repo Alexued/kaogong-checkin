@@ -31,6 +31,7 @@ function legacyState() {
 test('v2 parent and subtask records map deterministically to one daily snapshot', () => {
   const source = legacyState();
   const result = migration.migrateLegacyToV3(JSON.stringify(source), JSON.stringify([]));
+  assert.equal(result.state.settings.appMode, 'exam');
   assert.equal(result.state.tasks[0].schedule.startDate, '2026-08-01');
   assert.equal(result.state.tasks[0].order, 2);
   assert.equal(result.state.dailyProgress.length, 1);
@@ -100,6 +101,61 @@ test('repository migration stores exact source backup and commits a stable v3 en
   const committed = await repository.commit(nextState);
   assert.equal(committed.envelope.revision, firstRevision + 1);
   assert.equal(committed.envelope.deviceId, loaded.record.envelope.deviceId);
+});
+
+test('legacy migration preserves general mode and rejects an explicit invalid mode', () => {
+  const general = legacyState();
+  general.settings.appMode = 'general';
+  const result = migration.migrateLegacyToV3(JSON.stringify(general));
+  assert.equal(result.state.settings.appMode, 'general');
+
+  general.settings.appMode = 'focus';
+  assert.throws(() => migration.migrateLegacyToV3(JSON.stringify(general)), /app mode/i);
+});
+
+test('repository additively upgrades a pre-appMode v3 record and its outbox envelopes', async () => {
+  const seedStorage = new MemoryStorage();
+  const seedRepository = new repositoryModule.RepositoryV3(seedStorage);
+  const seeded = await seedRepository.load();
+  const oldRecord = structuredClone(seeded.record);
+  oldRecord.outbox.push({
+    mutationId: 'mode-upgrade',
+    deviceId: oldRecord.envelope.deviceId,
+    localRevision: oldRecord.envelope.revision,
+    expectedBackupRevision: 0,
+    snapshotId: 'snapshot-mode-upgrade',
+    snapshotSha256: 'a'.repeat(64),
+    createdAt: '2026-08-08T00:00:00.000Z',
+    operation: 'replace-state',
+    envelope: structuredClone(oldRecord.envelope),
+  });
+  delete oldRecord.envelope.state.settings.appMode;
+  delete oldRecord.outbox[0].envelope.state.settings.appMode;
+
+  const storage = new MemoryStorage({ 'kgc-repository-v3': JSON.stringify(oldRecord) });
+  const repository = new repositoryModule.RepositoryV3(storage);
+  const loaded = await repository.load();
+  assert.equal(loaded.record.envelope.state.settings.appMode, 'exam');
+  assert.equal(loaded.record.outbox[0].envelope.state.settings.appMode, 'exam');
+  assert.equal(loaded.record.envelope.revision, oldRecord.envelope.revision);
+  assert.equal(JSON.parse(storage.getItem('kgc-repository-v3')).envelope.state.settings.appMode, 'exam');
+});
+
+test('repository rejects an explicitly invalid v3 mode instead of normalizing it', async () => {
+  const seedStorage = new MemoryStorage();
+  const seedRepository = new repositoryModule.RepositoryV3(seedStorage);
+  const seeded = await seedRepository.load();
+  const invalid = structuredClone(seeded.record);
+  invalid.envelope.state.settings.appMode = 'focus';
+  const raw = JSON.stringify(invalid);
+
+  const storage = new MemoryStorage({ 'kgc-repository-v3': raw });
+  const repository = new repositoryModule.RepositoryV3(storage);
+  await assert.rejects(repository.load(), (error) => {
+    assert.equal(error.lock.errorCode, 'SETTINGS_APP_MODE');
+    return true;
+  });
+  assert.equal(storage.getItem('kgc-repository-v3'), raw);
 });
 
 test('repository locks a corrupt primary and never substitutes blank state', async () => {
@@ -207,4 +263,13 @@ test('domain validation rejects duplicate progress keys and orphan timers', () =
   state.dailyProgress = [];
   state.timerSessions.push({ id: 'timer-1', label: '', taskId: 'missing', date: '2026-01-01', startedAt: '2026-01-01T00:00:00.000Z', durationMs: 0, laps: [], mode: 'stopwatch', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null });
   assert.throws(() => domain.validateDomainState(state), /ORPHAN_TIMER/);
+});
+
+test('domain settings validation accepts only exam and general modes', () => {
+  const state = domain.emptyDomainState();
+  assert.equal(state.settings.appMode, 'exam');
+  state.settings.appMode = 'general';
+  assert.doesNotThrow(() => domain.validateDomainState(state));
+  state.settings.appMode = 'focus';
+  assert.throws(() => domain.validateDomainState(state), /SETTINGS_APP_MODE/);
 });

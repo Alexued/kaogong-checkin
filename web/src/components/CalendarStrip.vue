@@ -418,7 +418,7 @@ onUnmounted(() => {
 
 .nav {
   width: 44px;
-  height: 40px;
+  height: 44px;
   border-radius: 10px;
 }
 
@@ -557,7 +557,7 @@ onUnmounted(() => {
 
 .expand {
   width: 48px;
-  height: 28px;
+  height: 44px;
   margin: 2px auto 0;
   border-radius: 10px;
   transition: transform 180ms ease, background-color 180ms ease;

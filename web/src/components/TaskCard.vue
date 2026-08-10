@@ -32,12 +32,12 @@
           <span v-if="item.overdueDays > 0" class="date">
             {{ debtSources.length > 1 ? `最早 ${item.date}` : `${item.date} 应完成` }}
           </span>
-          <span v-else class="badge">{{ item.task.type === 'daily' ? '每日' : '截止' }}</span>
+          <span v-else class="badge">{{ item.task.type === 'daily' ? '每日' : (general ? '一次性' : '截止') }}</span>
           <span v-if="isQuantity" class="badge quantity">
             {{ item.target - item.progress }}{{ item.unit }}待完成
           </span>
           <span v-if="subItems.length" class="badge sub">
-            子任务 {{ subDoneCount }}/{{ subItems.length }}
+            {{ general ? '步骤' : '子任务' }} {{ subDoneCount }}/{{ subItems.length }}
           </span>
         </div>
       </div>
@@ -153,8 +153,9 @@ const props = withDefaults(
     /** 子任务清单（有子任务时点击卡片展开/收起） */
     subItems?: SubItem[];
     expanded?: boolean;
+    general?: boolean;
   }>(),
-  { reorder: false, first: false, last: false, subItems: () => [], expanded: false }
+  { reorder: false, first: false, last: false, subItems: () => [], expanded: false, general: false }
 );
 const emit = defineEmits<{
   (e: 'toggle', item: PlanItem, ev: MouseEvent): void;
@@ -567,8 +568,8 @@ function onCardClick(ev: MouseEvent) {
   background: var(--bg-elev);
   color: var(--text-2);
   border-radius: 9px;
-  width: 34px;
-  height: 26px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   cursor: pointer;

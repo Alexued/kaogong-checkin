@@ -76,7 +76,7 @@
         >
           <h2 class="sheet-title">{{ detail.label || '（无标签）' }}</h2>
           <div class="detail-grid">
-            <span class="dt">关联任务</span>
+            <span class="dt">关联{{ isGeneral ? '打卡项' : '任务' }}</span>
             <span>{{ taskTitle(detail.taskId) || '未关联' }}</span>
             <span class="dt">日期</span>
             <span>{{ detail.date }}</span>
@@ -113,6 +113,7 @@ import { navigateToParent } from '../lib/backNavigation';
 import type { TimerRecord } from '../types';
 
 const store = useAppStore();
+const isGeneral = computed(() => store.settings.appMode === 'general');
 const router = useRouter();
 
 /** 记录详情弹层当前展示的记录 */
@@ -188,6 +189,7 @@ function barWidth(ms: number) {
 }
 
 .back-btn {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -207,6 +209,8 @@ function barWidth(ms: number) {
 }
 
 .mini {
+  min-width: 44px;
+  min-height: 44px;
   border: 1px solid var(--card-border);
   background: transparent;
   color: var(--text-2);

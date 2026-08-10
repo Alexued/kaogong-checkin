@@ -51,6 +51,7 @@ function defaultData() {
     drills: [],
     formulaDrills: [],
     settings: {
+      appMode: 'exam',
       planEndDate: null,
       theme: 'light',
       markDate: null,
@@ -458,6 +459,13 @@ function createKgcServer(options = {}) {
 
     if (entity === 'settings') {
       if (kind !== 'upsert') return { recognized: false, applied: false };
+      if (
+        Object.prototype.hasOwnProperty.call(payload, 'appMode') &&
+        payload.appMode !== 'exam' &&
+        payload.appMode !== 'general'
+      ) {
+        return { recognized: false, applied: false };
+      }
       const currentUpdatedAt = target.settings && target.settings.updatedAt
         ? target.settings.updatedAt
         : '';

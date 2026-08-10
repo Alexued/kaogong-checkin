@@ -1,26 +1,26 @@
 <template>
   <div class="page stats-page">
     <header class="page-heading">
-      <h1 class="page-title">统计</h1>
-      <p class="page-sub">计划完成情况与练习节奏</p>
+      <h1 class="page-title">{{ isGeneral ? '复盘' : '统计' }}</h1>
+      <p class="page-sub">{{ isGeneral ? '看见日常行动留下的节律' : '计划完成情况与练习节奏' }}</p>
     </header>
 
-    <section class="card summary-strip" aria-label="学习摘要">
+    <section class="card summary-strip" :aria-label="isGeneral ? '节律摘要' : '学习摘要'">
       <div class="summary-item">
         <strong>{{ summary.streakDays }}</strong>
-        <span>连续全勤</span>
+        <span>{{ isGeneral ? '连续完成' : '连续全勤' }}</span>
       </div>
       <div class="summary-item">
         <strong>{{ summary.fullAttendanceDays }}</strong>
-        <span>全勤天数</span>
+        <span>{{ isGeneral ? '圆满天数' : '全勤天数' }}</span>
       </div>
       <div class="summary-item">
         <strong>{{ Math.round(summary.averageCompletionRate * 100) }}%</strong>
         <span>平均完成率</span>
       </div>
       <div class="summary-item">
-        <strong>{{ summary.daysUntilPlanEnd ?? '—' }}</strong>
-        <span>距计划结束</span>
+        <strong>{{ isGeneral ? activityDays : (summary.daysUntilPlanEnd ?? '—') }}</strong>
+        <span>{{ isGeneral ? '活跃天数' : '距计划结束' }}</span>
       </div>
     </section>
 
@@ -100,7 +100,7 @@
       <div class="section-title-row">
         <div>
           <h2 id="record-days-title">最近记录日</h2>
-          <p>任务、计时与背诵</p>
+          <p>{{ isGeneral ? '打卡与计时' : '任务、计时与背诵' }}</p>
         </div>
         <span>{{ recordDays.length }} 天</span>
       </div>
@@ -118,11 +118,11 @@
           </span>
           <span class="record-summary">{{ recordSummary(day) }}</span>
           <span v-if="day.total > 0" class="record-rate" :class="{ full: day.ratio === 1 }">
-            {{ day.ratio === 1 ? '全勤' : `${Math.round(day.ratio * 100)}%` }}
+            {{ day.ratio === 1 ? (isGeneral ? '圆满' : '全勤') : `${Math.round(day.ratio * 100)}%` }}
           </span>
           <span class="row-arrow" aria-hidden="true">›</span>
         </button>
-        <div v-if="!recordDays.length" class="records-empty">暂无学习记录</div>
+        <div v-if="!recordDays.length" class="records-empty">{{ isGeneral ? '暂无活动记录' : '暂无学习记录' }}</div>
       </div>
     </section>
   </div>
@@ -130,7 +130,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import BarChart, { type ChartBar } from '../components/BarChart.vue';
 import MonthlyHeatmap from '../components/MonthlyHeatmap.vue';
 import { formatCn, todayStr, weekdayCn } from '../lib/date';
@@ -146,11 +146,14 @@ import {
 } from '../lib/statistics';
 import { fmtDuration } from '../lib/stopwatch';
 import { useAppStore } from '../stores/app';
+import { effectivePlanEnd } from '../lib/appMode';
 
 const store = useAppStore();
 const router = useRouter();
+const route = useRoute();
 const today = todayStr();
 const visibleMonth = ref(today.slice(0, 7));
+const isGeneral = computed(() => store.settings.appMode === 'general');
 
 /** Subtask check-ins stay out of main-task completion statistics. */
 const mainCheckins = computed(() => {
@@ -158,13 +161,16 @@ const mainCheckins = computed(() => {
   return store.checkins.filter((checkin) => !subtaskIds.has(checkin.taskId));
 });
 
-const planEndDate = computed(() => store.settings.planEndDate || null);
+const planEndDate = computed(() => effectivePlanEnd(store.settings));
+const visibleDrills = computed(() => isGeneral.value ? [] : store.drills);
+const visibleFormulaDrills = computed(() => isGeneral.value ? [] : store.formulaDrills);
 const allRecordDates = computed(() => recordedDates(
   mainCheckins.value,
   store.timers,
-  store.drills,
-  store.formulaDrills,
+  visibleDrills.value,
+  visibleFormulaDrills.value,
 ));
+const activityDays = computed(() => new Set(allRecordDates.value).size);
 const summary = computed(() => statisticsSummary(
   store.tasks,
   mainCheckins.value,
@@ -207,14 +213,14 @@ const recordDays = computed(() => recentRecordDays(
   store.tasks,
   mainCheckins.value,
   store.timers,
-  store.drills,
-  store.formulaDrills,
+  visibleDrills.value,
+  visibleFormulaDrills.value,
   today,
   planEndDate.value,
 ));
 
 function goDay(date: string) {
-  router.push(`/stats/day/${date}`);
+  router.push(`${route.path === '/drill' ? '/review/day' : '/stats/day'}/${date}`);
 }
 
 function timerBars(group: TimerComparisonGroup): ChartBar[] {
@@ -237,9 +243,9 @@ function recordSummary(day: RecordDay): string {
   if (day.total > 0) parts.push(`任务 ${day.done}/${day.total}`);
   else if (day.taskRecords > 0) parts.push(`打卡 ${day.taskRecords}`);
   if (day.timerSessions > 0) parts.push(`计时 ${day.timerSessions} 组`);
-  if (day.drillSessions > 0) parts.push(`百化分 ${day.drillSessions} 场`);
-  if (day.formulaSessions > 0) parts.push(`公式 ${day.formulaSessions} 场`);
-  return parts.join(' · ') || '有学习记录';
+  if (!isGeneral.value && day.drillSessions > 0) parts.push(`百化分 ${day.drillSessions} 场`);
+  if (!isGeneral.value && day.formulaSessions > 0) parts.push(`公式 ${day.formulaSessions} 场`);
+  return parts.join(' · ') || (isGeneral.value ? '有打卡记录' : '有学习记录');
 }
 </script>
 
@@ -309,6 +315,10 @@ function recordSummary(day: RecordDay): string {
 .rate-panel,
 .timer-panel {
   padding: 16px;
+}
+
+.heatmap-panel {
+  padding-inline: 12px;
 }
 
 .panel-head,
@@ -520,9 +530,10 @@ function recordSummary(day: RecordDay): string {
 }
 
 @media (max-width: 380px) {
-  .heatmap-panel,
   .rate-panel,
   .timer-panel { padding: 14px; }
+  .heatmap-panel { padding-inline: 4px; }
+  .heatmap-panel > .panel-head { padding-inline: 8px; }
   .record-row {
     grid-template-columns: 69px minmax(0, 1fr) auto 14px;
     gap: 7px;

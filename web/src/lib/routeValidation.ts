@@ -30,6 +30,11 @@ export function resolveStatsDayNavigation(
     : { path: INVALID_STATS_DATE_REDIRECT, replace: true };
 }
 
+export function resolveDayDetailSiblingPath(routeName: unknown, date: string): string {
+  const base = routeName === 'review-day' ? '/review/day' : '/stats/day';
+  return `${base}/${date}`;
+}
+
 export function resolveUnknownRoute(): typeof UNKNOWN_ROUTE_REDIRECT {
   return UNKNOWN_ROUTE_REDIRECT;
 }
