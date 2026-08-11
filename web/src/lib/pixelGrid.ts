@@ -1,4 +1,5 @@
 export type PixelGridPreset = 'wave' | 'spiral' | 'pulse';
+export type PixelGridPatternPreset = 'confirm' | 'dissolve' | 'arrival';
 
 export interface PixelGridAnimation {
   delays: readonly number[];
@@ -8,6 +9,13 @@ export interface PixelGridAnimation {
 export interface PixelGridPlaybackState {
   active?: boolean;
   reduceMotion?: boolean;
+}
+
+export interface PixelGridPattern {
+  groups: readonly (readonly number[])[];
+  frames: readonly (readonly number[])[];
+  frameDuration: number;
+  transitionDuration: number;
 }
 
 export const PIXEL_GRID_TRANSITION_DURATION = 0.3;
@@ -30,6 +38,68 @@ export const PIXEL_GRID_PRESETS: Readonly<Record<PixelGridPreset, PixelGridAnima
     delays: [0.24, 0.12, 0.24, 0.12, 0, 0.12, 0.24, 0.12, 0.24],
     duration: 0.2,
   },
+};
+
+function normalizePixelCells(cells: readonly number[]): number[] {
+  return [...new Set(cells.filter((cell) => Number.isInteger(cell) && cell >= 1 && cell <= 9))]
+    .sort((left, right) => left - right);
+}
+
+/** Compile Pattern groups with the same grouping rules as SwiftPixelGrid. */
+export function compilePixelPattern(groups: readonly (readonly number[])[]): number[][] {
+  if (!groups.length) return [];
+
+  if (groups.length === 1) {
+    return groups[0].map((cell) => normalizePixelCells([cell]));
+  }
+
+  if (groups.every((group) => group.length === 1)) {
+    return [normalizePixelCells(groups.flat()), []];
+  }
+
+  return groups.map(normalizePixelCells);
+}
+
+function definePixelPattern(
+  groups: readonly (readonly number[])[],
+  frameDuration: number,
+  transitionDuration: number,
+): PixelGridPattern {
+  return {
+    groups,
+    frames: compilePixelPattern(groups),
+    frameDuration,
+    transitionDuration,
+  };
+}
+
+/**
+ * Interaction patterns adapted from SwiftPixelGrid's discrete Pattern engine.
+ * Each preset ends on its meaningful settled state so one-shot playback can
+ * stop without a visual jump.
+ */
+export const PIXEL_GRID_PATTERNS: Readonly<Record<PixelGridPatternPreset, PixelGridPattern>> = {
+  confirm: definePixelPattern([
+    [5],
+    [2, 4, 5, 6, 8],
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  ], 0.095, 0.08),
+  dissolve: definePixelPattern([
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    [2, 4, 5, 6, 8],
+    [5],
+    [],
+  ], 0.075, 0.065),
+  arrival: definePixelPattern([
+    [7],
+    [7, 8],
+    [4, 7, 8],
+    [4, 5, 7, 8],
+    [1, 4, 5, 7, 8],
+    [1, 2, 4, 5, 7, 8],
+    [1, 2, 3, 4, 5, 7, 8],
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
+  ], 0.055, 0.05),
 };
 
 function clampUnit(value: number): number {
@@ -82,6 +152,11 @@ export function pixelGridCycleDuration(preset: PixelGridPreset): number {
   const animation = PIXEL_GRID_PRESETS[preset];
   const maximumDelay = Math.max(...animation.delays);
   return 2 * (maximumDelay + animation.duration) + PIXEL_GRID_FADE_OUT_PADDING;
+}
+
+export function pixelPatternCycleDuration(pattern: PixelGridPatternPreset): number {
+  const animation = PIXEL_GRID_PATTERNS[pattern];
+  return animation.frames.length * animation.frameDuration;
 }
 
 function positiveRemainder(value: number, modulus: number): number {
@@ -148,5 +223,47 @@ export function pixelGridIntensitiesAt(
         ? intensityForTiming(normalizedElapsed, animation.delays[index], holdTime, cycleDuration)
         : 0;
   }
+  return target;
+}
+
+export function pixelPatternFrameIndexAt(
+  elapsedTime: number,
+  pattern: PixelGridPatternPreset,
+  once = false,
+): number | null {
+  const animation = PIXEL_GRID_PATTERNS[pattern];
+  if (!animation.frames.length) return null;
+
+  const elapsed = Math.max(0, Number.isFinite(elapsedTime) ? elapsedTime : 0);
+  const cycleDuration = pixelPatternCycleDuration(pattern);
+  if (once && elapsed >= cycleDuration) return animation.frames.length - 1;
+
+  const cycleTime = positiveRemainder(elapsed, cycleDuration);
+  return Math.min(
+    Math.floor(cycleTime / animation.frameDuration),
+    animation.frames.length - 1,
+  );
+}
+
+/** Fill a nine-value target with a discrete Pattern frame at absolute time. */
+export function pixelPatternIntensitiesAt(
+  elapsedTime: number,
+  pattern: PixelGridPatternPreset,
+  state: PixelGridPlaybackState = {},
+  target: number[] = new Array<number>(9),
+  once = false,
+): number[] {
+  const active = state.active ?? true;
+  const reduceMotion = state.reduceMotion ?? false;
+  const animation = PIXEL_GRID_PATTERNS[pattern];
+
+  target.fill(0);
+  if (!active) return target;
+
+  const activeCells = reduceMotion
+    ? normalizePixelCells(animation.frames.flat())
+    : animation.frames[pixelPatternFrameIndexAt(elapsedTime, pattern, once) ?? -1] ?? [];
+
+  for (const cell of activeCells) target[cell - 1] = 1;
   return target;
 }

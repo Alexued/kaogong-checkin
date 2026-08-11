@@ -5,10 +5,15 @@ import { importTypeScript } from './import-typescript.mjs';
 const {
   PIXEL_GRID_FADE_OUT_PADDING,
   PIXEL_GRID_PRESETS,
+  PIXEL_GRID_PATTERNS,
+  compilePixelPattern,
   cubicEaseOut,
   pixelGridCycleDuration,
   pixelGridIntensitiesAt,
   pixelGridIntensityAt,
+  pixelPatternCycleDuration,
+  pixelPatternFrameIndexAt,
+  pixelPatternIntensitiesAt,
 } = await importTypeScript(new URL('../src/lib/pixelGrid.ts', import.meta.url));
 
 test('pixel presets preserve the audited 3x3 timings', () => {
@@ -52,5 +57,40 @@ test('static playback states return meaningful reusable frames', () => {
   assert.equal(pixelGridIntensitiesAt(0.2, 'spiral', { active: false }, target), target);
   assert.deepEqual(target, new Array(9).fill(0));
   assert.equal(pixelGridIntensitiesAt(4, 'spiral', { reduceMotion: true }, target), target);
+  assert.deepEqual(target, new Array(9).fill(1));
+});
+
+test('pattern compiler follows SwiftPixelGrid grouping and normalization rules', () => {
+  assert.deepEqual(compilePixelPattern([]), []);
+  assert.deepEqual(compilePixelPattern([[1, 2, 3]]), [[1], [2], [3]]);
+  assert.deepEqual(compilePixelPattern([[2], [4], [6], [8]]), [[2, 4, 6, 8], []]);
+  assert.deepEqual(
+    compilePixelPattern([[0, 5, 1, 1, 10], [9, 5]]),
+    [[1, 5], [5, 9]],
+  );
+});
+
+test('interaction patterns preserve meaningful settled frames and timing', () => {
+  assert.deepEqual(PIXEL_GRID_PATTERNS.confirm.frames.at(-1), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.deepEqual(PIXEL_GRID_PATTERNS.dissolve.frames.at(-1), []);
+  assert.equal(pixelPatternCycleDuration('confirm'), 3 * 0.095);
+  assert.equal(pixelPatternCycleDuration('dissolve'), 4 * 0.075);
+});
+
+test('pattern playback uses absolute time, loops, and stops on the final frame', () => {
+  assert.equal(pixelPatternFrameIndexAt(0, 'confirm'), 0);
+  assert.equal(pixelPatternFrameIndexAt(0.095, 'confirm'), 1);
+  assert.equal(pixelPatternFrameIndexAt(pixelPatternCycleDuration('confirm'), 'confirm'), 0);
+  assert.equal(pixelPatternFrameIndexAt(pixelPatternCycleDuration('confirm'), 'confirm', true), 2);
+
+  const settled = pixelPatternIntensitiesAt(9, 'dissolve', {}, undefined, true);
+  assert.deepEqual(settled, new Array(9).fill(0));
+});
+
+test('pattern static states reuse targets and reduced motion renders the frame union', () => {
+  const target = new Array(9).fill(-1);
+  assert.equal(pixelPatternIntensitiesAt(0, 'confirm', { active: false }, target), target);
+  assert.deepEqual(target, new Array(9).fill(0));
+  assert.equal(pixelPatternIntensitiesAt(4, 'confirm', { reduceMotion: true }, target), target);
   assert.deepEqual(target, new Array(9).fill(1));
 });

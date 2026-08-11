@@ -25,7 +25,13 @@
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
-        <button class="head-btn" :class="{ on: reordering }" type="button" @click="reordering = !reordering">
+        <button
+          class="head-btn"
+          :class="{ on: reordering }"
+          type="button"
+          :aria-label="reordering ? '完成排序' : '调整顺序'"
+          @click="reordering = !reordering"
+        >
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M8 6h12M8 12h12M8 18h12" /><path d="M3 6h.01M3 12h.01M3 18h.01" />
           </svg>
@@ -126,7 +132,14 @@
 
     <!-- 右下角快速新增任务（teleport 出滑动轨道，保持相对视口固定；仅今日页激活时显示） -->
     <teleport to="body">
-      <button v-if="isActiveTab && !hasPlannedItems" class="fab" type="button" :aria-label="isGeneral ? '新增打卡项' : '新增任务'" @click="openNewTask">
+      <button
+        v-if="showFab"
+        class="fab"
+        :class="{ 'fab-entering': shellPhase === 'entering' }"
+        type="button"
+        :aria-label="isGeneral ? '新增打卡项' : '新增任务'"
+        @click="openNewTask"
+      >
         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
           stroke-width="2.6" stroke-linecap="round">
           <path d="M12 5v14M5 12h14" />
@@ -136,10 +149,12 @@
     <teleport to="body">
       <PixelGrid
         v-if="pixelFeedback"
+        :key="pixelFeedback.key"
         class="pixel-check-feedback"
         :style="{ left: `${pixelFeedback.x}px`, top: `${pixelFeedback.y}px` }"
-        preset="pulse"
-        label="打卡完成"
+        :pattern="pixelFeedback.pattern"
+        :label="pixelFeedback.label"
+        once
       />
     </teleport>
     <TaskEditorSheet
@@ -154,7 +169,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, inject, onBeforeUnmount, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { generatePlan, selectProgressSource, type PlanItem, type ProgressSource } from '../lib/plan';
@@ -168,6 +183,8 @@ import TaskEditorSheet from '../components/TaskEditorSheet.vue';
 import PixelGrid from '../components/PixelGrid.vue';
 import type { Task } from '../types';
 import { effectivePlanEnd, modeCopy } from '../lib/appMode';
+import { pixelPatternCycleDuration, type PixelGridPatternPreset } from '../lib/pixelGrid';
+import { SHELL_PHASE_KEY, type ShellPhase } from '../lib/shellPhase';
 
 const store = useAppStore();
 const route = useRoute();
@@ -179,11 +196,23 @@ const editingTask = ref<Task | null>(null);
 const isGeneral = computed(() => store.settings.appMode === 'general');
 const copy = computed(() => modeCopy(store.settings.appMode));
 const planEndDate = computed(() => effectivePlanEnd(store.settings));
-const pixelFeedback = ref<{ x: number; y: number } | null>(null);
+const pixelFeedback = ref<{
+  key: number;
+  x: number;
+  y: number;
+  pattern: PixelGridPatternPreset;
+  label: string;
+} | null>(null);
 let pixelFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
+let feedbackKey = 0;
+let taskCreationOrigin: { x: number; y: number } | null = null;
+const shellPhase = inject(SHELL_PHASE_KEY, ref<ShellPhase>('ready'));
 
 /** Tab 页常驻轨道后，FAB 只在今日页为当前路由时显示 */
 const isActiveTab = computed(() => route.path === '/');
+const showFab = computed(() => (
+  isActiveTab.value && !hasPlannedItems.value && shellPhase.value !== 'pending'
+));
 
 /** 展开子任务的主任务 id 集合 */
 const expandedItems = ref(new Set<string>());
@@ -223,8 +252,10 @@ const subsByTask = computed(() => {
 });
 
 /** 子任务打卡/恢复（日期跟随当前查看的日期） */
-function onToggleSub(sub: SubItem) {
+function onToggleSub(sub: SubItem, ev: MouseEvent) {
+  const checking = !sub.done;
   store.toggleCheckin(sub.id, selectedDate.value, sub.checkinId);
+  if (checking) celebrate(ev);
 }
 
 const isToday = computed(() => selectedDate.value === todayStr());
@@ -302,7 +333,8 @@ function taskSubtasks(taskId: string) {
   return store.subtasks.filter((s) => s.taskId === taskId).sort((a, b) => a.order - b.order);
 }
 
-function openNewTask() {
+function openNewTask(ev?: MouseEvent) {
+  if (ev) taskCreationOrigin = { x: ev.clientX, y: ev.clientY };
   editingTask.value = null;
   sheetOpen.value = true;
 }
@@ -331,6 +363,7 @@ function onSaveTask(form: {
   unit: string;
   subs: { id?: string; title: string }[];
 }) {
+  const creating = !form.id;
   const id = store.saveTask({
     id: form.id,
     title: form.title,
@@ -340,6 +373,10 @@ function onSaveTask(form: {
     unit: form.unit,
   });
   if (id) store.saveSubtasks(id, form.subs);
+  if (id && creating && taskCreationOrigin) {
+    showPixelFeedback('arrival', isGeneral.value ? '打卡项已创建' : '任务已创建', taskCreationOrigin);
+  }
+  taskCreationOrigin = null;
   editingTask.value = null;
 }
 
@@ -355,15 +392,23 @@ function checkAllDone() {
   }
 }
 
-/** canvas-confetti 粒子爆发（以点击位置为原点） */
-function celebrate(ev: MouseEvent) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  pixelFeedback.value = { x: ev.clientX, y: ev.clientY };
+function showPixelFeedback(
+  pattern: PixelGridPatternPreset,
+  label: string,
+  origin: { x: number; y: number },
+) {
+  feedbackKey += 1;
+  pixelFeedback.value = { key: feedbackKey, pattern, label, ...origin };
   if (pixelFeedbackTimer) clearTimeout(pixelFeedbackTimer);
   pixelFeedbackTimer = setTimeout(() => {
     pixelFeedback.value = null;
     pixelFeedbackTimer = null;
-  }, 520);
+  }, Math.ceil(pixelPatternCycleDuration(pattern) * 1000) + 120);
+}
+
+/** SwiftPixelGrid Pattern feedback, anchored to the triggering control. */
+function celebrate(ev: MouseEvent) {
+  showPixelFeedback('confirm', '打卡完成', { x: ev.clientX, y: ev.clientY });
 }
 
 onBeforeUnmount(() => {
@@ -546,6 +591,22 @@ onBeforeUnmount(() => {
   transform: scale(0.9);
 }
 
+.fab.fab-entering {
+  animation: fab-shell-enter 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@keyframes fab-shell-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .head-btn.icon-only {
   width: 48px;
   min-width: 48px;
@@ -559,6 +620,28 @@ onBeforeUnmount(() => {
   pointer-events: none;
   transform: translate(-50%, -50%) scale(1.35);
   filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent-solid) 45%, transparent));
+}
+
+@media (max-width: 520px) {
+  .empty {
+    padding-right: 84px;
+    padding-left: 4px;
+    text-align: left;
+    line-height: 1.7;
+    text-wrap: pretty;
+  }
+}
+
+@media (max-width: 360px) {
+  .head-btn {
+    width: 48px;
+    min-width: 48px;
+    padding: 0;
+  }
+
+  .head-btn span {
+    display: none;
+  }
 }
 
 /* 平板 / 宽屏：任务双列，FAB 对齐内容列右缘 */
@@ -587,6 +670,17 @@ onBeforeUnmount(() => {
     bottom: calc(66px + env(safe-area-inset-bottom));
     width: 48px;
     height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab.fab-entering {
+    animation: fab-shell-fade 160ms ease-out both;
+  }
+
+  @keyframes fab-shell-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 </style>

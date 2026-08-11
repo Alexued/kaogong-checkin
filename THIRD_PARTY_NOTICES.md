@@ -2,7 +2,7 @@
 
 ## SwiftPixelGrid
 
-The 3x3 pixel animation timing, preset delays, rendering layers, and reduced-motion behavior in this project are adapted from [afetmin/SwiftPixelGrid](https://github.com/afetmin/SwiftPixelGrid), reference commit `cc194aa84b120b8cb5819bc866c9620cd91481e0`.
+The 3x3 pixel animation timing, preset delays, Pattern grouping and normalization rules, absolute-time playback, rendering layers, and reduced-motion behavior in this project are adapted from [afetmin/SwiftPixelGrid](https://github.com/afetmin/SwiftPixelGrid), reference commit `cc194aa84b120b8cb5819bc866c9620cd91481e0`.
 
 MIT License
 

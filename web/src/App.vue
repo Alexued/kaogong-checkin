@@ -28,7 +28,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, provide, readonly, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import TabBar from './components/TabBar.vue';
 import LaunchIntro from './components/LaunchIntro.vue';
@@ -38,6 +38,7 @@ import DrillView from './views/DrillView.vue';
 import SettingsView from './views/SettingsView.vue';
 import { useSwipeTabs, TAB_PATHS } from './lib/swipeTabs';
 import { shouldPlayStartupAnimation } from './lib/localPreferences';
+import { SHELL_PHASE_KEY, type ShellPhase } from './lib/shellPhase';
 
 const { trackStyle, pageStyle, isTabPage } = useSwipeTabs();
 const route = useRoute();
@@ -45,7 +46,8 @@ const isSecondary = computed(() => !isTabPage.value);
 const isActiveRootPage = (path: string) => isTabPage.value && route.path === path;
 const launchEnabled = shouldPlayStartupAnimation();
 const showLaunch = ref(launchEnabled);
-const shellPhase = ref<'pending' | 'entering' | 'ready'>(launchEnabled ? 'pending' : 'ready');
+const shellPhase = ref<ShellPhase>(launchEnabled ? 'pending' : 'ready');
+provide(SHELL_PHASE_KEY, readonly(shellPhase));
 const shellClass = computed(() => ({
   'shell-pending': shellPhase.value === 'pending',
   'shell-entering': shellPhase.value === 'entering',

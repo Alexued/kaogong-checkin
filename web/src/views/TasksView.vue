@@ -10,7 +10,7 @@
       </div>
     </header>
 
-    <button class="btn add-btn" @click="openEditor()">+ {{ isGeneral ? '新建打卡项' : '新建任务' }}</button>
+    <button ref="addButton" class="btn add-btn" @click="openEditor()">+ {{ isGeneral ? '新建打卡项' : '新建任务' }}</button>
 
     <div
       v-for="(t, i) in activeTasks"
@@ -40,7 +40,7 @@
       <div class="row-actions">
         <button class="mini" @click="openEditor(t)">编辑</button>
         <button class="mini" @click="store.setArchived(t.id, true)">归档</button>
-        <button class="mini danger" @click="onDelete(t)">删除</button>
+        <button class="mini danger" @click="onDelete(t, $event)">删除</button>
       </div>
     </div>
 
@@ -52,7 +52,7 @@
         </div>
         <div class="row-actions">
           <button class="mini" @click="store.setArchived(t.id, false)">恢复</button>
-          <button class="mini danger" @click="onDelete(t)">删除</button>
+          <button class="mini danger" @click="onDelete(t, $event)">删除</button>
         </div>
       </div>
     </template>
@@ -65,16 +65,30 @@
       :subtasks="editingSubtasks"
       @save="onSave"
     />
+    <teleport to="body">
+      <PixelGrid
+        v-if="taskFeedback"
+        :key="taskFeedback.key"
+        class="pixel-task-feedback"
+        :class="{ danger: taskFeedback.pattern === 'dissolve' }"
+        :style="{ left: `${taskFeedback.x}px`, top: `${taskFeedback.y}px` }"
+        :pattern="taskFeedback.pattern"
+        :label="taskFeedback.label"
+        once
+      />
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { navigateToParent } from '../lib/backNavigation';
 import TaskEditorSheet from '../components/TaskEditorSheet.vue';
+import PixelGrid from '../components/PixelGrid.vue';
 import type { Task } from '../types';
+import { pixelPatternCycleDuration, type PixelGridPatternPreset } from '../lib/pixelGrid';
 
 const store = useAppStore();
 const router = useRouter();
@@ -87,6 +101,16 @@ const archivedTasks = computed(() => store.tasks.filter((t) => t.archived));
 
 const sheetOpen = ref(false);
 const editingTask = ref<Task | null>(null);
+const addButton = ref<HTMLButtonElement | null>(null);
+const taskFeedback = ref<{
+  key: number;
+  x: number;
+  y: number;
+  pattern: PixelGridPatternPreset;
+  label: string;
+} | null>(null);
+let taskFeedbackKey = 0;
+let taskFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 正在编辑任务的现有子任务（按顺序） */
 const editingSubtasks = computed(() =>
@@ -111,6 +135,7 @@ function onSave(form: {
   unit: string;
   subs: { id?: string; title: string }[];
 }) {
+  const creating = !form.id;
   const id = store.saveTask({
     id: form.id,
     title: form.title,
@@ -120,13 +145,53 @@ function onSave(form: {
     unit: form.unit,
   });
   if (id) store.saveSubtasks(id, form.subs);
-}
-
-function onDelete(t: Task) {
-  if (window.confirm(`确定删除${isGeneral.value ? '打卡项' : '任务'}「${t.title}」？相关打卡进度会一并删除，计时记录会保留但取消关联。`)) {
-    store.deleteTask(t.id);
+  if (id && creating && addButton.value) {
+    showTaskFeedback(
+      'arrival',
+      isGeneral.value ? '打卡项已创建' : '任务已创建',
+      addButton.value.getBoundingClientRect(),
+    );
   }
 }
+
+function showTaskFeedback(
+  pattern: PixelGridPatternPreset,
+  label: string,
+  bounds: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>,
+) {
+  taskFeedbackKey += 1;
+  taskFeedback.value = {
+    key: taskFeedbackKey,
+    pattern,
+    label,
+    x: bounds.left + bounds.width / 2,
+    y: bounds.top + bounds.height / 2,
+  };
+  if (taskFeedbackTimer) clearTimeout(taskFeedbackTimer);
+  taskFeedbackTimer = setTimeout(() => {
+    taskFeedback.value = null;
+    taskFeedbackTimer = null;
+  }, Math.ceil(pixelPatternCycleDuration(pattern) * 1000) + 120);
+}
+
+function onDelete(t: Task, ev: MouseEvent) {
+  if (window.confirm(`确定删除${isGeneral.value ? '打卡项' : '任务'}「${t.title}」？相关打卡进度会一并删除，计时记录会保留但取消关联。`)) {
+    const row = (ev.currentTarget as HTMLElement | null)?.closest('.row');
+    const bounds = row?.getBoundingClientRect();
+    store.deleteTask(t.id);
+    if (bounds) {
+      showTaskFeedback(
+        'dissolve',
+        isGeneral.value ? '打卡项已删除' : '任务已删除',
+        bounds,
+      );
+    }
+  }
+}
+
+onBeforeUnmount(() => {
+  if (taskFeedbackTimer) clearTimeout(taskFeedbackTimer);
+});
 </script>
 
 <style scoped>
@@ -226,5 +291,19 @@ function onDelete(t: Task) {
 
 .mini.danger {
   color: var(--danger);
+}
+
+.pixel-task-feedback {
+  position: fixed;
+  z-index: 190;
+  color: var(--accent-solid);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.35);
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--accent-solid) 45%, transparent));
+}
+
+.pixel-task-feedback.danger {
+  color: var(--danger);
+  filter: drop-shadow(0 0 7px color-mix(in srgb, var(--danger) 42%, transparent));
 }
 </style>

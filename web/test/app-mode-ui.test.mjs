@@ -27,7 +27,7 @@ test('general mode owns a review root and filters exam-only activity from summar
   assert.match(today, /effectivePlanEnd\(store\.settings\)/);
   assert.match(today, /class="head-btn icon-only"[\s\S]*aria-label="isGeneral \? '新增打卡项' : '新增任务'"/);
   assert.match(today, /empty-landscape-add/);
-  assert.match(today, /v-if="isActiveTab && !hasPlannedItems" class="fab"/);
+  assert.match(today, /v-if="showFab"/);
   assert.match(router, /path: '\/review\/day\/:date'/);
   assert.match(dayDetail, /resolveDayDetailSiblingPath\(route\.name/);
   assert.match(dayDetail, /store\.subtasks\.find\(\(subtask\) => subtask\.id === c\.taskId\)/);

@@ -3,7 +3,8 @@
     ref="root"
     class="pixel-grid"
     :style="rootStyle"
-    :data-preset="preset"
+    :data-engine="pattern ? 'pattern' : 'delay'"
+    :data-preset="pattern || preset"
     :data-animated="active && !reducedMotion && !pageHidden ? 'true' : 'false'"
     :role="decorative ? undefined : 'status'"
     :aria-label="decorative ? undefined : label"
@@ -24,14 +25,19 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
+  PIXEL_GRID_PATTERNS,
   pixelGridCycleDuration,
   pixelGridIntensitiesAt,
+  pixelPatternCycleDuration,
+  pixelPatternIntensitiesAt,
+  type PixelGridPatternPreset,
   type PixelGridPreset,
 } from '../lib/pixelGrid';
 
 const props = withDefaults(defineProps<{
   active?: boolean;
   preset?: PixelGridPreset;
+  pattern?: PixelGridPatternPreset;
   label?: string;
   size?: number;
   once?: boolean;
@@ -50,6 +56,9 @@ const reducedMotion = ref(false);
 const pageHidden = ref(false);
 const rootStyle = computed(() => ({
   '--pixel-grid-size': `${Math.min(Math.max(props.size, 11), 160)}px`,
+  '--pixel-transition-duration': props.pattern
+    ? `${PIXEL_GRID_PATTERNS[props.pattern].transitionDuration}s`
+    : '0s',
 }));
 const cellStyle = (index: number) => ({
   '--intensity': `var(--pixel-${index}, 0)`,
@@ -87,14 +96,26 @@ function tick(now: number) {
   }
 
   const elapsed = Math.max(0, now - epoch) / 1000;
-  if (props.once && elapsed >= pixelGridCycleDuration(props.preset)) {
-    applyStaticFrame(1);
+  const playbackDuration = props.pattern
+    ? pixelPatternCycleDuration(props.pattern)
+    : pixelGridCycleDuration(props.preset);
+  if (props.once && elapsed >= playbackDuration) {
+    if (props.pattern) {
+      pixelPatternIntensitiesAt(elapsed, props.pattern, { active: true }, values, true);
+      applyFrame(values);
+    } else {
+      applyStaticFrame(1);
+    }
     animationFrame = null;
     return;
   }
 
   if (!lowEndDevice || now - lastPaint >= 1000 / 30) {
-    pixelGridIntensitiesAt(elapsed, props.preset, { active: true }, values);
+    if (props.pattern) {
+      pixelPatternIntensitiesAt(elapsed, props.pattern, { active: true }, values);
+    } else {
+      pixelGridIntensitiesAt(elapsed, props.preset, { active: true }, values);
+    }
     applyFrame(values);
     lastPaint = now;
   }
@@ -111,7 +132,12 @@ function startFrameLoop(restart: boolean) {
   const now = performance.now();
   if (restart || epoch === 0) epoch = now;
   if (reducedMotion.value) {
-    applyStaticFrame(1);
+    if (props.pattern) {
+      pixelPatternIntensitiesAt(0, props.pattern, { reduceMotion: true }, values);
+      applyFrame(values);
+    } else {
+      applyStaticFrame(1);
+    }
     return;
   }
   if (pageHidden.value) return;
@@ -132,7 +158,7 @@ function handleVisibilityChange() {
 }
 
 watch(
-  () => [props.active, props.preset, props.once],
+  () => [props.active, props.preset, props.pattern, props.once],
   () => startFrameLoop(true),
 );
 
@@ -210,7 +236,17 @@ onBeforeUnmount(() => {
   opacity: var(--intensity);
 }
 
+.pixel-grid[data-engine="pattern"] .pixel-grid__bloom i,
+.pixel-grid[data-engine="pattern"] .pixel-grid__on i {
+  transition: opacity var(--pixel-transition-duration) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .pixel-grid[data-engine="pattern"] .pixel-grid__bloom i,
+  .pixel-grid[data-engine="pattern"] .pixel-grid__on i {
+    transition: none;
+  }
+
   .pixel-grid__bloom i {
     opacity: var(--intensity);
   }
