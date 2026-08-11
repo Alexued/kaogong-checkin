@@ -10,6 +10,11 @@
   overflow: hidden;
 }
 
+html.app-dialog-open,
+html.app-dialog-open body {
+  overflow: hidden;
+}
+
 .swipe-track {
   height: 100%;
   display: flex;

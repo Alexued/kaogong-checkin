@@ -13,8 +13,9 @@ import {
 } from './client';
 import { getPairingToken, removePairingToken } from './pairing-storage';
 import { SyncGeneration } from './sync-generation';
-import { isSyncEnabled, LOCAL_STATE_KEY } from './sync-preference';
+import { isSyncEnabled, LOCAL_STATE_KEY, persistSyncEnabled } from './sync-preference';
 import { compactQueue, normalizeQueue, type QueuedSyncMessage } from './sync-queue';
+import { createPeerTransfer, parsePeerTransfer, type PeerTransfer } from './peer-transfer';
 import type { AppState, RemoteSyncMessage, ServerInfo, SyncMessage } from '../types';
 import { fromV3, toV3 } from '../domain/legacyAdapterV3';
 import { MigrationLockedError, RepositoryV3 } from '../storage/repositoryV3';
@@ -26,6 +27,7 @@ import {
 } from '../lib/stateMigration';
 
 const QUEUE_KEY = 'kgc-queue';
+const PEER_QUEUE_ARCHIVE_KEY = 'kgc-peer-queue-archive-v1';
 const ACK_PROTOCOL_VERSION = 2;
 
 let queue: QueuedSyncMessage[] = [];
@@ -186,6 +188,21 @@ export function initializeLocalState() {
   }
   schedulePersistState();
   void initializeV3Persistence();
+}
+
+function archivePeerQueue(previousQueue: QueuedSyncMessage[]) {
+  if (!previousQueue.length) return;
+  let archive: Array<{ createdAt: string; queue: QueuedSyncMessage[] }> = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PEER_QUEUE_ARCHIVE_KEY) || '[]');
+    if (Array.isArray(parsed)) archive = parsed;
+  } catch {
+    archive = [];
+  }
+  archive.unshift({ createdAt: new Date().toISOString(), queue: structuredClone(previousQueue) });
+  try { localStorage.setItem(PEER_QUEUE_ARCHIVE_KEY, JSON.stringify(archive.slice(0, 5))); } catch {
+    /* The native recovery point still preserves the pre-replacement snapshot. */
+  }
 }
 
 export async function initializeLocalStateAsync(): Promise<void> {
@@ -539,4 +556,75 @@ export async function backupLocalStateToComputer(): Promise<BackupAppendResultV3
     replacing = false;
     if (isCurrentRun(generation)) void refreshSnapshotAndConnect(generation);
   }
+}
+
+/** Export one validated, size-bounded v3 snapshot for device direct sync. */
+export async function exportLocalPeerTransfer(): Promise<PeerTransfer> {
+  await initializeLocalStateAsync();
+  if (!v3Repository || useAppStore().recoveryRequired) throw new Error('local repository unavailable');
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+    try { localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(currentState())); } catch { /* v3 remains canonical */ }
+  }
+  if (v3PersistTimer) {
+    clearTimeout(v3PersistTimer);
+    v3PersistTimer = null;
+  }
+  await v3PersistChain;
+  const record = await v3Repository.commit(toV3(currentState()));
+  return createPeerTransfer(record.envelope);
+}
+
+export async function exportLocalPeerRecoveryPoint(): Promise<{ bundleJson: string; transfer: PeerTransfer }> {
+  const transfer = await exportLocalPeerTransfer();
+  const bundleJson = JSON.stringify({
+    formatVersion: 1,
+    createdAt: new Date().toISOString(),
+    transfer,
+    computerSyncEnabled: isSyncEnabled(),
+    pendingComputerQueue: queue,
+  });
+  return { bundleJson, transfer };
+}
+
+/**
+ * Apply a peer snapshot as a complete replacement. Callers create a native
+ * recovery point first. Computer sync is forced off and its active queue is
+ * archived before the canonical v3 record is committed.
+ */
+export async function replaceLocalStateFromPeer(value: unknown): Promise<AppState> {
+  const { envelope } = await parsePeerTransfer(value);
+  await initializeLocalStateAsync();
+  if (!v3Repository || useAppStore().recoveryRequired) throw new Error('local repository unavailable');
+
+  persistSyncEnabled(false);
+  stopSync();
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  if (v3PersistTimer) {
+    clearTimeout(v3PersistTimer);
+    v3PersistTimer = null;
+  }
+  await v3PersistChain;
+
+  const nextState = fromV3(envelope.state);
+  const previousQueue = queue;
+  archivePeerQueue(previousQueue);
+  await v3Repository.commit(envelope.state, []);
+
+  queue = [];
+  queueLoaded = true;
+  persistQueue();
+  localMutationEpoch += 1;
+  const store = useAppStore();
+  store.applySnapshot(nextState);
+  store.recoveryRequired = false;
+  try { localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(nextState)); } catch {
+    /* The canonical repository was already atomically committed. */
+  }
+  schedulePersistState();
+  return nextState;
 }

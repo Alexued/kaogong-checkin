@@ -95,6 +95,7 @@ import type { Task, Subtask } from '../types';
 import DatePickerSheet from './DatePickerSheet.vue';
 import { formatCn } from '../lib/date';
 import { useAppStore } from '../stores/app';
+import { confirmDialog } from '../lib/appDialog';
 
 interface SubEdit {
   id?: string;
@@ -167,12 +168,19 @@ function setQuantityMode() {
   form.value.target = Math.max(2, form.value.target || 2);
 }
 
-function addSubtask() {
+async function addSubtask() {
   const current = form.value;
   if (!current) return;
   if (current.subs.length === 0 && current.target > 1) {
-    const confirmed = window.confirm(`${isGeneral.value ? '添加步骤' : '添加子任务'}会把数量目标重置为清单模式，是否继续？`);
+    const childName = isGeneral.value ? '步骤' : '子任务';
+    const confirmed = await confirmDialog({
+      title: `添加${childName}并改为清单模式`,
+      message: `当前数量目标会重置为清单模式，之后以${childName}完成情况作为进度。`,
+      confirmLabel: `添加${childName}`,
+      variant: 'warning',
+    });
     if (!confirmed) return;
+    if (form.value !== current) return;
     current.target = 1;
     current.unit = '';
   }

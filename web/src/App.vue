@@ -25,6 +25,7 @@
   </div>
   <TabBar :class="shellClass" />
   <LaunchIntro v-if="showLaunch" @done="finishLaunch" />
+  <AppDialogHost />
 </template>
 
 <script setup lang="ts">
@@ -32,6 +33,7 @@ import { computed, onBeforeUnmount, provide, readonly, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import TabBar from './components/TabBar.vue';
 import LaunchIntro from './components/LaunchIntro.vue';
+import AppDialogHost from './components/AppDialogHost.vue';
 import TodayView from './views/TodayView.vue';
 import TimerView from './views/TimerView.vue';
 import DrillView from './views/DrillView.vue';

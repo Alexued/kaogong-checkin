@@ -170,6 +170,7 @@ import {
 import { formatDateTime } from '../../lib/date';
 import RefTable from './RefTable.vue';
 import type { DrillRecord } from '../../types';
+import { confirmDialog } from '../../lib/appDialog';
 
 const store = useAppStore();
 
@@ -219,8 +220,14 @@ function startSession() {
   phase.value = 'playing';
 }
 
-function onExit() {
-  if (window.confirm('退出后本场进度不保留，已答题目成绩已记录')) {
+async function onExit() {
+  const accepted = await confirmDialog({
+    title: '退出本场百化分训练',
+    message: '本场剩余题目和当前顺序不会保留，已经作答的成绩仍会写入历史。',
+    confirmLabel: '退出训练',
+    variant: 'warning',
+  });
+  if (accepted) {
     phase.value = 'setup';
     current.value = null;
     queue.value = [];
@@ -324,8 +331,14 @@ const perPercentStats = computed(() => {
   });
 });
 
-function onClear() {
-  if (window.confirm('清空全部背诵记录？')) store.clearDrills();
+async function onClear() {
+  const accepted = await confirmDialog({
+    title: '清空百化分背诵记录',
+    message: '全部历史作答和掌握度统计都会被清空。',
+    confirmLabel: '清空记录',
+    variant: 'danger',
+  });
+  if (accepted) store.clearDrills();
 }
 </script>
 

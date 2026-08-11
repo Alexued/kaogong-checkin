@@ -31,5 +31,6 @@ test('general mode owns a review root and filters exam-only activity from summar
   assert.match(router, /path: '\/review\/day\/:date'/);
   assert.match(dayDetail, /resolveDayDetailSiblingPath\(route\.name/);
   assert.match(dayDetail, /store\.subtasks\.find\(\(subtask\) => subtask\.id === c\.taskId\)/);
-  assert.match(tasks, /相关打卡进度会一并删除，计时记录会保留但取消关联/);
+  assert.match(tasks, /相关打卡进度将从本机移除/);
+  assert.match(tasks, /计时记录会保留，但不再关联这个任务/);
 });

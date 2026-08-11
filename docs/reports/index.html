@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#f4f2ec" />
-    <title>测试报告 · 考公打卡</title>
-    <meta name="description" content="考公打卡的版本化测试报告目录。" />
+    <title>测试报告 · 格记</title>
+    <meta name="description" content="格记的版本化测试报告目录。" />
     <link rel="stylesheet" href="v0.7.1/adb-20260807T184457+0800/report.css" />
   </head>
   <body class="catalog-page">
     <a class="skip-link" href="#main-content">跳到报告目录</a>
     <header class="run-header">
       <div class="report-shell">
-        <nav class="breadcrumb" aria-label="面包屑"><a href="../index.html">考公打卡</a><span aria-hidden="true">/</span><span aria-current="page">测试报告</span></nav>
+        <nav class="breadcrumb" aria-label="面包屑"><a href="../index.html">格记</a><span aria-hidden="true">/</span><span aria-current="page">测试报告</span></nav>
         <div class="run-heading">
           <div>
             <p class="kicker">Quality assurance archive</p>
@@ -27,12 +27,19 @@
       <section class="report-section" aria-labelledby="runs-title">
         <div class="section-heading section-heading-wide">
           <div><p>Published runs</p><h2 id="runs-title">运行记录</h2></div>
-          <p>当前仅发布 v0.7.1 的 Android 真机运行账本。</p>
+          <p>包含 Android 真机运行账本和当前版本的专项回归报告。</p>
         </div>
         <div class="table-scroll" tabindex="0" aria-label="报告运行列表，可横向滚动">
           <table class="catalog-table">
             <thead><tr><th scope="col">版本</th><th scope="col">运行 ID</th><th scope="col">状态</th><th scope="col">统计</th><th scope="col">报告</th></tr></thead>
             <tbody>
+              <tr>
+                <td><strong>v0.10.0</strong></td>
+                <td><code>20260811-device-direct</code><br /><small>Android · Xiaomi M2006J10C</small></td>
+                <td><span class="status status-pass">通过</span></td>
+                <td>147 自动化通过 · 设备直连与全模块回归</td>
+                <td><a href="v0.10.0/DEVICE-DIRECT-SYNC-TEST-REPORT.md">打开专项报告</a></td>
+              </tr>
               <tr>
                 <td><strong>v0.7.1</strong></td>
                 <td><code>20260807T184457+0800</code><br /><small>Android · Device A</small></td>
@@ -46,7 +53,7 @@
       </section>
     </main>
     <footer class="report-footer">
-      <div class="report-shell"><p>考公打卡 · QA archive</p><nav aria-label="返回"><a href="../index.html">返回产品页</a></nav></div>
+      <div class="report-shell"><p>格记 · QA archive</p><nav aria-label="返回"><a href="../index.html">返回产品页</a></nav></div>
     </footer>
   </body>
 </html>

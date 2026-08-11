@@ -111,6 +111,7 @@ import { fmtDuration } from '../lib/stopwatch';
 import { formatTime } from '../lib/date';
 import { navigateToParent } from '../lib/backNavigation';
 import type { TimerRecord } from '../types';
+import { confirmDialog } from '../lib/appDialog';
 
 const store = useAppStore();
 const isGeneral = computed(() => store.settings.appMode === 'general');
@@ -144,8 +145,14 @@ function taskTitle(id: string | null) {
   return id ? store.tasks.find((t) => t.id === id)?.title || '' : '';
 }
 
-function onDelete(id: string) {
-  if (window.confirm('删除这条计时记录？')) store.deleteTimer(id);
+async function onDelete(id: string) {
+  const accepted = await confirmDialog({
+    title: '删除这条计时记录',
+    message: '删除后，这次计时不会再出现在历史记录和统计中。',
+    confirmLabel: '删除记录',
+    variant: 'danger',
+  });
+  if (accepted) store.deleteTimer(id);
 }
 
 // ---------- 数据对比（最近 10 次） ----------

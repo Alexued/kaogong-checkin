@@ -133,6 +133,7 @@ import {
 } from '../../lib/formula';
 import { shuffle } from '../../lib/drill';
 import RefTable from './RefTable.vue';
+import { confirmDialog } from '../../lib/appDialog';
 
 const store = useAppStore();
 
@@ -178,8 +179,14 @@ function startSession() {
   phase.value = 'playing';
 }
 
-function onExit() {
-  if (window.confirm('退出后本场进度不保留，已评成绩已记录')) {
+async function onExit() {
+  const accepted = await confirmDialog({
+    title: '退出本场公式训练',
+    message: '本场剩余卡片和当前顺序不会保留，已经自评的结果仍会写入历史。',
+    confirmLabel: '退出训练',
+    variant: 'warning',
+  });
+  if (accepted) {
     phase.value = 'setup';
     current.value = null;
     queue.value = [];

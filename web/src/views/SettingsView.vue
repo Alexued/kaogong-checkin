@@ -82,6 +82,8 @@
       </div>
     </div>
 
+    <DeviceSyncPanel />
+
     <div class="section-title">电脑同步</div>
     <div class="card block server-card">
       <div class="setting-row top-row">
@@ -298,6 +300,7 @@ import {
   setComputerSyncEnabled,
 } from '../api/computer-sync';
 import { getPairingToken, getSelectedServerId } from '../api/pairing-storage';
+import { confirmDialog } from '../lib/appDialog';
 import {
   APP_VERSION,
   compareVersions,
@@ -335,6 +338,7 @@ import {
 } from '../lib/localPreferences';
 import DatePickerSheet from '../components/DatePickerSheet.vue';
 import PixelGrid from '../components/PixelGrid.vue';
+import DeviceSyncPanel from '../components/DeviceSyncPanel.vue';
 import { runViewTransition } from '../lib/motion';
 import { effectivePlanEnd, modeCopy } from '../lib/appMode';
 import type { AppMode } from '../types';
@@ -814,7 +818,13 @@ async function submitPairing() {
 }
 
 async function overwriteLocal() {
-  if (!window.confirm('立即在电脑上保留一份当前手机数据快照吗？此操作不会修改手机数据。')) return;
+  const accepted = await confirmDialog({
+    title: '备份当前记录到电脑',
+    message: '电脑会保存一份当前手机数据快照，本机记录不会被修改。',
+    confirmLabel: '立即备份',
+    variant: 'neutral',
+  });
+  if (!accepted) return;
   overwriting.value = true;
   syncMessage.value = '';
   try {

@@ -89,6 +89,7 @@ import TaskEditorSheet from '../components/TaskEditorSheet.vue';
 import PixelGrid from '../components/PixelGrid.vue';
 import type { Task } from '../types';
 import { pixelPatternCycleDuration, type PixelGridPatternPreset } from '../lib/pixelGrid';
+import { confirmDialog } from '../lib/appDialog';
 
 const store = useAppStore();
 const router = useRouter();
@@ -174,18 +175,25 @@ function showTaskFeedback(
   }, Math.ceil(pixelPatternCycleDuration(pattern) * 1000) + 120);
 }
 
-function onDelete(t: Task, ev: MouseEvent) {
-  if (window.confirm(`确定删除${isGeneral.value ? '打卡项' : '任务'}「${t.title}」？相关打卡进度会一并删除，计时记录会保留但取消关联。`)) {
-    const row = (ev.currentTarget as HTMLElement | null)?.closest('.row');
-    const bounds = row?.getBoundingClientRect();
-    store.deleteTask(t.id);
-    if (bounds) {
-      showTaskFeedback(
-        'dissolve',
-        isGeneral.value ? '打卡项已删除' : '任务已删除',
-        bounds,
-      );
-    }
+async function onDelete(t: Task, ev: MouseEvent) {
+  const row = (ev.currentTarget as HTMLElement | null)?.closest('.row');
+  const bounds = row?.getBoundingClientRect();
+  const noun = isGeneral.value ? '打卡项' : '任务';
+  const accepted = await confirmDialog({
+    title: `删除${noun}“${t.title}”`,
+    message: `删除后，这个${noun}及相关打卡进度将从本机移除。`,
+    details: ['计时记录会保留，但不再关联这个任务', '此操作不能直接撤销'],
+    confirmLabel: `删除${noun}`,
+    variant: 'danger',
+  });
+  if (!accepted) return;
+  store.deleteTask(t.id);
+  if (bounds) {
+    showTaskFeedback(
+      'dissolve',
+      isGeneral.value ? '打卡项已删除' : '任务已删除',
+      bounds,
+    );
   }
 }
 

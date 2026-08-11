@@ -28,7 +28,10 @@ test('check-in and task operations use one-shot semantic patterns', () => {
 
 test('task deletion commits immediately before transient feedback begins', () => {
   const deletion = tasks.slice(tasks.indexOf('function onDelete'));
-  assert.ok(deletion.indexOf('store.deleteTask(t.id)') < deletion.indexOf("showTaskFeedback(\n        'dissolve'"));
+  const commitIndex = deletion.indexOf('store.deleteTask(t.id)');
+  const feedbackIndex = deletion.indexOf("'dissolve'", commitIndex);
+  assert.ok(commitIndex >= 0);
+  assert.ok(feedbackIndex > commitIndex);
 });
 
 test('pattern motion has an explicit reduced-motion path', () => {
