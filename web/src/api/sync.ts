@@ -93,6 +93,8 @@ function currentState(): AppState {
     timers: store.timers,
     drills: store.drills,
     formulaDrills: store.formulaDrills,
+    speedDrills: store.speedDrills,
+    analysisReviews: store.analysisReviews,
     settings: store.settings,
   };
 }

@@ -44,7 +44,7 @@
           <div class="record-head">
               <div>
               <span class="record-label">{{ r.label || '（无标签）' }}</span>
-              <span class="badge mode-badge">{{ r.mode === 'countdown' ? '倒计时' : '计时' }}</span>
+              <span class="badge mode-badge">{{ modeLabel(r.mode) }}</span>
               <span v-if="taskTitle(r.taskId)" class="badge">{{ taskTitle(r.taskId) }}</span>
             </div>
             <div class="record-right">
@@ -119,6 +119,10 @@ const router = useRouter();
 
 /** 记录详情弹层当前展示的记录 */
 const detail = ref<TimerRecord | null>(null);
+
+function modeLabel(mode: TimerRecord['mode']): string {
+  return mode === 'pomodoro' ? '番茄钟' : mode === 'countdown' ? '倒计时' : '计时';
+}
 
 function endTime(r: TimerRecord): string {
   return formatTime(new Date(new Date(r.startedAt).getTime() + r.durationMs).toISOString());

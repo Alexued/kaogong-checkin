@@ -3,6 +3,8 @@ import type {
   Checkin,
   DrillRecord,
   FormulaDrillRecord,
+  SpeedDrillRecord,
+  AnalysisReviewRecord,
   Subtask,
   Task,
   TimerRecord,
@@ -142,6 +144,41 @@ function legacyFormulaAttempt(attempt: DrillAttemptV3): FormulaDrillRecord {
   };
 }
 
+function legacySpeedAttempt(attempt: DomainStateV3['speedAttempts'][number]): SpeedDrillRecord {
+  return {
+    id: attempt.id,
+    categoryKey: attempt.categoryKey,
+    categoryLabel: attempt.categoryLabel,
+    difficulty: attempt.difficulty,
+    prompt: attempt.prompt,
+    expression: attempt.expression,
+    correctAnswer: attempt.correctAnswer,
+    userAnswer: attempt.userAnswer,
+    correct: attempt.correct,
+    elapsedMs: attempt.elapsedMs,
+    sessionId: attempt.sessionId,
+    createdAt: attempt.createdAt,
+    updatedAt: attempt.updatedAt,
+    deleted: attempt.deletedAt !== null,
+  };
+}
+
+function legacyAnalysisReview(review: DomainStateV3['analysisReviews'][number]): AnalysisReviewRecord {
+  return {
+    id: review.id,
+    source: review.source,
+    questionText: review.questionText,
+    userAnswer: review.userAnswer,
+    correctAnswer: review.correctAnswer,
+    categoryKey: review.categoryKey,
+    categoryLabel: review.categoryLabel,
+    sections: review.sections.map((section) => ({ ...section })),
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt,
+    deleted: review.deletedAt !== null,
+  };
+}
+
 /**
  * Project canonical v3 state into the collection shape consumed by the current UI.
  * Task/subtask tombstones stay hidden because the legacy shape has no tombstone field.
@@ -165,6 +202,8 @@ export function fromV3(state: DomainStateV3): AppState {
     timers: state.timerSessions.map(legacyTimer),
     drills,
     formulaDrills,
+    speedDrills: (state.speedAttempts || []).map(legacySpeedAttempt),
+    analysisReviews: (state.analysisReviews || []).map(legacyAnalysisReview),
     settings: {
       appMode: state.settings.appMode,
       planEndDate: state.settings.planEndDate,

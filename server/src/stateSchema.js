@@ -1,5 +1,7 @@
 const STATE_SCHEMA_VERSION = 2;
-const COLLECTIONS = ['tasks', 'subtasks', 'checkins', 'timers', 'drills', 'formulaDrills'];
+const COLLECTIONS = ['tasks', 'subtasks', 'checkins', 'timers', 'drills', 'formulaDrills', 'speedDrills', 'analysisReviews'];
+const LEGACY_COLLECTIONS = ['tasks', 'subtasks', 'checkins', 'timers', 'drills', 'formulaDrills'];
+const OPTIONAL_COLLECTIONS = ['speedDrills', 'analysisReviews'];
 
 function isRecord(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -86,6 +88,8 @@ function migrateStoredState(value, defaultSettings) {
     timers: cloneJson(stateCollection(cloned, 'timers')),
     drills: cloneJson(stateCollection(cloned, 'drills')),
     formulaDrills: cloneJson(stateCollection(cloned, 'formulaDrills')),
+    speedDrills: cloneJson(stateCollection(cloned, 'speedDrills')),
+    analysisReviews: cloneJson(stateCollection(cloned, 'analysisReviews')),
     settings,
   };
 }
@@ -98,7 +102,8 @@ function isValidV2State(value) {
   return Boolean(
     isRecord(value) &&
       value.schemaVersion === STATE_SCHEMA_VERSION &&
-      COLLECTIONS.every((key) => Array.isArray(value[key])) &&
+      LEGACY_COLLECTIONS.every((key) => Array.isArray(value[key])) &&
+      OPTIONAL_COLLECTIONS.every((key) => value[key] === undefined || Array.isArray(value[key])) &&
       isRecord(value.settings) &&
       isValidAppMode(value.settings.appMode) &&
       value.tasks.every((task) =>

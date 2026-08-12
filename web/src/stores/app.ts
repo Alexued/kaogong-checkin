@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { AppState, Task, Subtask, Checkin, Settings, SyncMessage, TimerRecord, DrillRecord, FormulaDrillRecord } from '../types';
+import type { AppState, Task, Subtask, Checkin, Settings, SyncMessage, TimerRecord, DrillRecord, FormulaDrillRecord, SpeedDrillRecord, AnalysisReviewRecord } from '../types';
 import { enqueue } from '../api/sync';
 import { buildProgressCheckin } from '../lib/plan';
 import {
@@ -14,13 +14,15 @@ import {
 const now = () => new Date().toISOString();
 const uid = () => crypto.randomUUID();
 
-const ENTITY_KEY: Record<string, 'tasks' | 'subtasks' | 'checkins' | 'timers' | 'drills' | 'formulaDrills'> = {
+const ENTITY_KEY: Record<string, 'tasks' | 'subtasks' | 'checkins' | 'timers' | 'drills' | 'formulaDrills' | 'speedDrills' | 'analysisReviews'> = {
   task: 'tasks',
   subtask: 'subtasks',
   checkin: 'checkins',
   timer: 'timers',
   drill: 'drills',
   formulaDrill: 'formulaDrills',
+  speedDrill: 'speedDrills',
+  analysisReview: 'analysisReviews',
 };
 
 /** 与服务器一致的 last-write-wins 应用逻辑（按 updatedAt 字符串比较） */
@@ -67,6 +69,8 @@ export const useAppStore = defineStore('app', {
     timers: [] as TimerRecord[],
     drills: [] as DrillRecord[],
     formulaDrills: [] as FormulaDrillRecord[],
+    speedDrills: [] as SpeedDrillRecord[],
+    analysisReviews: [] as AnalysisReviewRecord[],
     settings: { appMode: 'exam', planEndDate: null, theme: 'light', markDate: null } as Settings,
     online: false,
     pendingSyncCount: 0,
@@ -96,6 +100,8 @@ export const useAppStore = defineStore('app', {
       this.timers = s.timers || [];
       this.drills = s.drills || [];
       this.formulaDrills = s.formulaDrills || [];
+      this.speedDrills = s.speedDrills || [];
+      this.analysisReviews = s.analysisReviews || [];
       this.settings = settings;
     },
     /** 应用服务器广播的变更（其他客户端产生） */
@@ -323,6 +329,35 @@ export const useAppStore = defineStore('app', {
         entity: 'formulaDrill',
         payload: { ...record, id: uid(), createdAt: t, updatedAt: t, deleted: false },
       });
+    },
+
+    saveSpeedDrill(record: Omit<SpeedDrillRecord, 'id' | 'createdAt' | 'updatedAt' | 'deleted'>) {
+      const t = now();
+      this.send({
+        kind: 'upsert',
+        entity: 'speedDrill',
+        payload: { ...record, id: uid(), createdAt: t, updatedAt: t, deleted: false },
+      });
+    },
+
+    clearSpeedDrills() {
+      const t = now();
+      for (const record of this.speedDrills) {
+        if (!record.deleted) this.send({ kind: 'delete', entity: 'speedDrill', payload: { id: record.id, updatedAt: t } });
+      }
+    },
+
+    saveAnalysisReview(record: Omit<AnalysisReviewRecord, 'id' | 'createdAt' | 'updatedAt' | 'deleted'>) {
+      const t = now();
+      this.send({
+        kind: 'upsert',
+        entity: 'analysisReview',
+        payload: { ...record, id: uid(), createdAt: t, updatedAt: t, deleted: false },
+      });
+    },
+
+    deleteAnalysisReview(id: string) {
+      this.send({ kind: 'delete', entity: 'analysisReview', payload: { id, updatedAt: now() } });
     },
 
     saveSettings(patch: Partial<Settings>) {

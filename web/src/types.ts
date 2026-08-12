@@ -72,7 +72,7 @@ export interface TimerRecord {
   createdAt: string;
   updatedAt: string;
   deleted: boolean;
-  mode?: 'stopwatch' | 'countdown';
+  mode?: 'stopwatch' | 'countdown' | 'pomodoro';
 }
 
 export interface DrillRecord {
@@ -101,6 +101,44 @@ export interface FormulaDrillRecord {
   deleted: boolean;
 }
 
+export type SpeedDifficulty = 'easy' | 'normal' | 'hard';
+
+export interface SpeedDrillRecord {
+  id: string;
+  categoryKey: string;
+  categoryLabel: string;
+  difficulty: SpeedDifficulty;
+  prompt: string;
+  expression: string;
+  correctAnswer: string;
+  userAnswer: string;
+  correct: boolean;
+  elapsedMs: number;
+  sessionId: string;
+  createdAt: string;
+  updatedAt: string;
+  deleted: boolean;
+}
+
+export interface AnalysisReviewSection {
+  title: string;
+  content: string;
+}
+
+export interface AnalysisReviewRecord {
+  id: string;
+  source: 'camera' | 'gallery' | 'text';
+  questionText: string;
+  userAnswer: string;
+  correctAnswer: string;
+  categoryKey: string;
+  categoryLabel: string;
+  sections: AnalysisReviewSection[];
+  createdAt: string;
+  updatedAt: string;
+  deleted: boolean;
+}
+
 export interface AppState {
   schemaVersion: 2;
   tasks: Task[];
@@ -109,6 +147,8 @@ export interface AppState {
   timers: TimerRecord[];
   drills: DrillRecord[];
   formulaDrills: FormulaDrillRecord[];
+  speedDrills: SpeedDrillRecord[];
+  analysisReviews: AnalysisReviewRecord[];
   settings: Settings;
 }
 
@@ -130,7 +170,7 @@ export interface ServerInfo {
   backupFormatVersion?: number;
 }
 
-export type SyncEntity = 'task' | 'subtask' | 'checkin' | 'settings' | 'timer' | 'drill' | 'formulaDrill';
+export type SyncEntity = 'task' | 'subtask' | 'checkin' | 'settings' | 'timer' | 'drill' | 'formulaDrill' | 'speedDrill' | 'analysisReview';
 export interface SyncMessage {
   kind: 'upsert' | 'delete';
   entity: SyncEntity;

@@ -85,9 +85,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function addMissingAppMode(envelope: unknown): boolean {
   if (!isRecord(envelope) || !isRecord(envelope.state) || !isRecord(envelope.state.settings)) return false;
-  if (Object.prototype.hasOwnProperty.call(envelope.state.settings, 'appMode')) return false;
-  envelope.state.settings.appMode = 'exam';
-  return true;
+  let changed = false;
+  if (!Object.prototype.hasOwnProperty.call(envelope.state.settings, 'appMode')) {
+    envelope.state.settings.appMode = 'exam';
+    changed = true;
+  }
+  if (!Object.prototype.hasOwnProperty.call(envelope.state, 'speedAttempts')) {
+    envelope.state.speedAttempts = [];
+    changed = true;
+  }
+  if (!Object.prototype.hasOwnProperty.call(envelope.state, 'analysisReviews')) {
+    envelope.state.analysisReviews = [];
+    changed = true;
+  }
+  return changed;
 }
 
 function upgradeStoredRecord(record: unknown): boolean {

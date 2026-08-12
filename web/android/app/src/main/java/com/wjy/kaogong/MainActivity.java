@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
   public void onCreate(Bundle savedInstanceState) {
     registerPlugin(AppUpdatePlugin.class);
     registerPlugin(DeviceSyncPlugin.class);
+    registerPlugin(TextRecognitionPlugin.class);
     super.onCreate(savedInstanceState);
     // Android 15+ (targetSdk 35) 强制 edge-to-edge：WebView 延伸到状态栏/导航栏下方，
     // 且 Android WebView 的 env(safe-area-inset-*) 恒为 0，纯 CSS 无法避让。

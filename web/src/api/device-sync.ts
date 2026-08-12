@@ -120,7 +120,7 @@ export const deviceSyncState = {
 };
 
 function appVersion(): string {
-  return String(import.meta.env.VITE_APP_VERSION || '0.10.0');
+  return String(import.meta.env.VITE_APP_VERSION || '0.11.0');
 }
 
 function normalizePeer(peer: PeerDevice): PeerDevice {

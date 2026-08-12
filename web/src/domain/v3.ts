@@ -53,7 +53,7 @@ export interface TimerSessionV3 {
   startedAt: string;
   durationMs: number;
   laps: Array<{ elapsedMs: number; splitMs: number }>;
-  mode: 'stopwatch' | 'countdown';
+  mode: 'stopwatch' | 'countdown' | 'pomodoro';
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -73,6 +73,37 @@ export interface DrillAttemptV3 {
   deletedAt: string | null;
 }
 
+export interface SpeedAttemptV3 {
+  id: string;
+  categoryKey: string;
+  categoryLabel: string;
+  difficulty: 'easy' | 'normal' | 'hard';
+  prompt: string;
+  expression: string;
+  correctAnswer: string;
+  userAnswer: string;
+  correct: boolean;
+  elapsedMs: number;
+  sessionId: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface AnalysisReviewV3 {
+  id: string;
+  source: 'camera' | 'gallery' | 'text';
+  questionText: string;
+  userAnswer: string;
+  correctAnswer: string;
+  categoryKey: string;
+  categoryLabel: string;
+  sections: Array<{ title: string; content: string }>;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface SettingsV3 {
   appMode: AppMode;
   planEndDate: string | null;
@@ -87,6 +118,8 @@ export interface DomainStateV3 {
   dailyProgress: DailyProgressV3[];
   timerSessions: TimerSessionV3[];
   drillAttempts: DrillAttemptV3[];
+  speedAttempts: SpeedAttemptV3[];
+  analysisReviews: AnalysisReviewV3[];
   settings: SettingsV3;
 }
 
@@ -199,6 +232,8 @@ export function validateDomainState(state: DomainStateV3): void {
   if (!Array.isArray(state.tasks) || !Array.isArray(state.dailyProgress) || !Array.isArray(state.timerSessions) || !Array.isArray(state.drillAttempts)) {
     fail('STATE_COLLECTIONS');
   }
+  if (state.speedAttempts !== undefined && !Array.isArray(state.speedAttempts)) fail('STATE_SPEED_COLLECTION');
+  if (state.analysisReviews !== undefined && !Array.isArray(state.analysisReviews)) fail('STATE_REVIEW_COLLECTION');
   if (!isRecord(state.settings)) fail('SETTINGS_SHAPE');
   const taskIds = new Set<string>();
   const allSubtaskIds = new Set<string>();
@@ -212,6 +247,8 @@ export function validateDomainState(state: DomainStateV3): void {
   const progressKeys = new Set<string>();
   const timerIds = new Set<string>();
   const attemptIds = new Set<string>();
+  const speedAttemptIds = new Set<string>();
+  const reviewIds = new Set<string>();
   for (const progress of state.dailyProgress) {
     requireId(progress.id, 'PROGRESS_ID');
     requireId(progress.taskId, 'PROGRESS_TASK_ID');
@@ -249,7 +286,7 @@ export function validateDomainState(state: DomainStateV3): void {
     requireTimestamp(timer.startedAt, 'TIMER_STARTED_AT');
     if (typeof timer.durationMs !== 'number' || !Number.isSafeInteger(timer.durationMs) || timer.durationMs < 0) fail('TIMER_DURATION');
     if (!Array.isArray(timer.laps) || timer.laps.some((lap) => !isRecord(lap) || !Number.isSafeInteger(lap.elapsedMs) || lap.elapsedMs < 0 || !Number.isSafeInteger(lap.splitMs) || lap.splitMs < 0)) fail('TIMER_LAPS');
-    if (timer.mode !== 'stopwatch' && timer.mode !== 'countdown') fail('TIMER_MODE');
+    if (timer.mode !== 'stopwatch' && timer.mode !== 'countdown' && timer.mode !== 'pomodoro') fail('TIMER_MODE');
     requireTimestamp(timer.createdAt, 'TIMER_CREATED_AT');
     requireTimestamp(timer.updatedAt, 'TIMER_UPDATED_AT');
     requireNullableTimestamp(timer.deletedAt, 'TIMER_DELETED_AT');
@@ -269,6 +306,40 @@ export function validateDomainState(state: DomainStateV3): void {
     requireTimestamp(attempt.updatedAt, 'ATTEMPT_UPDATED_AT');
     requireNullableTimestamp(attempt.deletedAt, 'ATTEMPT_DELETED_AT');
   }
+  for (const attempt of state.speedAttempts || []) {
+    requireId(attempt.id, 'SPEED_ID');
+    if (speedAttemptIds.has(attempt.id)) fail('DUPLICATE_SPEED_ID');
+    speedAttemptIds.add(attempt.id);
+    requireId(attempt.categoryKey, 'SPEED_CATEGORY_KEY');
+    requireId(attempt.sessionId, 'SPEED_SESSION_ID');
+    if (typeof attempt.categoryLabel !== 'string' || !attempt.categoryLabel.trim() || Array.from(attempt.categoryLabel).length > 64) fail('SPEED_CATEGORY_LABEL');
+    if (attempt.difficulty !== 'easy' && attempt.difficulty !== 'normal' && attempt.difficulty !== 'hard') fail('SPEED_DIFFICULTY');
+    if (typeof attempt.prompt !== 'string' || !attempt.prompt.trim() || Array.from(attempt.prompt).length > 2048) fail('SPEED_PROMPT');
+    if (typeof attempt.expression !== 'string' || Array.from(attempt.expression).length > 512) fail('SPEED_EXPRESSION');
+    if (typeof attempt.correctAnswer !== 'string' || typeof attempt.userAnswer !== 'string') fail('SPEED_ANSWER');
+    if (typeof attempt.correct !== 'boolean') fail('SPEED_CORRECT');
+    requireSafeInt(attempt.elapsedMs, 'SPEED_ELAPSED');
+    requireTimestamp(attempt.createdAt, 'SPEED_CREATED_AT');
+    requireTimestamp(attempt.updatedAt, 'SPEED_UPDATED_AT');
+    requireNullableTimestamp(attempt.deletedAt, 'SPEED_DELETED_AT');
+  }
+  for (const review of state.analysisReviews || []) {
+    requireId(review.id, 'REVIEW_ID');
+    if (reviewIds.has(review.id)) fail('DUPLICATE_REVIEW_ID');
+    reviewIds.add(review.id);
+    if (review.source !== 'camera' && review.source !== 'gallery' && review.source !== 'text') fail('REVIEW_SOURCE');
+    if (typeof review.questionText !== 'string' || !review.questionText.trim() || Array.from(review.questionText).length > 16000) fail('REVIEW_QUESTION');
+    if (typeof review.userAnswer !== 'string' || typeof review.correctAnswer !== 'string') fail('REVIEW_ANSWER');
+    requireId(review.categoryKey, 'REVIEW_CATEGORY_KEY');
+    if (typeof review.categoryLabel !== 'string' || !review.categoryLabel.trim() || Array.from(review.categoryLabel).length > 64) fail('REVIEW_CATEGORY_LABEL');
+    if (!Array.isArray(review.sections) || review.sections.length < 1 || review.sections.length > 12) fail('REVIEW_SECTIONS');
+    for (const section of review.sections) {
+      if (!isRecord(section) || typeof section.title !== 'string' || !section.title.trim() || typeof section.content !== 'string' || !section.content.trim()) fail('REVIEW_SECTION');
+    }
+    requireTimestamp(review.createdAt, 'REVIEW_CREATED_AT');
+    requireTimestamp(review.updatedAt, 'REVIEW_UPDATED_AT');
+    requireNullableTimestamp(review.deletedAt, 'REVIEW_DELETED_AT');
+  }
   if (state.settings.planEndDate !== null) requireDate(state.settings.planEndDate, 'SETTINGS_PLAN_DATE');
   if (state.settings.markDate !== null) requireDate(state.settings.markDate, 'SETTINGS_MARK_DATE');
   if (state.settings.appMode !== 'exam' && state.settings.appMode !== 'general') fail('SETTINGS_APP_MODE');
@@ -283,6 +354,8 @@ export function emptyDomainState(): DomainStateV3 {
     dailyProgress: [],
     timerSessions: [],
     drillAttempts: [],
+    speedAttempts: [],
+    analysisReviews: [],
     settings: {
       appMode: 'exam',
       planEndDate: null,

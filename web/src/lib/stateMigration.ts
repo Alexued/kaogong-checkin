@@ -10,6 +10,8 @@ const COLLECTION_KEYS = [
   'timers',
   'drills',
   'formulaDrills',
+  'speedDrills',
+  'analysisReviews',
 ] as const;
 
 type JsonRecord = Record<string, unknown>;
@@ -102,6 +104,8 @@ export function migrateAppState(input: unknown): AppState {
     timers: cloneJson(collection(cloned, 'timers')),
     drills: cloneJson(collection(cloned, 'drills')),
     formulaDrills: cloneJson(collection(cloned, 'formulaDrills')),
+    speedDrills: cloneJson(collection(cloned, 'speedDrills')),
+    analysisReviews: cloneJson(collection(cloned, 'analysisReviews')),
     settings: {
       planEndDate: null,
       theme: 'light',

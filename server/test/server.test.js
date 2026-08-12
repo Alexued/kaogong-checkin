@@ -225,6 +225,8 @@ test('factory protects state, rate-limits pairing, persists tokens, and restarts
     timers: [],
     drills: [],
     formulaDrills: [],
+    speedDrills: [],
+    analysisReviews: [],
     settings: { appMode: 'general', theme: 'light', note: '本地优先', updatedAt: '2026-08-05T00:00:00.000Z' },
   };
   const putState = await fetch(`${baseUrl}/api/state`, {

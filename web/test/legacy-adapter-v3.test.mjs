@@ -44,7 +44,7 @@ function legacyState() {
     timers: [{
       id: 'timer-1', label: '练习', taskId: 'task-q', date: '2026-08-04',
       startedAt: '2026-08-04T04:00:00.000Z', durationMs: 1234,
-      laps: [{ elapsedMs: 1234, splitMs: 1234 }], mode: 'countdown',
+      laps: [{ elapsedMs: 1234, splitMs: 1234 }], mode: 'pomodoro',
       createdAt: '2026-08-04T04:00:00.000Z', updatedAt: '2026-08-04T04:01:00.000Z', deleted: true,
     }],
     drills: [{
@@ -54,6 +54,25 @@ function legacyState() {
     formulaDrills: [{
       id: 'formula-1', formulaKey: 'growth-1', known: false, mode: 'full', sessionId: 'session-f',
       createdAt: '2026-08-04T06:00:00.000Z', updatedAt: '2026-08-04T06:00:00.000Z', deleted: true,
+    }],
+    speedDrills: [{
+      id: 'speed-1', categoryKey: 'prior-amount', categoryLabel: '估算前期量', difficulty: 'normal',
+      prompt: '现期 5200，同比增长 8.3%，估算基期量', expression: '5200 ÷ 1.083',
+      correctAnswer: '4801.5', userAnswer: '4801.5', correct: true, elapsedMs: 5200, sessionId: 'session-s',
+      createdAt: '2026-08-04T06:10:00.000Z', updatedAt: '2026-08-04T06:10:00.000Z', deleted: false,
+    }],
+    analysisReviews: [{
+      id: 'review-1', source: 'camera', questionText: '现期量为 5200，同比增长 8.3%，求基期量。',
+      userAnswer: '4800', correctAnswer: '4801.5', categoryKey: 'base-amount', categoryLabel: '基期量',
+      sections: [
+        { title: '题型识别', content: '这是基期量问题。' },
+        { title: '找数检查', content: '现期 5200，增长率 8.3%。' },
+        { title: '核心关系', content: '基期 = 现期 ÷ (1+r)。' },
+        { title: '最短路径', content: '直接代入关系式。' },
+        { title: '估算策略', content: '先判断结果略小于 5200。' },
+        { title: '易错复盘', content: '不要用现期乘增长率。' },
+      ],
+      createdAt: '2026-08-04T06:20:00.000Z', updatedAt: '2026-08-04T06:20:00.000Z', deleted: false,
     }],
     settings: {
       appMode: 'general',
@@ -81,7 +100,7 @@ test('toV3 preserves current v2 business fields without mutating the UI state', 
   const progress = state.dailyProgress.find((item) => item.taskId === 'task-c');
   assert.equal(progress.completed, 1);
   assert.deepEqual(progress.subtaskSnapshot, [{ id: 'sub-1', title: '子任务', done: true }]);
-  assert.equal(state.timerSessions[0].mode, 'countdown');
+  assert.equal(state.timerSessions[0].mode, 'pomodoro');
   assert.equal(state.timerSessions[0].deletedAt, '2026-08-04T04:01:00.000Z');
   assert.deepEqual(
     state.drillAttempts.map(({ kind, catalogKey, correct, known, deletedAt }) => ({ kind, catalogKey, correct, known, deletedAt })),
@@ -93,6 +112,9 @@ test('toV3 preserves current v2 business fields without mutating the UI state', 
   assert.equal(state.settings.theme, 'dark');
   assert.equal(state.settings.appMode, 'general');
   assert.equal(state.settings.markDate, '2026-11-30');
+  const { deleted: _speedDeleted, ...speedRecord } = source.speedDrills[0];
+  assert.deepEqual(state.speedAttempts[0], { ...speedRecord, deletedAt: null });
+  assert.equal(state.analysisReviews[0].sections.length, 6);
 });
 
 test('fromV3 returns every legacy UI collection and preserves record semantics', () => {
@@ -102,7 +124,7 @@ test('fromV3 returns every legacy UI collection and preserves record semantics',
 
   assert.deepEqual(state, before);
   assert.deepEqual(Object.keys(legacy).sort(), [
-    'checkins', 'drills', 'formulaDrills', 'schemaVersion', 'settings', 'subtasks', 'tasks', 'timers',
+    'analysisReviews', 'checkins', 'drills', 'formulaDrills', 'schemaVersion', 'settings', 'speedDrills', 'subtasks', 'tasks', 'timers',
   ]);
   assert.equal(legacy.schemaVersion, 2);
   assert.deepEqual(legacy.tasks.find((task) => task.id === 'task-q'), legacyState().tasks[0]);
@@ -117,6 +139,8 @@ test('fromV3 returns every legacy UI collection and preserves record semantics',
   assert.deepEqual(legacy.timers, legacyState().timers);
   assert.deepEqual(legacy.drills, legacyState().drills);
   assert.deepEqual(legacy.formulaDrills, legacyState().formulaDrills);
+  assert.deepEqual(legacy.speedDrills, legacyState().speedDrills);
+  assert.deepEqual(legacy.analysisReviews, legacyState().analysisReviews);
   assert.deepEqual(legacy.settings, { appMode: 'general', planEndDate: '2026-12-31', theme: 'dark', markDate: '2026-11-30' });
 });
 

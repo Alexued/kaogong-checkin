@@ -113,7 +113,7 @@ test('legacy migration preserves general mode and rejects an explicit invalid mo
   assert.throws(() => migration.migrateLegacyToV3(JSON.stringify(general)), /app mode/i);
 });
 
-test('repository additively upgrades a pre-appMode v3 record and its outbox envelopes', async () => {
+test('repository additively upgrades old v3 records and their outbox envelopes', async () => {
   const seedStorage = new MemoryStorage();
   const seedRepository = new repositoryModule.RepositoryV3(seedStorage);
   const seeded = await seedRepository.load();
@@ -130,13 +130,21 @@ test('repository additively upgrades a pre-appMode v3 record and its outbox enve
     envelope: structuredClone(oldRecord.envelope),
   });
   delete oldRecord.envelope.state.settings.appMode;
+  delete oldRecord.envelope.state.speedAttempts;
+  delete oldRecord.envelope.state.analysisReviews;
   delete oldRecord.outbox[0].envelope.state.settings.appMode;
+  delete oldRecord.outbox[0].envelope.state.speedAttempts;
+  delete oldRecord.outbox[0].envelope.state.analysisReviews;
 
   const storage = new MemoryStorage({ 'kgc-repository-v3': JSON.stringify(oldRecord) });
   const repository = new repositoryModule.RepositoryV3(storage);
   const loaded = await repository.load();
   assert.equal(loaded.record.envelope.state.settings.appMode, 'exam');
   assert.equal(loaded.record.outbox[0].envelope.state.settings.appMode, 'exam');
+  assert.deepEqual(loaded.record.envelope.state.speedAttempts, []);
+  assert.deepEqual(loaded.record.envelope.state.analysisReviews, []);
+  assert.deepEqual(loaded.record.outbox[0].envelope.state.speedAttempts, []);
+  assert.deepEqual(loaded.record.outbox[0].envelope.state.analysisReviews, []);
   assert.equal(loaded.record.envelope.revision, oldRecord.envelope.revision);
   assert.equal(JSON.parse(storage.getItem('kgc-repository-v3')).envelope.state.settings.appMode, 'exam');
 });
@@ -263,6 +271,28 @@ test('domain validation rejects duplicate progress keys and orphan timers', () =
   state.dailyProgress = [];
   state.timerSessions.push({ id: 'timer-1', label: '', taskId: 'missing', date: '2026-01-01', startedAt: '2026-01-01T00:00:00.000Z', durationMs: 0, laps: [], mode: 'stopwatch', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null });
   assert.throws(() => domain.validateDomainState(state), /ORPHAN_TIMER/);
+});
+
+test('domain validation rejects duplicate speed attempts and analysis reviews', () => {
+  const timestamp = '2026-01-01T00:00:00.000Z';
+  const state = domain.emptyDomainState();
+  const speedAttempt = {
+    id: 'speed-1', categoryKey: 'growth', categoryLabel: '增长率', difficulty: 'normal',
+    prompt: '12.5% 等于几分之一？', expression: '12.5%', correctAnswer: '1/8', userAnswer: '1/8',
+    correct: true, elapsedMs: 1000, sessionId: 'speed-session', createdAt: timestamp, updatedAt: timestamp, deletedAt: null,
+  };
+  state.speedAttempts.push(speedAttempt, { ...speedAttempt });
+  assert.throws(() => domain.validateDomainState(state), /DUPLICATE_SPEED_ID/);
+
+  state.speedAttempts = [];
+  const review = {
+    id: 'review-1', source: 'text', questionText: '现期量为 120，同比增长 20%，求基期量。',
+    userAnswer: '100', correctAnswer: '100', categoryKey: 'base-value', categoryLabel: '基期量',
+    sections: [{ title: '题型识别', content: '已知现期量和增长率，求基期量。' }],
+    createdAt: timestamp, updatedAt: timestamp, deletedAt: null,
+  };
+  state.analysisReviews.push(review, { ...review });
+  assert.throws(() => domain.validateDomainState(state), /DUPLICATE_REVIEW_ID/);
 });
 
 test('domain settings validation accepts only exam and general modes', () => {

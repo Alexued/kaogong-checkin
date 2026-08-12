@@ -39,6 +39,8 @@ const ENTITY_COLLECTION = {
   timer: 'timers',
   drill: 'drills',
   formulaDrill: 'formulaDrills',
+  speedDrill: 'speedDrills',
+  analysisReview: 'analysisReviews',
 };
 
 function defaultData() {
@@ -50,6 +52,8 @@ function defaultData() {
     timers: [],
     drills: [],
     formulaDrills: [],
+    speedDrills: [],
+    analysisReviews: [],
     settings: {
       appMode: 'exam',
       planEndDate: null,

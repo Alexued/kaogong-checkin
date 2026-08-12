@@ -70,7 +70,7 @@ function applyLegacyMessage(state: AppState, message: SyncMessage): void {
     if (message.kind === 'upsert' && (state.settings.updatedAt || '') <= (payload.updatedAt || '')) state.settings = { ...state.settings, ...clone(payload) };
     return;
   }
-  const key = ({ task: 'tasks', subtask: 'subtasks', checkin: 'checkins', timer: 'timers', drill: 'drills', formulaDrill: 'formulaDrills' } as Record<string, keyof AppState>)[message.entity];
+  const key = ({ task: 'tasks', subtask: 'subtasks', checkin: 'checkins', timer: 'timers', drill: 'drills', formulaDrill: 'formulaDrills', speedDrill: 'speedDrills', analysisReview: 'analysisReviews' } as Record<string, keyof AppState>)[message.entity];
   if (!key) throw new Error('INVALID_LEGACY_ENTITY');
   const collection = state[key] as Array<JsonRecord>;
   const index = collection.findIndex((item) => item.id === payload.id);
@@ -137,7 +137,7 @@ function mapTimer(source: JsonRecord): TimerSessionV3 {
     laps: Array.isArray(source.laps)
       ? source.laps.map((lap) => ({ elapsedMs: milliseconds(lap.elapsedMs), splitMs: milliseconds(lap.splitMs) }))
       : [],
-    mode: source.mode === 'countdown' ? 'countdown' : 'stopwatch',
+    mode: source.mode === 'countdown' || source.mode === 'pomodoro' ? source.mode : 'stopwatch',
     createdAt,
     updatedAt: timestamp(source.updatedAt, createdAt),
     deletedAt: source.deleted ? timestamp(source.updatedAt, createdAt) : null,
@@ -221,6 +221,22 @@ export function migrateLegacyToV3(rawState: string, rawQueue = ''): LegacyMigrat
   }
   output.timerSessions = state.timers.map((timer) => mapTimer(timer as unknown as JsonRecord));
   output.drillAttempts = mapAttempts(state);
+  output.speedAttempts = state.speedDrills.map((source) => ({
+    id: String(source.id), categoryKey: String(source.categoryKey), categoryLabel: String(source.categoryLabel),
+    difficulty: source.difficulty, prompt: String(source.prompt), expression: String(source.expression || ''),
+    correctAnswer: String(source.correctAnswer), userAnswer: String(source.userAnswer), correct: Boolean(source.correct),
+    elapsedMs: milliseconds(source.elapsedMs), sessionId: String(source.sessionId),
+    createdAt: timestamp(source.createdAt, new Date(0).toISOString()), updatedAt: timestamp(source.updatedAt, source.createdAt),
+    deletedAt: source.deleted ? timestamp(source.updatedAt, source.createdAt) : null,
+  }));
+  output.analysisReviews = state.analysisReviews.map((source) => ({
+    id: String(source.id), source: source.source, questionText: String(source.questionText),
+    userAnswer: String(source.userAnswer || ''), correctAnswer: String(source.correctAnswer || ''),
+    categoryKey: String(source.categoryKey), categoryLabel: String(source.categoryLabel),
+    sections: Array.isArray(source.sections) ? source.sections.map((section) => ({ title: String(section.title), content: String(section.content) })) : [],
+    createdAt: timestamp(source.createdAt, new Date(0).toISOString()), updatedAt: timestamp(source.updatedAt, source.createdAt),
+    deletedAt: source.deleted ? timestamp(source.updatedAt, source.createdAt) : null,
+  }));
   output.settings = {
     appMode: normalizeAppMode(state.settings.appMode),
     planEndDate: state.settings.planEndDate || null,

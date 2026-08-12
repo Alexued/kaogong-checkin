@@ -59,7 +59,10 @@ export function summarizeEnvelope(envelope: StorageEnvelopeV3): PeerSnapshotSumm
     taskCount: envelope.state.tasks.filter((item) => item.deletedAt === null).length,
     progressCount: envelope.state.dailyProgress.filter((item) => item.deletedAt === null && item.completed > 0).length,
     timerCount: envelope.state.timerSessions.filter((item) => item.deletedAt === null).length,
-    drillCount: envelope.state.drillAttempts.filter((item) => item.deletedAt === null).length,
+    drillCount:
+      envelope.state.drillAttempts.filter((item) => item.deletedAt === null).length
+      + (envelope.state.speedAttempts || []).filter((item) => item.deletedAt === null).length
+      + (envelope.state.analysisReviews || []).filter((item) => item.deletedAt === null).length,
     savedAt: envelope.savedAt,
   };
 }
