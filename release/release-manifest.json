@@ -4,6 +4,9 @@
   "stateSchemaVersion": 3,
   "syncProtocolVersion": 3,
   "backupFormatVersion": 1,
+  "fileName": "kaogong-checkin-v0.12.0.apk",
+  "size": 48741828,
+  "sha256": "40d9bc50da68a2202622c21e264174e84673610381c8d242763042320418649d",
   "applicationId": "com.wjy.kaogong",
   "releaseChannel": "internal-debug"
 }

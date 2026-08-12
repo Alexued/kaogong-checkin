@@ -2,6 +2,7 @@ import { App as CapApp } from '@capacitor/app';
 import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { readonly, shallowRef } from 'vue';
 import { confirmDialog } from '../lib/appDialog';
+import { useAppStore } from '../stores/app';
 import { setComputerSyncEnabled } from './computer-sync';
 import {
   buildPeerConnectUri,
@@ -19,6 +20,7 @@ import {
 
 const DISCOVERABLE_KEY = 'kgc-device-sync-discoverable';
 const SEARCHING_KEY = 'kgc-device-sync-searching';
+const DEVICE_ID_KEY = 'kgc-device-sync-id-v1';
 
 export interface PeerDevice {
   deviceId: string;
@@ -120,7 +122,7 @@ export const deviceSyncState = {
 };
 
 function appVersion(): string {
-  return String(import.meta.env.VITE_APP_VERSION || '0.11.0');
+  return String(import.meta.env.VITE_APP_VERSION || '0.12.0');
 }
 
 function normalizePeer(peer: PeerDevice): PeerDevice {
@@ -171,8 +173,13 @@ function summaryText(summary?: PeerSnapshotSummary): string {
 
 async function ensureIdentity(): Promise<string> {
   if (localDeviceId) return localDeviceId;
-  const { envelope } = await parsePeerTransfer(await exportLocalPeerTransfer());
-  localDeviceId = envelope.deviceId;
+  const stored = localStorage.getItem(DEVICE_ID_KEY)?.trim() || '';
+  localDeviceId = stored.length >= 8
+    ? stored
+    : (crypto.randomUUID?.() || `device-${Date.now().toString(36)}`);
+  try { localStorage.setItem(DEVICE_ID_KEY, localDeviceId); } catch {
+    /* Discovery remains available even when WebView storage is full. */
+  }
   return localDeviceId;
 }
 
@@ -197,18 +204,23 @@ async function applyIncomingTransfer(
   source: Pick<PeerDevice, 'deviceId' | 'name'>,
 ): Promise<void> {
   const parsed = await parsePeerTransfer(transfer);
-  const recovery = await exportLocalPeerRecoveryPoint();
-  await NativeDeviceSync.saveRecoveryPoint({
-    bundleJson: recovery.bundleJson,
-    sourceName: source.name,
-    sourceDeviceId: source.deviceId,
-    summary: recovery.transfer.summary,
-  });
+  const wasRecoveryRequired = useAppStore().recoveryRequired;
+  if (!wasRecoveryRequired) {
+    const recovery = await exportLocalPeerRecoveryPoint();
+    await NativeDeviceSync.saveRecoveryPoint({
+      bundleJson: recovery.bundleJson,
+      sourceName: source.name,
+      sourceDeviceId: source.deviceId,
+      summary: recovery.transfer.summary,
+    });
+  }
   await setComputerSyncEnabled(false);
   await replaceLocalStateFromPeer(parsed.transfer);
   await refreshRecoveryPoints();
   successRevision.value += 1;
-  statusMessage.value = `已接收 ${source.name} 的记录，电脑同步已暂停`;
+  statusMessage.value = wasRecoveryRequired
+    ? `已用 ${source.name} 的记录完成恢复，电脑同步已暂停`
+    : `已接收 ${source.name} 的记录，电脑同步已暂停`;
 }
 
 async function handleIncomingRequest(event: IncomingRequestEvent) {
@@ -216,12 +228,20 @@ async function handleIncomingRequest(event: IncomingRequestEvent) {
     const accepted = await confirmDialog({
       title: `接收“${event.sourceDevice.name}”的记录`,
       message: `本机现有记录将被完整替换。对方记录包含：${summaryText(event.summary)}。`,
-      details: ['替换前会自动创建恢复点', '电脑同步会暂停，避免旧快照覆盖新记录'],
+      details: useAppStore().recoveryRequired
+        ? ['原始迁移备份仍会保留', '电脑同步会暂停，避免旧快照覆盖新记录']
+        : ['替换前会自动创建恢复点', '电脑同步会暂停，避免旧快照覆盖新记录'],
       confirmLabel: '允许接收',
       variant: 'danger',
     });
     await NativeDeviceSync.approveIncoming({ requestId: event.requestId, accepted });
     if (!accepted) statusMessage.value = `已拒绝 ${event.sourceDevice.name} 的发送请求`;
+    return;
+  }
+
+  if (useAppStore().recoveryRequired) {
+    await NativeDeviceSync.approveIncoming({ requestId: event.requestId, accepted: false });
+    statusMessage.value = '本机数据尚未恢复，不能向外发送；可以从另一台设备接收记录';
     return;
   }
 
@@ -407,13 +427,15 @@ export async function restoreRecoveryPoint(point: RecoveryPoint) {
   if (!accepted) return false;
   busy.value = true;
   try {
-    const current = await exportLocalPeerRecoveryPoint();
-    await NativeDeviceSync.saveRecoveryPoint({
-      bundleJson: current.bundleJson,
-      sourceName: '恢复前的本机记录',
-      sourceDeviceId: localDeviceId || 'local-device',
-      summary: current.transfer.summary,
-    });
+    if (!useAppStore().recoveryRequired) {
+      const current = await exportLocalPeerRecoveryPoint();
+      await NativeDeviceSync.saveRecoveryPoint({
+        bundleJson: current.bundleJson,
+        sourceName: '恢复前的本机记录',
+        sourceDeviceId: localDeviceId || 'local-device',
+        summary: current.transfer.summary,
+      });
+    }
     const saved = await NativeDeviceSync.readRecoveryPoint({ id: point.id });
     const bundle = JSON.parse(saved.bundleJson) as { transfer?: PeerTransfer };
     if (!bundle.transfer) throw new Error('RECOVERY_TRANSFER_MISSING');

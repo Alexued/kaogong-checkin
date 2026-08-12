@@ -133,6 +133,8 @@ export interface AnalysisReviewRecord {
   correctAnswer: string;
   categoryKey: string;
   categoryLabel: string;
+  skillId?: string;
+  questionBankId?: string;
   sections: AnalysisReviewSection[];
   createdAt: string;
   updatedAt: string;

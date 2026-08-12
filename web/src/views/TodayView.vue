@@ -46,9 +46,7 @@
       </div>
     </header>
 
-    <div v-if="store.recoveryRequired" class="recovery-notice" role="alert">
-      本地数据需要恢复，当前已进入只读模式。原始数据未被覆盖。
-    </div>
+    <DataRecoveryPanel compact />
 
     <section class="progress-overview" :aria-label="isGeneral ? '今日打卡进度' : '今日完成进度'">
       <ProgressRing :percent="progress">
@@ -185,6 +183,7 @@ import type { Task } from '../types';
 import { effectivePlanEnd, modeCopy } from '../lib/appMode';
 import { pixelPatternCycleDuration, type PixelGridPatternPreset } from '../lib/pixelGrid';
 import { SHELL_PHASE_KEY, type ShellPhase } from '../lib/shellPhase';
+import DataRecoveryPanel from '../components/DataRecoveryPanel.vue';
 
 const store = useAppStore();
 const route = useRoute();
@@ -254,8 +253,15 @@ const subsByTask = computed(() => {
 /** 子任务打卡/恢复（日期跟随当前查看的日期） */
 function onToggleSub(sub: SubItem, ev: MouseEvent) {
   const checking = !sub.done;
-  store.toggleCheckin(sub.id, selectedDate.value, sub.checkinId);
+  if (!store.toggleCheckin(sub.id, selectedDate.value, sub.checkinId)) {
+    showRecoveryForBlockedWrite();
+    return;
+  }
   if (checking) celebrate(ev);
+}
+
+function showRecoveryForBlockedWrite() {
+  document.querySelector('#data-recovery')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 const isToday = computed(() => selectedDate.value === todayStr());
@@ -293,12 +299,16 @@ function onMark(date: string) {
 function onToggle(item: PlanItem, ev: MouseEvent) {
   const source = selectProgressSource(item, item.done ? -1 : 1);
   const checking = source.progress < source.target;
-  store.setProgress(
+  const saved = store.setProgress(
     item.task.id,
     source.date,
     checking ? source.target : 0,
     source.checkinId,
   );
+  if (!saved) {
+    showRecoveryForBlockedWrite();
+    return;
+  }
   if (checking) {
     celebrate(ev);
     checkAllDone();
@@ -307,7 +317,10 @@ function onToggle(item: PlanItem, ev: MouseEvent) {
 
 function onToggleSource(item: PlanItem, source: ProgressSource, ev: MouseEvent) {
   const checking = source.progress < source.target;
-  store.setProgress(item.task.id, source.date, checking ? source.target : 0, source.checkinId);
+  if (!store.setProgress(item.task.id, source.date, checking ? source.target : 0, source.checkinId)) {
+    showRecoveryForBlockedWrite();
+    return;
+  }
   if (checking) {
     celebrate(ev);
     checkAllDone();
@@ -322,7 +335,10 @@ function onAdjustProgress(
 ) {
   const source = explicitSource || selectProgressSource(item, delta);
   const next = Math.min(source.target, Math.max(0, source.progress + delta));
-  store.setProgress(item.task.id, source.date, next, source.checkinId);
+  if (!store.setProgress(item.task.id, source.date, next, source.checkinId)) {
+    showRecoveryForBlockedWrite();
+    return;
+  }
   if (delta > 0 && next === source.target) {
     celebrate(ev);
     checkAllDone();

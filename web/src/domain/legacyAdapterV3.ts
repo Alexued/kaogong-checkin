@@ -164,7 +164,7 @@ function legacySpeedAttempt(attempt: DomainStateV3['speedAttempts'][number]): Sp
 }
 
 function legacyAnalysisReview(review: DomainStateV3['analysisReviews'][number]): AnalysisReviewRecord {
-  return {
+  const output: AnalysisReviewRecord = {
     id: review.id,
     source: review.source,
     questionText: review.questionText,
@@ -177,6 +177,9 @@ function legacyAnalysisReview(review: DomainStateV3['analysisReviews'][number]):
     updatedAt: review.updatedAt,
     deleted: review.deletedAt !== null,
   };
+  if (review.skillId) output.skillId = review.skillId;
+  if (review.questionBankId) output.questionBankId = review.questionBankId;
+  return output;
 }
 
 /**

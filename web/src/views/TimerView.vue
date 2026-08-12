@@ -26,10 +26,10 @@
           <div class="clock">{{ clockText }}</div>
         </div>
         <div v-if="!pomodoro.startedAt && pomodoro.stage === 'focus'" class="pomo-settings card">
-          <label><span>专注</span><input v-model.number="focusMinutes" type="number" min="1" max="180" inputmode="numeric" /><small>分</small></label>
-          <label><span>短休息</span><input v-model.number="shortBreakMinutes" type="number" min="1" max="60" inputmode="numeric" /><small>分</small></label>
-          <label><span>长休息</span><input v-model.number="longBreakMinutes" type="number" min="1" max="120" inputmode="numeric" /><small>分</small></label>
-          <label><span>轮次</span><input v-model.number="longBreakEvery" type="number" min="2" max="12" inputmode="numeric" /><small>轮</small></label>
+          <button class="pomo-setting-button" type="button" @click="openWheel('focus')"><span>专注</span><strong>{{ focusMinutes }}<small>分</small></strong></button>
+          <button class="pomo-setting-button" type="button" @click="openWheel('short')"><span>短休息</span><strong>{{ shortBreakMinutes }}<small>分</small></strong></button>
+          <button class="pomo-setting-button" type="button" @click="openWheel('long')"><span>长休息</span><strong>{{ longBreakMinutes }}<small>分</small></strong></button>
+          <button class="pomo-setting-button" type="button" @click="openWheel('every')"><span>长休息间隔</span><strong>{{ longBreakEvery }}<small>轮</small></strong></button>
           <label class="pomo-task"><span>关联{{ isGeneral ? '打卡项' : '任务' }}</span><select v-model="pomoTaskId" class="input"><option value="">不关联</option><option v-for="t in linkableTasks" :key="t.id" :value="t.id">{{ t.title }}</option></select></label>
         </div>
       </div>
@@ -38,10 +38,10 @@
         <div class="preset-row">
           <button v-for="preset in presets" :key="preset" type="button" @click="setPreset(preset)">{{ preset }} 分钟</button>
         </div>
-        <div class="duration-inputs">
-          <label><input v-model.number="countdownMinutes" type="number" min="0" max="999" inputmode="numeric" /><span>分</span></label>
+        <div class="duration-wheels" aria-label="倒计时时间">
+          <WheelPicker v-model="countdownMinutes" label="分钟" :min="0" :max="999" suffix="分" />
           <span class="duration-colon">:</span>
-          <label><input v-model.number="countdownSeconds" type="number" min="0" max="59" inputmode="numeric" /><span>秒</span></label>
+          <WheelPicker v-model="countdownSeconds" label="秒钟" :min="0" :max="59" suffix="秒" />
         </div>
       </div>
       <div v-else class="countdown-clock-wrap" :class="{ completed: countdown.completed }">
@@ -107,6 +107,7 @@
           </div>
         </div>
       </Transition>
+      <NumberWheelSheet v-model:open="wheelOpen" v-model="wheelValue" :min="wheelMin" :max="wheelMax" :title="wheelTitle" :suffix="wheelSuffix" :pad="wheelPad" @update:model-value="applyWheelValue" />
     </teleport>
   </div>
 </template>
@@ -119,6 +120,8 @@ import { pomodoro, pomodoroStageLabel as stageLabel } from '../lib/pomodoro';
 import { toLocalDateStr } from '../lib/date';
 import PixelGrid from '../components/PixelGrid.vue';
 import { confirmDialog } from '../lib/appDialog';
+import WheelPicker from '../components/WheelPicker.vue';
+import NumberWheelSheet from '../components/NumberWheelSheet.vue';
 
 const store = useAppStore();
 const isGeneral = computed(() => store.settings.appMode === 'general');
@@ -143,7 +146,19 @@ const pomoStageLabel = computed(() => stageLabel(pomodoro.stage));
 const pomodoroProgress = computed(() => pomodoro.durationMs > 0 ? Math.max(0, Math.min(1, remainingDisplay.value / pomodoro.durationMs)) : 0);
 const pomodoroCompleted = ref(false);
 const completedStage = ref<'focus' | 'shortBreak' | 'longBreak'>('focus');
+const wheelOpen = ref(false);
+const wheelKind = ref<'focus' | 'short' | 'long' | 'every'>('focus');
 let raf = 0;
+
+const wheelTitle = computed(() => ({ focus: '专注时长', short: '短休息时长', long: '长休息时长', every: '长休息间隔' }[wheelKind.value]));
+const wheelSuffix = computed(() => wheelKind.value === 'every' ? '轮' : '分钟');
+const wheelMin = computed(() => wheelKind.value === 'every' ? 2 : 1);
+const wheelMax = computed(() => wheelKind.value === 'focus' ? 180 : wheelKind.value === 'short' ? 60 : wheelKind.value === 'long' ? 120 : 12);
+const wheelPad = computed(() => wheelKind.value === 'every' ? 1 : 2);
+const wheelValue = computed({
+  get: () => ({ focus: focusMinutes.value, short: shortBreakMinutes.value, long: longBreakMinutes.value, every: longBreakEvery.value }[wheelKind.value]),
+  set: (value: number) => applyWheelValue(value),
+});
 
 function tick() {
   if (mode.value === 'pomodoro') {
@@ -179,6 +194,13 @@ function pause() { if (mode.value === 'countdown') countdown.pause(); else sw.pa
 function resume() { if (mode.value === 'countdown') countdown.resume(); else sw.resume(); cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); }
 function beginFinish() { if (mode.value === 'countdown') countdown.pause(); else sw.pause(); cancelAnimationFrame(raf); tick(); finishing.value = true; }
 function setPreset(minutes: number) { countdownMinutes.value = minutes; countdownSeconds.value = 0; }
+function openWheel(kind: typeof wheelKind.value) { wheelKind.value = kind; wheelOpen.value = true; }
+function applyWheelValue(value: number) {
+  if (wheelKind.value === 'focus') focusMinutes.value = value;
+  else if (wheelKind.value === 'short') shortBreakMinutes.value = value;
+  else if (wheelKind.value === 'long') longBreakMinutes.value = value;
+  else longBreakEvery.value = value;
+}
 
 function scheduleTick() {
   cancelAnimationFrame(raf);
@@ -262,9 +284,8 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 .ring-track { stroke: var(--card-border); }.ring-value { stroke: var(--accent-solid); stroke-linecap: round; stroke-dasharray: 615.75; transition: stroke-dashoffset 180ms linear; }
 .countdown-clock-wrap.completed { animation: countdown-pulse 620ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes countdown-pulse { 50% { transform: scale(1.045); } }
-.countdown-setup { display: grid; gap: 18px; place-items: center; }.preset-row { display: flex; gap: 8px; }.preset-row button { border: 1px solid var(--card-border); border-radius: 10px; background: var(--card); color: var(--text-2); padding: 8px 12px; font-size: 12px; }
-.duration-inputs { display: flex; align-items: center; gap: 8px; }.duration-inputs label { display: flex; align-items: baseline; gap: 5px; color: var(--text-2); }.duration-inputs input { width: 78px; border: 1px solid var(--card-border); border-radius: 12px; background: var(--bg-elev); color: var(--text); padding: 11px 8px; text-align: center; font-size: 28px; font-variant-numeric: tabular-nums; }.duration-colon { font-size: 28px; color: var(--text-3); }
-.pomodoro-stage { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }.pomo-meta { width:min(78vw,300px); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; color:var(--text-2); font-size:13px; font-weight:750; }.pomo-meta small { text-align:right; color:var(--text-3); }.pomo-dots { display:flex; gap:5px; }.pomo-dots i { width:8px; height:8px; border-radius:2px; background:var(--card-border); }.pomo-dots i.on { background:var(--accent-solid); }.pomo-settings { width:min(100%,430px); display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:10px; }.pomo-settings label { min-width:0; display:grid; grid-template-columns:1fr auto; gap:3px; align-items:end; color:var(--text-3); font-size:10px; }.pomo-settings label>span { grid-column:1/-1; }.pomo-settings input { min-width:0; width:100%; border:1px solid var(--card-border); border-radius:8px; background:var(--bg-elev); color:var(--text); padding:7px 4px; text-align:center; font-size:17px; font-weight:750; }.pomo-settings small { padding-bottom:7px; }.pomo-settings .pomo-task { grid-column:1/-1; display:block; }.pomo-task .input { width:100%; margin-top:3px; font-size:12px; padding:7px 9px; }.pomo-complete-sheet { text-align:center; }.pomo-complete-sheet h2 { margin:12px 0 7px; font-size:22px; }.pomo-complete-sheet p { color:var(--text-2); font-size:13px; line-height:1.6; }.pomo-complete-sheet .btn { width:100%; margin-top:8px; }
+.countdown-setup { display: grid; gap: 18px; place-items: center; }.preset-row { display: flex; gap: 8px; }.preset-row button { min-height: 44px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--card); color: var(--text-2); padding: 8px 12px; font-size: 12px; }.duration-wheels { display: grid; grid-template-columns: minmax(88px, 130px) auto minmax(88px, 130px); align-items: center; gap: 6px; }.duration-wheels :deep(.wheel-field) { width: 100%; }.duration-colon { margin-top: 22px; font-size: 28px; color: var(--text-3); }
+.pomodoro-stage { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }.pomo-meta { width:min(78vw,300px); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; color:var(--text-2); font-size:13px; font-weight:750; }.pomo-meta small { text-align:right; color:var(--text-3); }.pomo-dots { display:flex; gap:5px; }.pomo-dots i { width:8px; height:8px; border-radius:2px; background:var(--card-border); }.pomo-dots i.on { background:var(--accent-solid); }.pomo-settings { width:min(100%,430px); display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:10px; }.pomo-setting-button { min-width:0; min-height:76px; display:grid; align-content:center; gap:5px; border:1px solid var(--card-border); border-radius:8px; background:var(--bg-elev); color:var(--text-2); text-align:left; padding:9px; }.pomo-setting-button span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }.pomo-setting-button strong { color:var(--text); font-size:18px; font-variant-numeric:tabular-nums; }.pomo-setting-button small { margin-left:3px; color:var(--text-3); font-size:10px; font-weight:600; }.pomo-setting-button:active { border-color:var(--accent-solid); background:var(--accent-soft); }.pomo-settings .pomo-task { grid-column:1/-1; display:block; }.pomo-task .input { width:100%; margin-top:3px; font-size:12px; padding:7px 9px; }.pomo-complete-sheet { text-align:center; }.pomo-complete-sheet h2 { margin:12px 0 7px; font-size:22px; }.pomo-complete-sheet p { color:var(--text-2); font-size:13px; line-height:1.6; }.pomo-complete-sheet .btn { width:100%; margin-top:8px; }
 .laps-area { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 420px; margin: 10px auto 0; }.laps-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 6px; }.laps-title { font-size: 13px; font-weight: 700; color: var(--text-3); }.font-ctl { display: flex; gap: 6px; }.font-btn { border: 1px solid var(--card-border); background: var(--card); color: var(--text-2); border-radius: 9px; padding: 3px 10px; font-size: 13px; font-weight: 700; }.font-btn:disabled { opacity: .4; }.laps-scroll { flex: 1; min-height: 0; overflow-y: auto; }.lap { display: flex; align-items: center; gap: 14px; padding: 6px 8px; font-variant-numeric: tabular-nums; }.lap-no { width: 1.7em; height: 1.7em; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: .78em; font-weight: 800; flex: none; }.lap-split { font-weight: 700; flex: 1; }.lap-elapsed { color: var(--text-2); }
 .controls { display: flex; justify-content: center; align-items: center; gap: 24px; padding: 10px 0 18px; }.round-btn { border: none; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; cursor: pointer; transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }.round-btn span { font-size: 12px; font-weight: 700; }.round-btn:active { transform: scale(.92); }.round-btn:disabled { opacity: .45; }.round-btn.main { width: 96px; height: 96px; }.round-btn.lap { width: 80px; height: 80px; background: linear-gradient(135deg,#3b82f6,#6366f1); box-shadow: 0 8px 24px rgba(59,130,246,.35); }.round-btn.sub { width: 64px; height: 64px; }.round-btn.start { background: linear-gradient(135deg,#34d399,#10b981); box-shadow: 0 10px 30px rgba(16,185,129,.45); }.round-btn.pause { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 10px 30px rgba(245,158,11,.45); }.round-btn.stop { background: linear-gradient(135deg,#f87171,#64748b); box-shadow: 0 6px 18px rgba(100,116,139,.35); }
 .history-entry { display: flex; align-items: center; gap: 10px; padding: 15px 18px; text-decoration: none; color: var(--text); }.he-label { flex: 1; font-size: 15.5px; font-weight: 600; }.he-count { font-size: 13px; color: var(--text-3); }.he-arrow { font-size: 20px; color: var(--text-3); }

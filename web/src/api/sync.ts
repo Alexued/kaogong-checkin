@@ -11,14 +11,21 @@ import {
   wsUrl,
   type BackupAppendResultV3,
 } from './client';
-import { getPairingToken, removePairingToken } from './pairing-storage';
+import { getPairingToken, getSelectedServerId, removePairingToken } from './pairing-storage';
 import { SyncGeneration } from './sync-generation';
 import { isSyncEnabled, LOCAL_STATE_KEY, persistSyncEnabled } from './sync-preference';
 import { compactQueue, normalizeQueue, type QueuedSyncMessage } from './sync-queue';
 import { createPeerTransfer, parsePeerTransfer, type PeerTransfer } from './peer-transfer';
 import type { AppState, RemoteSyncMessage, ServerInfo, SyncMessage } from '../types';
 import { fromV3, toV3 } from '../domain/legacyAdapterV3';
-import { MigrationLockedError, RepositoryV3 } from '../storage/repositoryV3';
+import { applySyncMessage } from '../lib/applySyncMessage';
+import {
+  LEGACY_STATE_KEY,
+  MIGRATION_BACKUP_KEY,
+  MigrationLockedError,
+  RepositoryV3,
+  type MigrationRecoveryStatusV3,
+} from '../storage/repositoryV3';
 import {
   STATE_SCHEMA_VERSION,
   V1_BACKUP_KEY,
@@ -28,6 +35,8 @@ import {
 
 const QUEUE_KEY = 'kgc-queue';
 const PEER_QUEUE_ARCHIVE_KEY = 'kgc-peer-queue-archive-v1';
+const COMPUTER_OVERWRITE_CANDIDATE_KEY = 'kgc-computer-overwrite-candidate-v1';
+const COMPUTER_OVERWRITE_BASELINE_KEY = 'kgc-computer-overwrite-baseline-v1';
 const ACK_PROTOCOL_VERSION = 2;
 
 let queue: QueuedSyncMessage[] = [];
@@ -53,6 +62,46 @@ let v3LoadPromise: Promise<void> | null = null;
 let v3PersistTimer: ReturnType<typeof setTimeout> | null = null;
 let v3PersistChain: Promise<void> = Promise.resolve();
 let localMutationEpoch = 0;
+let localOverwriteCandidate: AppState | null = null;
+
+function cloneState(state: AppState): AppState {
+  return JSON.parse(JSON.stringify(state)) as AppState;
+}
+
+function persistLocalOverwriteCandidate(): void {
+  if (!localOverwriteCandidate) return;
+  try { localStorage.setItem(COMPUTER_OVERWRITE_CANDIDATE_KEY, JSON.stringify(localOverwriteCandidate)); } catch {
+    /* The in-memory candidate remains usable for the current session. */
+  }
+}
+
+function clearLocalOverwriteCandidate(establishedServerId = ''): void {
+  localOverwriteCandidate = null;
+  localStorage.removeItem(COMPUTER_OVERWRITE_CANDIDATE_KEY);
+  if (establishedServerId) localStorage.setItem(COMPUTER_OVERWRITE_BASELINE_KEY, establishedServerId);
+}
+
+function resetComputerOverwriteBaseline(state: AppState): void {
+  localStorage.removeItem(COMPUTER_OVERWRITE_BASELINE_KEY);
+  localOverwriteCandidate = cloneState(state);
+  persistLocalOverwriteCandidate();
+}
+
+function ensureLocalOverwriteCandidate(): void {
+  if (localOverwriteCandidate) return;
+  const selectedServerId = getSelectedServerId();
+  if (selectedServerId && localStorage.getItem(COMPUTER_OVERWRITE_BASELINE_KEY) === selectedServerId) return;
+  try {
+    const raw = localStorage.getItem(COMPUTER_OVERWRITE_CANDIDATE_KEY);
+    if (raw) localOverwriteCandidate = migrateAppState(JSON.parse(raw));
+  } catch {
+    localStorage.removeItem(COMPUTER_OVERWRITE_CANDIDATE_KEY);
+  }
+  if (!localOverwriteCandidate) {
+    localOverwriteCandidate = cloneState(currentState());
+    persistLocalOverwriteCandidate();
+  }
+}
 
 function loadQueue() {
   if (queueLoaded) return;
@@ -192,6 +241,41 @@ export function initializeLocalState() {
   void initializeV3Persistence();
 }
 
+export function localRecoveryStatus(): MigrationRecoveryStatusV3 {
+  const repository = v3Repository || new RepositoryV3(localStorage);
+  return repository.recoveryStatus();
+}
+
+export async function retryLocalRecovery(): Promise<void> {
+  const repository = v3Repository || new RepositoryV3(localStorage);
+  const result = await repository.retryMigration();
+  v3Repository = repository;
+  const store = useAppStore();
+  store.applySnapshot(fromV3(result.record.envelope.state));
+  store.recoveryRequired = false;
+  v3Ready = true;
+  v3LoadPromise = Promise.resolve();
+  if (!subscribed) {
+    subscribed = true;
+    store.$subscribe(schedulePersistState);
+  }
+  store.loaded = true;
+  try { localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(currentState())); } catch { /* v3 is canonical */ }
+  replayPendingLocally();
+  resetComputerOverwriteBaseline(currentState());
+  schedulePersistState();
+}
+
+export function recoverySourceKeys(): string[] {
+  try {
+    const raw = localStorage.getItem(MIGRATION_BACKUP_KEY);
+    const backup = raw ? JSON.parse(raw) as { sources?: Array<{ key?: string }> } : null;
+    return (backup?.sources || []).map((source) => source.key || '').filter(Boolean);
+  } catch {
+    return [LEGACY_STATE_KEY];
+  }
+}
+
 function archivePeerQueue(previousQueue: QueuedSyncMessage[]) {
   if (!previousQueue.length) return;
   let archive: Array<{ createdAt: string; queue: QueuedSyncMessage[] }> = [];
@@ -216,6 +300,10 @@ export function enqueue(message: SyncMessage) {
   localMutationEpoch += 1;
   loadQueue();
   queue = compactQueue(queue, message);
+  if (localOverwriteCandidate) {
+    applySyncMessage(localOverwriteCandidate, message);
+    persistLocalOverwriteCandidate();
+  }
   persistQueue();
   scheduleV3Persist();
   flushCurrentSocket();
@@ -396,6 +484,11 @@ async function refreshSnapshotAndConnect(generation: number) {
   if (!isCurrentRun(generation) || replacing) return;
   const store = useAppStore();
   store.syncPhase = 'connecting';
+  if (store.recoveryRequired) {
+    store.online = false;
+    store.syncPhase = 'local';
+    return;
+  }
   let info: ServerInfo | null = null;
 
   try {
@@ -422,6 +515,15 @@ async function refreshSnapshotAndConnect(generation: number) {
   try {
     const state = await fetchState(runAbortController?.signal);
     if (!isCurrentRun(generation)) return;
+    if (localOverwriteCandidate && queue.length === 0) {
+      try {
+        if (JSON.stringify(localOverwriteCandidate) === JSON.stringify(migrateAppState(state))) {
+          clearLocalOverwriteCandidate(info?.serverId || getSelectedServerId());
+        }
+      } catch {
+        /* Snapshot validation below owns malformed server data. */
+      }
+    }
     applyServerSnapshot(state);
   } catch (error) {
     if (!isCurrentRun(generation) || (error instanceof DOMException && error.name === 'AbortError')) return;
@@ -441,6 +543,14 @@ export async function startSync() {
   await initializeLocalStateAsync();
   if (!isSyncEnabled() || started) return;
 
+  const store = useAppStore();
+  if (store.recoveryRequired) {
+    store.online = false;
+    store.syncPhase = 'local';
+    return;
+  }
+  ensureLocalOverwriteCandidate();
+
   started = true;
   const generation = generationGuard.begin();
   runGeneration = generation;
@@ -448,7 +558,6 @@ export async function startSync() {
   serverInfo = null;
   runAbortController?.abort();
   runAbortController = new AbortController();
-  const store = useAppStore();
   store.online = false;
   store.syncPairingRequired = false;
   store.syncPhase = 'connecting';
@@ -507,6 +616,52 @@ export async function overwriteServerWithLocal() {
     replaceAbortController = null;
     replacing = false;
     if (isCurrentRun(generation)) void refreshSnapshotAndConnect(generation);
+  }
+}
+
+/**
+ * Replace the computer with the local candidate captured before the first
+ * server snapshot. This path deliberately performs no GET /api/state before
+ * PUT /api/state, so stale computer records cannot enter the outgoing copy.
+ */
+export async function overwriteComputerWithLocal(): Promise<AppState> {
+  await initializeLocalStateAsync();
+  if (!isSyncEnabled()) throw new Error('sync disabled');
+  const store = useAppStore();
+  if (store.recoveryRequired) throw new Error('local recovery required');
+  if (replacing) throw new Error('replace already in progress');
+
+  const outgoing = cloneState(localOverwriteCandidate || currentState());
+  stopSync();
+  replacing = true;
+  replaceAbortController = new AbortController();
+  let replaced: AppState | null = null;
+  try {
+    const info = await fetchInfo(replaceAbortController.signal);
+    rememberServerInfo(info);
+    serverInfo = info;
+    updateServerStatus(info);
+    if (!store.syncStateSchemaCompatible) throw new Error('state schema incompatible');
+    if (pairingIsMissing(info)) {
+      store.syncPairingRequired = true;
+      store.syncPhase = 'pairing';
+      throw new Error('pairing required');
+    }
+
+    replaced = migrateAppState(await replaceState(outgoing, replaceAbortController.signal));
+    queue = [];
+    persistQueue();
+    store.applySnapshot(replaced);
+    clearLocalOverwriteCandidate(info.serverId || getSelectedServerId());
+    try { localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(replaced)); } catch {
+      /* The server accepted the state; v3 persistence retries below. */
+    }
+    schedulePersistState();
+    return replaced;
+  } finally {
+    replaceAbortController = null;
+    replacing = false;
+    if (replaced) await startSync();
   }
 }
 
@@ -597,8 +752,9 @@ export async function exportLocalPeerRecoveryPoint(): Promise<{ bundleJson: stri
  */
 export async function replaceLocalStateFromPeer(value: unknown): Promise<AppState> {
   const { envelope } = await parsePeerTransfer(value);
-  await initializeLocalStateAsync();
-  if (!v3Repository || useAppStore().recoveryRequired) throw new Error('local repository unavailable');
+  initializeLocalState();
+  if (!v3Repository) v3Repository = new RepositoryV3(localStorage);
+  await v3LoadPromise?.catch(() => undefined);
 
   persistSyncEnabled(false);
   stopSync();
@@ -610,12 +766,12 @@ export async function replaceLocalStateFromPeer(value: unknown): Promise<AppStat
     clearTimeout(v3PersistTimer);
     v3PersistTimer = null;
   }
-  await v3PersistChain;
+  await v3PersistChain.catch(() => undefined);
 
   const nextState = fromV3(envelope.state);
   const previousQueue = queue;
   archivePeerQueue(previousQueue);
-  await v3Repository.commit(envelope.state, []);
+  await v3Repository.replaceFromExternal(envelope.state);
 
   queue = [];
   queueLoaded = true;
@@ -624,6 +780,14 @@ export async function replaceLocalStateFromPeer(value: unknown): Promise<AppStat
   const store = useAppStore();
   store.applySnapshot(nextState);
   store.recoveryRequired = false;
+  store.writeBlockedMessage = '';
+  v3Ready = true;
+  v3LoadPromise = Promise.resolve();
+  if (!subscribed) {
+    subscribed = true;
+    store.$subscribe(schedulePersistState);
+  }
+  resetComputerOverwriteBaseline(nextState);
   try { localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify(nextState)); } catch {
     /* The canonical repository was already atomically committed. */
   }

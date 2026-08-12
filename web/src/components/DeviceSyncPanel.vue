@@ -18,6 +18,11 @@
     <p v-if="!supported" class="support-note">设备直连仅在 Android 应用中可用，浏览器不会开放本地监听端口。</p>
 
     <template v-else>
+      <div v-if="store.recoveryRequired" class="recovery-direct-note" role="status">
+        <strong>当前可发现和接收设备</strong>
+        <span>本机记录尚未恢复，暂不能向外发送。可让另一台设备发送完整记录到本机，接收后会自动退出只读模式。</span>
+        <a href="#data-recovery">查看本机备份恢复方式</a>
+      </div>
       <div class="toggle-list">
         <label class="toggle-row">
           <span><strong>允许附近设备发现本机</strong><small>开启后显示地址、配对码和二维码</small></span>
@@ -107,7 +112,7 @@
           <input v-model="selectedCode" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" @input="normalizeSelectedCode" />
         </label>
         <div class="transfer-actions">
-          <button class="btn ghost" type="button" :disabled="busy || selectedCode.length !== 6" @click="sendSelected">
+          <button class="btn ghost" type="button" :disabled="busy || selectedCode.length !== 6 || store.recoveryRequired" @click="sendSelected">
             发送本机记录
           </button>
           <button class="btn" type="button" :disabled="busy || selectedCode.length !== 6" @click="receiveSelected">
@@ -138,6 +143,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import QRCode from 'qrcode';
+import { useAppStore } from '../stores/app';
 import {
   clearPendingPeerTarget,
   deviceSyncState,
@@ -167,6 +173,7 @@ const {
   successRevision,
   peerRevision,
 } = deviceSyncState;
+const store = useAppStore();
 const supported = deviceSyncState.supported;
 const switching = ref(false);
 const selectedPeer = ref<PeerDevice | null>(null);
@@ -202,23 +209,35 @@ function messageFor(error: unknown): string {
   if (code.includes('TIMEOUT')) return '连接超时，请确认两台设备都保持前台';
   if (code.includes('OFFLINE') || code.includes('CONNECT')) return '无法连接对方，请确认处于同一 Wi-Fi';
   if (code.includes('SNAPSHOT')) return '记录校验失败，未修改本机数据';
+  if (code.includes('LOCAL_ADDRESS')) return '无法获取局域网地址，请先连接 Wi-Fi 后重试';
+  if (code.includes('HOST_START')) return '无法开放本机发现服务，请确认 Wi-Fi 已连接后重试';
+  if (code.includes('DISCOVERY_START')) return '附近设备搜索启动失败，请关闭搜索开关后重试';
+  if (code.includes('INVALID_DEVICE_ID')) return '设备标识初始化失败，请重新打开本页面后重试';
   return '操作失败，本机记录未被修改';
 }
 
 async function toggleDiscoverable(event: Event) {
+  const input = event.target as HTMLInputElement;
   switching.value = true;
   operationError.value = '';
-  try { await setDeviceDiscoverable((event.target as HTMLInputElement).checked); }
+  try { await setDeviceDiscoverable(input.checked); }
   catch (error) { operationError.value = messageFor(error); }
-  finally { switching.value = false; }
+  finally {
+    input.checked = discoverable.value;
+    switching.value = false;
+  }
 }
 
 async function toggleSearching(event: Event) {
+  const input = event.target as HTMLInputElement;
   switching.value = true;
   operationError.value = '';
-  try { await setDeviceSearching((event.target as HTMLInputElement).checked); }
+  try { await setDeviceSearching(input.checked); }
   catch (error) { operationError.value = messageFor(error); }
-  finally { switching.value = false; }
+  finally {
+    input.checked = searching.value;
+    switching.value = false;
+  }
 }
 
 function selectPeer(peer: PeerDevice) {
@@ -313,6 +332,8 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); });
 .direct-head span { margin-top: 4px; color: var(--text-3); font-size: 12px; line-height: 1.55; }
 .direct-head .pixel-grid { flex: none; color: var(--accent-solid); }
 .support-note, .recovery-empty { margin: 14px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.65; }
+.recovery-direct-note { margin-top: 14px; padding: 12px; border: 1px solid color-mix(in srgb,var(--danger) 32%,var(--card-border)); border-radius: 8px; background: color-mix(in srgb,var(--danger) 6%,var(--card)); }
+.recovery-direct-note strong,.recovery-direct-note span { display: block; }.recovery-direct-note strong { color: var(--text); font-size: 13px; }.recovery-direct-note span { margin-top: 4px; color: var(--text-2); font-size: 11px; line-height: 1.55; }.recovery-direct-note a { min-height: 40px; display: inline-flex; align-items: center; margin-top: 3px; color: var(--danger); font-size: 11px; font-weight: 750; text-decoration: none; }
 .toggle-list { margin-top: 14px; border-top: 1px solid var(--card-border); }
 .toggle-row { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
 .toggle-row > span:first-child { min-width: 0; }

@@ -3,6 +3,8 @@
     <h1 class="page-title">设置</h1>
     <p class="page-sub">{{ copy.overviewSubtitle }}</p>
 
+    <DataRecoveryPanel />
+
     <div class="section-title">使用模式</div>
     <section class="card mode-card" aria-labelledby="mode-title">
       <div class="mode-head">
@@ -161,8 +163,8 @@
           <button class="btn ghost" type="button" :disabled="connectingServer" @click="saveServerUrl">
             {{ connectingServer ? '连接中…' : '保存并连接' }}
           </button>
-          <button class="btn" type="button" :disabled="!store.online || overwriting" @click="overwriteLocal">
-            {{ overwriting ? '备份中…' : '立即备份到电脑' }}
+          <button class="btn" type="button" :disabled="overwriting || !normalizedServerUrl || store.recoveryRequired" @click="overwriteLocal">
+            {{ overwriting ? '正在覆盖…' : '用本机完整覆盖电脑' }}
           </button>
         </div>
       </template>
@@ -291,7 +293,7 @@ import {
   subscribeDiscovery,
   type DiscoveredServer,
 } from '../api/discover';
-import { backupLocalStateToComputer } from '../api/sync';
+import { overwriteComputerWithLocal } from '../api/sync';
 import {
   configureComputerServer,
   isSyncEnabled,
@@ -301,6 +303,7 @@ import {
 } from '../api/computer-sync';
 import { getPairingToken, getSelectedServerId } from '../api/pairing-storage';
 import { confirmDialog } from '../lib/appDialog';
+import DataRecoveryPanel from '../components/DataRecoveryPanel.vue';
 import {
   APP_VERSION,
   compareVersions,
@@ -819,21 +822,22 @@ async function submitPairing() {
 
 async function overwriteLocal() {
   const accepted = await confirmDialog({
-    title: '备份当前记录到电脑',
-    message: '电脑会保存一份当前手机数据快照，本机记录不会被修改。',
-    confirmLabel: '立即备份',
-    variant: 'neutral',
+    title: '用本机完整覆盖电脑',
+    message: '电脑端当前任务、打卡、计时和训练记录将全部替换为这台设备的数据。',
+    details: ['不会先读取电脑旧记录', '电脑会自动保留覆盖前恢复副本', '成功后其他设备应重新连接电脑同步'],
+    confirmLabel: '确认完整覆盖',
+    variant: 'danger',
   });
   if (!accepted) return;
   overwriting.value = true;
   syncMessage.value = '';
   try {
-    const result = await backupLocalStateToComputer();
-    syncMessage.value = 'metadata' in result
-      ? `备份完成：电脑端第 ${result.metadata.backupRevision} 代快照`
-      : '旧版电脑端已接收当前手机数据';
-  } catch {
-    syncMessage.value = '失败：备份未完成，手机数据和待同步队列均已保留';
+    await overwriteComputerWithLocal();
+    syncMessage.value = '覆盖完成：电脑当前记录已替换为本机完整记录，旧状态已保留恢复副本';
+  } catch (error) {
+    if (store.recoveryRequired) syncMessage.value = '失败：请先在页面顶部完成本地数据恢复，再覆盖电脑';
+    else if (error instanceof Error && error.message.includes('pairing')) syncMessage.value = '失败：请先输入电脑显示的六位配对码';
+    else syncMessage.value = '失败：电脑未完成覆盖，本机权威数据仍已保留，可检查连接后重试';
   } finally {
     overwriting.value = false;
   }

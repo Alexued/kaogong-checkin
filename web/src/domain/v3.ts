@@ -98,6 +98,8 @@ export interface AnalysisReviewV3 {
   correctAnswer: string;
   categoryKey: string;
   categoryLabel: string;
+  skillId?: string;
+  questionBankId?: string;
   sections: Array<{ title: string; content: string }>;
   createdAt: string;
   updatedAt: string;
@@ -332,6 +334,8 @@ export function validateDomainState(state: DomainStateV3): void {
     if (typeof review.userAnswer !== 'string' || typeof review.correctAnswer !== 'string') fail('REVIEW_ANSWER');
     requireId(review.categoryKey, 'REVIEW_CATEGORY_KEY');
     if (typeof review.categoryLabel !== 'string' || !review.categoryLabel.trim() || Array.from(review.categoryLabel).length > 64) fail('REVIEW_CATEGORY_LABEL');
+    if (review.skillId !== undefined && (typeof review.skillId !== 'string' || !review.skillId.trim() || Array.from(review.skillId).length > 64)) fail('REVIEW_SKILL_ID');
+    if (review.questionBankId !== undefined && (typeof review.questionBankId !== 'string' || !review.questionBankId.trim() || Array.from(review.questionBankId).length > 128)) fail('REVIEW_BANK_ID');
     if (!Array.isArray(review.sections) || review.sections.length < 1 || review.sections.length > 12) fail('REVIEW_SECTIONS');
     for (const section of review.sections) {
       if (!isRecord(section) || typeof section.title !== 'string' || !section.title.trim() || typeof section.content !== 'string' || !section.content.trim()) fail('REVIEW_SECTION');

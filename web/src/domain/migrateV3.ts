@@ -233,6 +233,8 @@ export function migrateLegacyToV3(rawState: string, rawQueue = ''): LegacyMigrat
     id: String(source.id), source: source.source, questionText: String(source.questionText),
     userAnswer: String(source.userAnswer || ''), correctAnswer: String(source.correctAnswer || ''),
     categoryKey: String(source.categoryKey), categoryLabel: String(source.categoryLabel),
+    skillId: source.skillId ? String(source.skillId) : undefined,
+    questionBankId: source.questionBankId ? String(source.questionBankId) : undefined,
     sections: Array.isArray(source.sections) ? source.sections.map((section) => ({ title: String(section.title), content: String(section.content) })) : [],
     createdAt: timestamp(source.createdAt, new Date(0).toISOString()), updatedAt: timestamp(source.updatedAt, source.createdAt),
     deletedAt: source.deleted ? timestamp(source.updatedAt, source.createdAt) : null,

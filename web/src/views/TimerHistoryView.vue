@@ -37,6 +37,7 @@
 
     <!-- 按日期分组的历史列表 -->
     <template v-else>
+      <div v-if="actionMessage" class="action-message" :class="{ bad: actionMessageBad }" role="status">{{ actionMessage }}</div>
       <div v-if="!grouped.length" class="empty">还没有计时记录</div>
       <div v-for="g in grouped" :key="g.date">
         <div class="group-date">{{ g.date }}</div>
@@ -119,6 +120,8 @@ const router = useRouter();
 
 /** 记录详情弹层当前展示的记录 */
 const detail = ref<TimerRecord | null>(null);
+const actionMessage = ref('');
+const actionMessageBad = ref(false);
 
 function modeLabel(mode: TimerRecord['mode']): string {
   return mode === 'pomodoro' ? '番茄钟' : mode === 'countdown' ? '倒计时' : '计时';
@@ -156,7 +159,11 @@ async function onDelete(id: string) {
     confirmLabel: '删除记录',
     variant: 'danger',
   });
-  if (accepted) store.deleteTimer(id);
+  if (accepted) {
+    const deleted = store.deleteTimer(id);
+    actionMessageBad.value = !deleted;
+    actionMessage.value = deleted ? '记录已删除，历史与统计已同步更新。' : (store.writeBlockedMessage || '当前处于只读模式，请先完成数据恢复。');
+  }
 }
 
 // ---------- 数据对比（最近 10 次） ----------
@@ -234,6 +241,7 @@ function barWidth(ms: number) {
 .mini.danger {
   color: var(--danger);
 }
+.action-message{margin:10px 0;padding:10px 12px;border-radius:8px;background:var(--accent-soft);color:var(--accent-solid);font-size:12px;line-height:1.5}.action-message.bad{background:color-mix(in srgb,var(--danger) 9%,var(--card));color:var(--danger)}
 
 .group-date {
   font-size: 13px;

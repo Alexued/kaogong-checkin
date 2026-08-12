@@ -5,60 +5,14 @@ import { buildProgressCheckin } from '../lib/plan';
 import {
   STATE_SCHEMA_VERSION,
   normalizeAppMode,
-  normalizeCheckinRecord,
   normalizeTarget,
   normalizeTaskRecord,
   normalizeUnit,
 } from '../lib/stateMigration';
+import { applySyncMessage } from '../lib/applySyncMessage';
 
 const now = () => new Date().toISOString();
 const uid = () => crypto.randomUUID();
-
-const ENTITY_KEY: Record<string, 'tasks' | 'subtasks' | 'checkins' | 'timers' | 'drills' | 'formulaDrills' | 'speedDrills' | 'analysisReviews'> = {
-  task: 'tasks',
-  subtask: 'subtasks',
-  checkin: 'checkins',
-  timer: 'timers',
-  drill: 'drills',
-  formulaDrill: 'formulaDrills',
-  speedDrill: 'speedDrills',
-  analysisReview: 'analysisReviews',
-};
-
-/** 与服务器一致的 last-write-wins 应用逻辑（按 updatedAt 字符串比较） */
-function applyMsg(state: AppState, msg: SyncMessage) {
-  const { kind, entity, payload } = msg;
-  if (entity === 'settings') {
-    if (kind === 'upsert' && (state.settings.updatedAt || '') <= (payload.updatedAt || '')) {
-      const next = { ...state.settings, ...payload };
-      state.settings = { ...next, appMode: normalizeAppMode(next.appMode) };
-    }
-    return;
-  }
-  const key = ENTITY_KEY[entity];
-  if (!key) return;
-  const arr = state[key] as { id: string; updatedAt: string }[];
-  const idx = arr.findIndex((x) => x.id === payload.id);
-  if (kind === 'upsert') {
-    let next = idx >= 0 ? { ...arr[idx], ...payload } : payload;
-    if (key === 'tasks') next = normalizeTaskRecord(next);
-    if (key === 'checkins') next = normalizeCheckinRecord(next);
-    if (idx >= 0) {
-      if ((arr[idx].updatedAt || '') <= (payload.updatedAt || '')) arr[idx] = next;
-    } else {
-      arr.push(next);
-    }
-  } else if (kind === 'delete') {
-    if (idx >= 0 && (arr[idx].updatedAt || '') <= (payload.updatedAt || '')) {
-      // 软删除便于同步合并；task / subtask 为硬删除
-      if (key !== 'tasks' && key !== 'subtasks') {
-        const next = { ...arr[idx], ...payload, deleted: true };
-        arr[idx] = key === 'checkins' ? normalizeCheckinRecord(next) : next;
-      }
-      else arr.splice(idx, 1);
-    }
-  }
-}
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -83,6 +37,7 @@ export const useAppStore = defineStore('app', {
     syncStateSchemaCompatible: true,
     recoveryRequired: false,
     loaded: false,
+    writeBlockedMessage: '',
   }),
   actions: {
     applySnapshot(s: AppState) {
@@ -106,17 +61,22 @@ export const useAppStore = defineStore('app', {
     },
     /** 应用服务器广播的变更（其他客户端产生） */
     applyRemote(msg: SyncMessage) {
-      applyMsg(this as unknown as AppState, msg);
+      applySyncMessage(this as unknown as AppState, msg);
     },
     /** 本地变更：乐观更新 + 入离线队列 */
-    send(msg: SyncMessage) {
-      if (this.recoveryRequired) return;
-      applyMsg(this as unknown as AppState, msg);
+    send(msg: SyncMessage): boolean {
+      if (this.recoveryRequired) {
+        this.writeBlockedMessage = '本地数据正在等待恢复，恢复完成后才可以修改记录。';
+        return false;
+      }
+      applySyncMessage(this as unknown as AppState, msg);
       enqueue(msg);
+      this.writeBlockedMessage = '';
+      return true;
     },
 
     /** Set one original due date's progress. Zero soft-deletes an existing record. */
-    setProgress(taskId: string, date: string, progress: number, checkinId?: string) {
+    setProgress(taskId: string, date: string, progress: number, checkinId?: string): boolean {
       const existing = checkinId
         ? this.checkins.find((checkin) => checkin.id === checkinId)
         : this.checkins
@@ -125,28 +85,28 @@ export const useAppStore = defineStore('app', {
       const task = this.tasks.find((candidate) => candidate.id === taskId);
       const timestamp = now();
       const next = buildProgressCheckin(task, taskId, date, progress, existing, timestamp, uid());
-      if (!next) return;
-      this.send({ kind: 'upsert', entity: 'checkin', payload: next });
+      if (!next) return false;
+      return this.send({ kind: 'upsert', entity: 'checkin', payload: next });
     },
 
-    incrementProgress(taskId: string, date: string, checkinId?: string) {
+    incrementProgress(taskId: string, date: string, checkinId?: string): boolean {
       const existing = checkinId
         ? this.checkins.find((checkin) => checkin.id === checkinId)
         : this.checkins.find((checkin) => checkin.taskId === taskId && checkin.date === date && !checkin.deleted);
-      this.setProgress(taskId, date, (existing?.deleted ? 0 : existing?.progress || 0) + 1, existing?.id);
+      return this.setProgress(taskId, date, (existing?.deleted ? 0 : existing?.progress || 0) + 1, existing?.id);
     },
 
-    decrementProgress(taskId: string, date: string, checkinId?: string) {
+    decrementProgress(taskId: string, date: string, checkinId?: string): boolean {
       const existing = checkinId
         ? this.checkins.find((checkin) => checkin.id === checkinId)
         : this.checkins.find((checkin) => checkin.taskId === taskId && checkin.date === date && !checkin.deleted);
-      this.setProgress(taskId, date, Math.max(0, (existing?.deleted ? 0 : existing?.progress || 0) - 1), existing?.id);
+      return this.setProgress(taskId, date, Math.max(0, (existing?.deleted ? 0 : existing?.progress || 0) - 1), existing?.id);
     },
 
     /** Binary compatibility wrapper. Backfill dates remain traceable. */
-    toggleCheckin(taskId: string, date: string, checkinId?: string) {
+    toggleCheckin(taskId: string, date: string, checkinId?: string): boolean {
       const existing = checkinId ? this.checkins.find((checkin) => checkin.id === checkinId) : undefined;
-      this.setProgress(taskId, date, existing && !existing.deleted && existing.progress > 0 ? 0 : 1, checkinId);
+      return this.setProgress(taskId, date, existing && !existing.deleted && existing.progress > 0 ? 0 : 1, checkinId);
     },
 
     /** 保存任务；返回任务 id（新建时为生成的 id，便于继续挂子任务） */
@@ -299,8 +259,8 @@ export const useAppStore = defineStore('app', {
       });
     },
 
-    deleteTimer(id: string) {
-      this.send({ kind: 'delete', entity: 'timer', payload: { id, updatedAt: now() } });
+    deleteTimer(id: string): boolean {
+      return this.send({ kind: 'delete', entity: 'timer', payload: { id, updatedAt: now() } });
     },
 
     /** 记录一次背诵作答 */

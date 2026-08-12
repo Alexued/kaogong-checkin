@@ -43,6 +43,15 @@ export interface MigrationBackupV3 {
   sources: Array<{ key: string; raw: string; utf8ByteLength: number; sha256: string }>;
 }
 
+export interface MigrationRecoveryStatusV3 {
+  locked: boolean;
+  errorCode: string;
+  firstFailedAt: string | null;
+  backupAvailable: boolean;
+  backupCreatedAt: string | null;
+  sourceBytes: number;
+}
+
 export interface MigrationLockV3 {
   formatVersion: 1;
   sourceDigest: string;
@@ -289,8 +298,57 @@ export class RepositoryV3 {
     return next;
   }
 
+  /** Replace a locked or healthy repository after the user approves an external snapshot. */
+  async replaceFromExternal(state: DomainStateV3): Promise<RepositoryRecordV3> {
+    validateDomainState(state);
+    let previous: RepositoryRecordV3 | null = null;
+    try {
+      const raw = this.storage.getItem(REPOSITORY_KEY);
+      if (raw) {
+        const candidate = parseJson<RepositoryRecordV3>(raw, 'INVALID_REPOSITORY');
+        validateRecord(candidate);
+        previous = candidate;
+      }
+    } catch {
+      previous = null;
+    }
+    const record: RepositoryRecordV3 = {
+      formatVersion: 1,
+      envelope: {
+        schemaVersion: DOMAIN_SCHEMA_VERSION,
+        revision: (previous?.envelope.revision || 0) + 1,
+        deviceId: previous?.envelope.deviceId || deviceId(),
+        savedAt: now(),
+        state: clone(state),
+      },
+      outbox: [],
+    };
+    this.writeRecord(record);
+    this.storage.removeItem(MIGRATION_LOCK_KEY);
+    return record;
+  }
+
   async exportBackup(): Promise<MigrationBackupV3> {
     return parseJson<MigrationBackupV3>(this.storage.getItem(MIGRATION_BACKUP_KEY), 'MIGRATION_BACKUP_MISSING');
+  }
+
+  recoveryStatus(): MigrationRecoveryStatusV3 {
+    const lock = this.readLock();
+    let backup: MigrationBackupV3 | null = null;
+    try {
+      const candidate = this.storage.getItem(MIGRATION_BACKUP_KEY);
+      if (candidate) backup = JSON.parse(candidate) as MigrationBackupV3;
+    } catch {
+      backup = null;
+    }
+    return {
+      locked: Boolean(lock),
+      errorCode: lock?.errorCode || '',
+      firstFailedAt: lock?.firstFailedAt || null,
+      backupAvailable: Boolean(backup?.sources?.some((source) => source.key === LEGACY_STATE_KEY && typeof source.raw === 'string')),
+      backupCreatedAt: backup?.createdAt || null,
+      sourceBytes: (backup?.sources || []).reduce((total, source) => total + (Number(source.utf8ByteLength) || 0), 0),
+    };
   }
 
   async resetToEmpty(): Promise<RepositoryRecordV3> {

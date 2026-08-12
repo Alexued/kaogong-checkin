@@ -197,7 +197,7 @@ onBeforeUnmount(() => {
 }
 
 .dialog-actions .btn:active { transform: scale(0.96); }
-.dialog-confirm.danger { background: var(--danger); }
+.dialog-confirm.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
 .dialog-confirm.warning { background: var(--warn); color: #fff; }
 
 .app-dialog-enter-active,
