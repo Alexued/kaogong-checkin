@@ -24,6 +24,19 @@
       </div>
     </section>
 
+    <section class="card capability-panel" aria-labelledby="capability-title">
+      <div class="panel-head capability-heading">
+        <div><span class="dashboard-kicker">{{ isGeneral ? '行动画像' : '能力画像' }}</span><h2 id="capability-title">最近的能力变化</h2><p>用已有打卡、专注与练习记录生成，不调用云端服务。</p></div>
+        <PixelGrid preset="wave" :size="42" once decorative />
+      </div>
+      <div class="capability-grid">
+        <div v-for="metric in capabilityMetrics" :key="metric.id" class="capability-card">
+          <span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><small>{{ metric.detail }}</small>
+          <div v-if="metric.percent !== undefined" class="capability-progress"><i :style="{ width: `${metric.percent}%` }"></i></div>
+        </div>
+      </div>
+    </section>
+
     <div class="overview-grid">
       <section class="card section-panel heatmap-panel" style="--enter-order: 1">
         <div class="panel-head">
@@ -147,6 +160,8 @@ import {
 import { fmtDuration } from '../lib/stopwatch';
 import { useAppStore } from '../stores/app';
 import { effectivePlanEnd } from '../lib/appMode';
+import PixelGrid from '../components/PixelGrid.vue';
+import { buildCapabilityMetrics } from '../lib/dashboard';
 
 const store = useAppStore();
 const router = useRouter();
@@ -154,6 +169,15 @@ const route = useRoute();
 const today = todayStr();
 const visibleMonth = ref(today.slice(0, 7));
 const isGeneral = computed(() => store.settings.appMode === 'general');
+const capabilityMetrics = computed(() => buildCapabilityMetrics({
+  mode: store.settings.appMode,
+  tasks: store.tasks,
+  checkins: mainCheckins.value,
+  timers: store.timers,
+  speedDrills: store.speedDrills,
+  analysisReviews: store.analysisReviews,
+  today,
+}));
 
 /** Subtask check-ins stay out of main-task completion statistics. */
 const mainCheckins = computed(() => {
@@ -316,6 +340,17 @@ function recordSummary(day: RecordDay): string {
 .timer-panel {
   padding: 16px;
 }
+
+.capability-panel { margin-top: 12px; padding: 16px; }
+.capability-heading { min-height: 52px; margin-bottom: 10px; }
+.capability-heading h2 { margin-top: 3px; }
+.capability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.capability-card { min-width: 0; display: grid; gap: 4px; padding: 12px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--bg-elev); }
+.capability-card > span { color: var(--text-3); font-size: 10px; }
+.capability-card strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.capability-card small { color: var(--text-2); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.capability-progress { height: 4px; overflow: hidden; margin-top: 5px; border-radius: 999px; background: var(--heat-0); }
+.capability-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent-from), var(--accent-to)); }
 
 .heatmap-panel {
   padding-inline: 12px;
@@ -534,6 +569,7 @@ function recordSummary(day: RecordDay): string {
   .timer-panel { padding: 14px; }
   .heatmap-panel { padding-inline: 4px; }
   .heatmap-panel > .panel-head { padding-inline: 8px; }
+  .capability-panel { padding: 14px; }
   .record-row {
     grid-template-columns: 69px minmax(0, 1fr) auto 14px;
     gap: 7px;

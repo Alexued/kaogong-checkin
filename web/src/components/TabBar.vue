@@ -1,5 +1,6 @@
 <template>
   <nav class="tabbar" aria-label="主导航">
+    <span class="tab-indicator" :style="resolvedIndicatorStyle" aria-hidden="true"></span>
     <router-link
       v-for="t in tabs"
       :key="t.to"
@@ -16,12 +17,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type CSSProperties } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAppStore } from '../stores/app';
 
 const route = useRoute();
 const store = useAppStore();
+const props = defineProps<{ indicatorStyle?: CSSProperties }>();
 const tabs = computed(() => [
   {
     to: '/',
@@ -44,6 +46,17 @@ const tabs = computed(() => [
     icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   },
 ]);
+
+const activeTabIndex = computed(() => {
+  const root = typeof route.meta.rootTab === 'string' ? route.meta.rootTab : route.path;
+  const index = tabs.value.findIndex((tab) => tab.to === root || (tab.to !== '/' && route.path.startsWith(tab.to)));
+  return Math.max(0, index);
+});
+
+const resolvedIndicatorStyle = computed<CSSProperties>(() => props.indicatorStyle || ({
+  transform: `translate3d(${activeTabIndex.value * 100}%, 0, 0)`,
+  transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
+}));
 
 function isActive(to: string) {
   if (route.meta.rootTab === to) return true;
@@ -68,6 +81,18 @@ function isActive(to: string) {
   transition: background-color 280ms ease;
 }
 
+.tab-indicator {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 25%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent-solid);
+  pointer-events: none;
+  will-change: transform;
+}
+
 .tab {
   min-width: 44px;
   min-height: 48px;
@@ -82,7 +107,7 @@ function isActive(to: string) {
   border-radius: 12px;
   transition:
     color 200ms ease,
-    transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab:active {
@@ -108,5 +133,9 @@ function isActive(to: string) {
     border-left: 1px solid var(--card-border);
     border-right: 1px solid var(--card-border);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-indicator, .tab { transition-duration: 0.01ms !important; }
 }
 </style>

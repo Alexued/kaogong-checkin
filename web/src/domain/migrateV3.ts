@@ -20,11 +20,17 @@ export interface MigrationReportV3 {
   duplicateCount: number;
   normalizedCount: number;
   orphanCount: number;
+  repairedCount: number;
 }
 
 export interface LegacyMigrationResultV3 {
   state: DomainStateV3;
   report: MigrationReportV3;
+}
+
+export interface LegacyMigrationOptionsV3 {
+  /** Manual recovery only: preserve records whose original task was removed. */
+  repairOrphans?: boolean;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -96,6 +102,45 @@ function chooseWinner(records: JsonRecord[]): JsonRecord | undefined {
   return records.slice().sort(compareRecord).at(-1);
 }
 
+function repairOrphanTasks(state: AppState, report: MigrationReportV3): void {
+  const taskIds = new Set(state.tasks.map((task) => task.id));
+  const subtaskIds = new Set(state.subtasks.map((subtask) => subtask.id));
+  const missing = new Map<string, string>();
+
+  for (const subtask of state.subtasks) {
+    if (!taskIds.has(subtask.taskId)) {
+      missing.set(subtask.taskId, subtask.createdAt || subtask.updatedAt || new Date(0).toISOString());
+    }
+  }
+  for (const checkin of state.checkins) {
+    if (checkin.deleted || taskIds.has(checkin.taskId) || subtaskIds.has(checkin.taskId)) continue;
+    missing.set(checkin.taskId, checkin.createdAt || checkin.updatedAt || `${checkin.date}T00:00:00.000Z`);
+  }
+  for (const timer of state.timers) {
+    if (!timer.taskId || taskIds.has(timer.taskId)) continue;
+    missing.set(timer.taskId, timer.createdAt || timer.startedAt || `${timer.date}T00:00:00.000Z`);
+  }
+
+  for (const [id, sourceTime] of missing) {
+    const createdAt = timestamp(sourceTime, new Date(0).toISOString());
+    state.tasks.push({
+      id,
+      title: '已恢复的历史项目',
+      type: 'daily',
+      endDate: createdAt.slice(0, 10),
+      createdAt,
+      updatedAt: createdAt,
+      archived: true,
+      order: state.tasks.length,
+      target: 1,
+      unit: '',
+    });
+    taskIds.add(id);
+    report.orphanCount += 1;
+    report.repairedCount += 1;
+  }
+}
+
 function mapTask(source: JsonRecord, subtasks: SubtaskV3[], report: MigrationReportV3): TaskV3 {
   const createdAt = timestamp(source.createdAt, new Date(0).toISOString());
   const updatedAt = timestamp(source.updatedAt, createdAt);
@@ -157,14 +202,25 @@ function mapAttempts(state: AppState): DrillAttemptV3[] {
   return [...percent, ...formula];
 }
 
-export function migrateLegacyToV3(rawState: string, rawQueue = ''): LegacyMigrationResultV3 {
+export function migrateLegacyToV3(
+  rawState: string,
+  rawQueue = '',
+  options: LegacyMigrationOptionsV3 = {},
+): LegacyMigrationResultV3 {
   const parsed = JSON.parse(rawState) as unknown;
   if (!isRecord(parsed)) throw new Error('INVALID_STATE_SHAPE');
   const sourceVersion = parsed.schemaVersion === undefined ? 1 : Number(parsed.schemaVersion);
   if (sourceVersion !== 1 && sourceVersion !== 2) throw new Error('UNSUPPORTED_STATE_VERSION');
   const state = migrateAppState(parsed);
   replayQueue(state, rawQueue);
-  const report: MigrationReportV3 = { sourceSchemaVersion: sourceVersion, duplicateCount: 0, normalizedCount: 0, orphanCount: 0 };
+  const report: MigrationReportV3 = {
+    sourceSchemaVersion: sourceVersion,
+    duplicateCount: 0,
+    normalizedCount: 0,
+    orphanCount: 0,
+    repairedCount: 0,
+  };
+  if (options.repairOrphans) repairOrphanTasks(state, report);
   const output = emptyDomainState();
   const subtaskParent = new Map<string, string>();
   const subtasksByTask = new Map<string, SubtaskV3[]>();

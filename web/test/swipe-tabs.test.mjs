@@ -7,6 +7,7 @@ const source = await readFile(new URL('../src/lib/swipeTabs.ts', import.meta.url
 const {
   canPreventSwipeMove,
   shouldCancelSwipeForTouchCount,
+  tabProgressFor,
 } = await importTypeScript(new URL('../src/lib/swipeTabs.ts', import.meta.url));
 
 test('touch moves only claim cancelable browser events', () => {
@@ -33,4 +34,14 @@ test('touchcancel has an abort-only path and removes the same listeners on unmou
 test('unmount cleanup cancels pending frame and settle timer', () => {
   assert.match(source, /onUnmounted\(\(\) => \{[\s\S]*?cancelTouchGesture\(\);/);
   assert.match(source, /function clearSettleTimer\(\) \{[\s\S]*?clearTimeout\(settleTimer\)[\s\S]*?settleTimer = null;/);
+});
+
+test('bottom indicator follows swipe progress continuously and stays inside four tabs', () => {
+  assert.equal(tabProgressFor(0, 0, 400), 0);
+  assert.equal(tabProgressFor(1, -200, 400), 1.5);
+  assert.equal(tabProgressFor(2, 100, 400), 1.75);
+  assert.equal(tabProgressFor(0, 120, 400), 0);
+  assert.equal(tabProgressFor(3, -120, 400), 3);
+  assert.match(source, /tabIndicatorStyle/);
+  assert.match(source, /translate3d\(\$\{tabProgress\.value \* 100\}%/);
 });

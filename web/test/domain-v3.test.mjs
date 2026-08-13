@@ -85,6 +85,21 @@ test('migration rejects a timer with an unexplained orphan task link', () => {
   assert.throws(() => migration.migrateLegacyToV3(JSON.stringify(source)), /ORPHAN_TIMER/);
 });
 
+test('manual recovery preserves active orphan records behind archived history projects', () => {
+  const source = legacyState();
+  const timestamp = '2026-08-01T04:00:00.000Z';
+  source.checkins.push({ id: 'orphan-progress', taskId: 'missing-progress', date: '2026-08-01', createdAt: timestamp, updatedAt: timestamp, deleted: false, progress: 1, targetSnapshot: 1, unitSnapshot: '' });
+  source.timers.push({ id: 'orphan-timer', label: '历史计时', taskId: 'missing-timer', date: '2026-08-01', startedAt: timestamp, durationMs: 1000, laps: [], createdAt: timestamp, updatedAt: timestamp, deleted: false, mode: 'stopwatch' });
+
+  const result = migration.migrateLegacyToV3(JSON.stringify(source), '', { repairOrphans: true });
+  assert.equal(result.report.repairedCount, 2);
+  assert.equal(result.state.tasks.filter((task) => task.title === '已恢复的历史项目').length, 2);
+  assert.equal(result.state.tasks.filter((task) => task.title === '已恢复的历史项目').every((task) => task.archivedAt !== null), true);
+  assert.equal(result.state.dailyProgress.some((progress) => progress.id === 'orphan-progress'), true);
+  assert.equal(result.state.timerSessions.find((timer) => timer.id === 'orphan-timer').taskId, 'missing-timer');
+  assert.doesNotThrow(() => domain.validateDomainState(result.state));
+});
+
 test('repository migration stores exact source backup and commits a stable v3 envelope', async () => {
   const rawState = JSON.stringify(legacyState());
   const rawQueue = JSON.stringify([]);
@@ -251,11 +266,13 @@ test('manual migration retry rebuilds only from the preserved backup and clears 
     }),
   });
   const repository = new repositoryModule.RepositoryV3(storage);
+  const preservedBackup = storage.getItem('kgc-migration-backup-v3');
   const retried = await repository.retryMigration();
   assert.equal(retried.record.envelope.state.tasks[0].title, legacyState().tasks[0].title);
   assert.equal(storage.getItem('kgc-migration-lock-v3'), null);
   assert.equal(storage.getItem('kgc-state'), '{live-source-is-corrupt');
   assert.equal(storage.getItem('kgc-queue'), '[{"live":"queue"}]');
+  assert.equal(storage.getItem('kgc-migration-backup-v3'), preservedBackup);
 });
 
 test('domain validation rejects duplicate progress keys and orphan timers', () => {

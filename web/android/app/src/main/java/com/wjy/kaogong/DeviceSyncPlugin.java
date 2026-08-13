@@ -962,9 +962,9 @@ public class DeviceSyncPlugin extends Plugin {
 
   @Override
   protected void handleOnPause() {
-    stopHostingInternal();
+    // Discovery is only useful while the list is visible. Keep an explicitly
+    // enabled host and any approved socket alive across brief system pauses.
     stopDiscoveryInternal();
-    cancelIncoming();
   }
 
   @Override

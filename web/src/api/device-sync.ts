@@ -184,7 +184,7 @@ async function ensureIdentity(): Promise<string> {
 }
 
 async function startHostingIfNeeded() {
-  if (!nativeSupported || !foreground.value || !discoverable.value || hostingInfo.value) return;
+  if (!nativeSupported || !discoverable.value || hostingInfo.value) return;
   const info = await NativeDeviceSync.startHosting({
     deviceId: await ensureIdentity(),
     appVersion: appVersion(),
@@ -232,7 +232,9 @@ async function handleIncomingRequest(event: IncomingRequestEvent) {
         ? ['原始迁移备份仍会保留', '电脑同步会暂停，避免旧快照覆盖新记录']
         : ['替换前会自动创建恢复点', '电脑同步会暂停，避免旧快照覆盖新记录'],
       confirmLabel: '允许接收',
+      cancelLabel: '拒绝本次',
       variant: 'danger',
+      explicitDecision: true,
     });
     await NativeDeviceSync.approveIncoming({ requestId: event.requestId, accepted });
     if (!accepted) statusMessage.value = `已拒绝 ${event.sourceDevice.name} 的发送请求`;
@@ -250,7 +252,9 @@ async function handleIncomingRequest(event: IncomingRequestEvent) {
     message: '对方请求获取本机的完整记录。发送不会修改本机数据。',
     details: ['任务、打卡、计时和训练记录都会发送', '仅本次请求有效'],
     confirmLabel: '允许发送',
+    cancelLabel: '拒绝本次',
     variant: 'warning',
+    explicitDecision: true,
   });
   if (!accepted) {
     await NativeDeviceSync.approveIncoming({ requestId: event.requestId, accepted: false });
@@ -275,16 +279,15 @@ async function handleIncomingSnapshot(event: IncomingSnapshotEvent) {
 
 async function applyLifecycle() {
   if (!nativeSupported) return;
-  if (!foreground.value) {
-    await Promise.allSettled([NativeDeviceSync.stopHosting(), NativeDeviceSync.stopDiscovery()]);
-    hostingInfo.value = null;
-    peers.value = [];
-    return;
-  }
   if (discoverable.value) await startHostingIfNeeded();
   else {
     await NativeDeviceSync.stopHosting();
     hostingInfo.value = null;
+  }
+  if (!foreground.value) {
+    await NativeDeviceSync.stopDiscovery();
+    peers.value = [];
+    return;
   }
   if (searching.value) await startDiscoveryIfNeeded();
   else {

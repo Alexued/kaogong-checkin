@@ -246,7 +246,7 @@ export function localRecoveryStatus(): MigrationRecoveryStatusV3 {
   return repository.recoveryStatus();
 }
 
-export async function retryLocalRecovery(): Promise<void> {
+export async function retryLocalRecovery(): Promise<{ repairedCount: number; normalizedCount: number }> {
   const repository = v3Repository || new RepositoryV3(localStorage);
   const result = await repository.retryMigration();
   v3Repository = repository;
@@ -264,6 +264,10 @@ export async function retryLocalRecovery(): Promise<void> {
   replayPendingLocally();
   resetComputerOverwriteBaseline(currentState());
   schedulePersistState();
+  return {
+    repairedCount: result.report.repairedCount,
+    normalizedCount: result.report.normalizedCount,
+  };
 }
 
 export function recoverySourceKeys(): string[] {

@@ -40,6 +40,13 @@ export function shouldCancelSwipeForTouchCount(touchCount: number): boolean {
   return touchCount !== 1;
 }
 
+export function tabProgressFor(activeIndex: number, dragOffset: number, viewportWidth: number): number {
+  return Math.max(0, Math.min(
+    TAB_PATHS.length - 1,
+    activeIndex - dragOffset / Math.max(1, viewportWidth),
+  ));
+}
+
 /** iOS 橡皮筋：位移越大阻力越大（非线性渐近屏宽上限） */
 function rubberBand(dx: number, dim: number): number {
   const c = 0.55;
@@ -74,6 +81,13 @@ export function useSwipeTabs() {
 
   const trackStyle = computed(() => ({
     transform: `translateX(${-activeIndex.value * vw.value + dragOffset.value}px)`,
+    transition: animating.value ? `transform ${animMs.value}ms ${IOS_CURVE}` : 'none',
+  }));
+
+  const tabProgress = computed(() => tabProgressFor(activeIndex.value, dragOffset.value, vw.value));
+
+  const tabIndicatorStyle = computed(() => ({
+    transform: `translate3d(${tabProgress.value * 100}%, 0, 0)`,
     transition: animating.value ? `transform ${animMs.value}ms ${IOS_CURVE}` : 'none',
   }));
 
@@ -293,5 +307,5 @@ export function useSwipeTabs() {
     window.removeEventListener('resize', onResize);
   });
 
-  return { trackStyle, pageStyle, isTabPage };
+  return { trackStyle, pageStyle, isTabPage, tabProgress, tabIndicatorStyle };
 }

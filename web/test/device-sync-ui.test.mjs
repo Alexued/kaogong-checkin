@@ -99,3 +99,28 @@ test('Android plugin owns NSD, framed TCP, approval, rate limiting and five atom
   assert.match(mainActivity, /registerPlugin\(DeviceSyncPlugin\.class\)/);
   assert.match(manifest, /android:scheme="kgc" android:host="peer-connect"/);
 });
+
+test('incoming decisions are explicit and an enabled host survives a brief Android pause', () => {
+  const incoming = service.slice(
+    service.indexOf('async function handleIncomingRequest'),
+    service.indexOf('async function handleIncomingSnapshot'),
+  );
+  assert.equal((incoming.match(/explicitDecision: true/g) || []).length, 2);
+  assert.equal((incoming.match(/cancelLabel: '拒绝本次'/g) || []).length, 2);
+
+  const pause = plugin.slice(
+    plugin.indexOf('protected void handleOnPause()'),
+    plugin.indexOf('protected void handleOnDestroy()'),
+  );
+  assert.match(pause, /stopDiscoveryInternal\(\)/);
+  assert.doesNotMatch(pause, /stopHostingInternal\(\)/);
+  assert.doesNotMatch(pause, /cancelIncoming\(\)/);
+
+  const lifecycle = service.slice(
+    service.indexOf('async function applyLifecycle'),
+    service.indexOf('export async function initializeDeviceSync'),
+  );
+  assert.match(lifecycle, /discoverable\.value[\s\S]*startHostingIfNeeded/);
+  assert.match(lifecycle, /!foreground\.value[\s\S]*stopDiscovery/);
+  assert.doesNotMatch(lifecycle, /!foreground\.value[\s\S]*stopHosting/);
+});

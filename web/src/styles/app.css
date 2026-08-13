@@ -15,6 +15,10 @@ html.app-dialog-open body {
   overflow: hidden;
 }
 
+body.focus-session-open .tabbar {
+  display: none;
+}
+
 .swipe-track {
   height: 100%;
   display: flex;

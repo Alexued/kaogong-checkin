@@ -10,8 +10,8 @@ android {
         applicationId "com.wjy.kaogong"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 15
-        versionName "0.12.0"
+        versionCode 16
+        versionName "0.13.0"
         buildConfigField "int", "KGC_STATE_SCHEMA_VERSION", "3"
         buildConfigField "int", "KGC_SYNC_PROTOCOL_VERSION", "3"
         buildConfigField "int", "KGC_BACKUP_FORMAT_VERSION", "1"

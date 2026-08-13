@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import PixelGrid from '../PixelGrid.vue';
 import type { AnalysisCoachResult } from '../../lib/analysisCoach';
 import { nativeTextRecognitionAvailable, recognizeChineseText } from '../../api/text-recognition';
@@ -75,6 +75,8 @@ import type { AnalysisReviewRecord } from '../../types';
 import { ANALYSIS_SKILLS, analysisSkill, analyzeWithSkill, DEFAULT_ANALYSIS_SKILL_ID } from '../../lib/analysisSkills';
 import QuestionBankPicker from './QuestionBankPicker.vue';
 import { ANALYSIS_BANK_COUNT, questionBankText, type AnalysisBankQuestion } from '../../lib/questionBank';
+
+const props = defineProps<{ seed?: { question: AnalysisBankQuestion; answer: string } | null }>();
 
 const store = useAppStore();
 const cameraInput = ref<HTMLInputElement | null>(null);
@@ -95,6 +97,18 @@ const recentReviews = computed(() => reviews.value.slice().sort((a, b) => b.crea
 const skills = ANALYSIS_SKILLS;
 const selectedSkill = computed(() => analysisSkill(skillId.value));
 const bankCount = ANALYSIS_BANK_COUNT;
+
+watch(() => props.seed, (seed) => {
+  if (!seed) return;
+  source.value = 'text';
+  questionBankId.value = seed.question.id;
+  questionText.value = questionBankText(seed.question);
+  correctAnswer.value = seed.question.answer;
+  userAnswer.value = seed.answer;
+  result.value = null;
+  ocrMessage.value = '已从专注答题带入，当前使用 ' + selectedSkill.value.name + '。';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}, { immediate: true });
 
 async function resizeImage(file: File): Promise<string> {
   const url = URL.createObjectURL(file);

@@ -31,6 +31,9 @@ test('recovery and timer UI expose actionable paths and stable danger contrast',
   assert.match(recovery, /验证并恢复/);
   assert.match(recovery, /查看原因和操作路径/);
   assert.match(recovery, /不要清除应用数据/);
+  assert.match(recovery, /接下来这样操作/);
+  assert.match(recovery, /错误码/);
+  assert.match(recovery, /设置 → 设备直连 → 发送本机记录/);
   const today = await readFile(new URL('../src/views/TodayView.vue', import.meta.url), 'utf8');
   assert.match(today, /if \(!store\.setProgress/);
   assert.match(today, /showRecoveryForBlockedWrite/);

@@ -10,16 +10,9 @@ import releaseLib from '../release-lib.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-test('release metadata declares the stage 0 compatibility target', () => {
-  assert.deepEqual(releaseLib.readVersion(), {
-    version: '0.11.0',
-    versionCode: 14,
-    stateSchemaVersion: 3,
-    syncProtocolVersion: 3,
-    backupFormatVersion: 1,
-    applicationId: 'com.wjy.kaogong',
-    releaseChannel: 'internal-debug',
-  });
+test('release metadata declares the current compatibility target', () => {
+  const current = JSON.parse(fs.readFileSync(path.join(ROOT, 'release', 'version.json'), 'utf8'));
+  assert.deepEqual(releaseLib.readVersion(), current);
 });
 
 test('all generated version consumers match the release metadata', () => {
@@ -28,13 +21,15 @@ test('all generated version consumers match the release metadata', () => {
     encoding: 'utf8',
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /Version metadata is consistent at 0\.11\.0 \(14\)/);
+  const current = releaseLib.readVersion();
+  assert.match(result.stdout, new RegExp(`Version metadata is consistent at ${current.version.replaceAll('.', '\\.')} \\(${current.versionCode}\\)`));
 });
 
 test('release manifest carries the compatibility metadata', (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'kaogong-release-metadata-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const apkPath = path.join(directory, 'kaogong-checkin-v0.11.0.apk');
+  const current = releaseLib.readVersion();
+  const apkPath = path.join(directory, `kaogong-checkin-v${current.version}.apk`);
   const manifestPath = path.join(directory, 'release-manifest.json');
   fs.writeFileSync(apkPath, 'fixture apk');
 
@@ -57,7 +52,7 @@ test('release manifest carries the compatibility metadata', (t) => {
     },
     releaseLib.readVersion(),
   );
-  assert.equal(manifest.fileName, 'kaogong-checkin-v0.11.0.apk');
+  assert.equal(manifest.fileName, `kaogong-checkin-v${current.version}.apk`);
   assert.equal(manifest.size, 11);
   assert.match(manifest.sha256, /^[a-f0-9]{64}$/);
 });

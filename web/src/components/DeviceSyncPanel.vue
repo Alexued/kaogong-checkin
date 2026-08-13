@@ -4,7 +4,7 @@
     <div class="direct-head">
       <div>
         <strong id="direct-sync-title">手机与平板直接传记录</strong>
-        <span>同一 Wi-Fi、应用保持前台，每次传输都由目标设备确认</span>
+        <span>同一 Wi-Fi、目标设备保持此页可见，每次传输都要明确允许</span>
       </div>
       <PixelGrid
         v-if="successPulse"
@@ -25,7 +25,7 @@
       </div>
       <div class="toggle-list">
         <label class="toggle-row">
-          <span><strong>允许附近设备发现本机</strong><small>开启后显示地址、配对码和二维码</small></span>
+          <span><strong>允许附近设备发现本机</strong><small>开启后持续接收连接，并显示地址、配对码和二维码</small></span>
           <span class="switch">
             <input :checked="discoverable" type="checkbox" :disabled="switching" @change="toggleDiscoverable" />
             <span class="switch-track"></span>
@@ -205,8 +205,10 @@ const countdownText = computed(() => {
 function messageFor(error: unknown): string {
   const code = error instanceof Error ? error.message : '';
   if (code.includes('PAIRING')) return '连接失败：配对码不正确或已失效';
-  if (code.includes('REJECTED')) return '对方已拒绝本次传输';
-  if (code.includes('TIMEOUT')) return '连接超时，请确认两台设备都保持前台';
+  if (code.includes('REJECTED')) return '对方已明确拒绝本次传输，请在对方设备重新发起并点“允许”';
+  if (code.includes('REQUEST_NOT_FOUND')) return '确认已超时，请保持目标设备页面可见后重新发起';
+  if (code.includes('TIMEOUT')) return '连接超时，请保持两台设备在同一 Wi-Fi，并让目标设备停留在此页面';
+  if (code.includes('PUSH_FAILED') || code.includes('PULL_FAILED')) return '连接中断，请保持目标设备页面可见后重新发起';
   if (code.includes('OFFLINE') || code.includes('CONNECT')) return '无法连接对方，请确认处于同一 Wi-Fi';
   if (code.includes('SNAPSHOT')) return '记录校验失败，未修改本机数据';
   if (code.includes('LOCAL_ADDRESS')) return '无法获取局域网地址，请先连接 Wi-Fi 后重试';

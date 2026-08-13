@@ -114,6 +114,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAppStore } from '../stores/app';
 import { countdown, fmtClock, fmtCountdown, fmtDuration, stopwatch as sw } from '../lib/stopwatch';
 import { pomodoro, pomodoroStageLabel as stageLabel } from '../lib/pomodoro';
@@ -124,6 +125,7 @@ import WheelPicker from '../components/WheelPicker.vue';
 import NumberWheelSheet from '../components/NumberWheelSheet.vue';
 
 const store = useAppStore();
+const route = useRoute();
 const isGeneral = computed(() => store.settings.appMode === 'general');
 const mode = ref<'stopwatch' | 'countdown' | 'pomodoro'>(pomodoro.startedAt ? 'pomodoro' : countdown.startedAt ? 'countdown' : 'stopwatch');
 const countdownMinutes = ref(25);
@@ -252,6 +254,14 @@ const finishing = ref(false);
 const label = ref('');
 const taskId = ref('');
 const linkableTasks = computed(() => store.tasks.filter((t) => !t.archived));
+const routeTaskId = computed(() => typeof route.query.taskId === 'string' ? route.query.taskId : '');
+watch(routeTaskId, (nextTaskId) => {
+  if (nextTaskId && linkableTasks.value.some((task) => task.id === nextTaskId)) {
+    taskId.value = nextTaskId;
+    pomoTaskId.value = nextTaskId;
+    label.value = linkableTasks.value.find((task) => task.id === nextTaskId)?.title || '';
+  }
+}, { immediate: true });
 watch(mode, (next) => {
   if (next === 'pomodoro') remainingDisplay.value = pomodoro.remainingMs();
   else if (next === 'countdown') remainingDisplay.value = countdown.remainingMs();

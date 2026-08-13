@@ -18,7 +18,7 @@
           <div>
             <p class="kicker">Quality assurance archive</p>
             <h1>测试报告</h1>
-            <p class="run-lede">按版本和运行 ID 保留的验收记录。报告状态反映运行完成时的结果快照，“关注”不等于完全通过。</p>
+            <p class="run-lede">按版本保留自动化、构建和 Android 真机验收记录。报告会明确区分已执行测试与残余验证项。</p>
           </div>
         </div>
       </div>
@@ -27,31 +27,38 @@
       <section class="report-section" aria-labelledby="runs-title">
         <div class="section-heading section-heading-wide">
           <div><p>Published runs</p><h2 id="runs-title">运行记录</h2></div>
-          <p>包含 Android 真机运行账本和当前版本的专项回归报告。</p>
+          <p>包含 Android 真机运行记录和当前版本的专项回归报告。</p>
         </div>
         <div class="table-scroll" tabindex="0" aria-label="报告运行列表，可横向滚动">
           <table class="catalog-table">
             <thead><tr><th scope="col">版本</th><th scope="col">运行 ID</th><th scope="col">状态</th><th scope="col">统计</th><th scope="col">报告</th></tr></thead>
             <tbody>
               <tr>
+                <td><strong>v0.13.0</strong></td>
+                <td><code>20260813-recovery-peer-opus5</code><br /><small>Android · Xiaomi M2007J1SC</small></td>
+                <td><span class="status status-pass">通过，有残余双机验证</span></td>
+                <td>216 项自动化通过 · 全模块真机 · TCP 第二设备模拟</td>
+                <td><a href="v0.13.0/TEST-REPORT.md">打开完整报告</a></td>
+              </tr>
+              <tr>
                 <td><strong>v0.12.0</strong></td>
                 <td><code>20260812-13-bugfix-sync-recovery</code><br /><small>Android · Xiaomi M2007J1SC</small></td>
                 <td><span class="status status-pass">通过</span></td>
-                <td>199 自动化通过 · 3 个缺陷修复 · 覆盖电脑与直连回归</td>
+                <td>199 项自动化通过 · 3 个缺陷修复 · 覆盖电脑与直连回归</td>
                 <td><a href="v0.12.0/TEST-REPORT.md">打开完整报告</a></td>
               </tr>
               <tr>
                 <td><strong>v0.11.0</strong></td>
                 <td><code>20260811-12-full-device</code><br /><small>Android · Xiaomi M2006J10C</small></td>
                 <td><span class="status status-pass">通过</span></td>
-                <td>195 自动化通过 · 新功能与全模块真机回归</td>
+                <td>195 项自动化通过 · 新功能与全模块真机回归</td>
                 <td><a href="v0.11.0/TEST-REPORT.md">打开完整报告</a></td>
               </tr>
               <tr>
                 <td><strong>v0.10.0</strong></td>
                 <td><code>20260811-device-direct</code><br /><small>Android · Xiaomi M2006J10C</small></td>
                 <td><span class="status status-pass">通过</span></td>
-                <td>147 自动化通过 · 设备直连与全模块回归</td>
+                <td>147 项自动化通过 · 设备直连与全模块回归</td>
                 <td><a href="v0.10.0/DEVICE-DIRECT-SYNC-TEST-REPORT.md">打开专项报告</a></td>
               </tr>
               <tr>

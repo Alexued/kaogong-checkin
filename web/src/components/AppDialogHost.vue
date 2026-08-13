@@ -1,13 +1,13 @@
 <template>
   <teleport to="body">
-    <Transition name="app-dialog">
+    <Transition name="app-dialog" @after-leave="continueAppDialogQueue">
       <div
         v-if="dialog"
         :key="dialog.id"
         class="dialog-mask"
-        data-back-dismiss
+        :data-back-dismiss="dialog.explicitDecision ? undefined : ''"
         data-back-priority="220"
-        @click.self="cancel"
+        @click.self="dismissIfAllowed"
       >
         <section
           ref="panel"
@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { activeAppDialog, settleAppDialog } from '../lib/appDialog';
+import { activeAppDialog, continueAppDialogQueue, settleAppDialog } from '../lib/appDialog';
 
 const dialog = computed(() => activeAppDialog.value);
 const panel = ref<HTMLElement | null>(null);
@@ -76,6 +76,10 @@ function cancel() {
   settleAppDialog(false);
 }
 
+function dismissIfAllowed() {
+  if (!dialog.value?.explicitDecision) cancel();
+}
+
 function accept() {
   settleAppDialog(true);
 }
@@ -83,7 +87,7 @@ function accept() {
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault();
-    cancel();
+    dismissIfAllowed();
     return;
   }
   if (event.key !== 'Tab' || !panel.value) return;

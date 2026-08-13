@@ -204,9 +204,14 @@ export class RepositoryV3 {
     return backup;
   }
 
-  private async migrateSource(rawState: string, rawQueue: string, backup: MigrationBackupV3): Promise<{ record: RepositoryRecordV3; report: MigrationReportV3 }> {
+  private async migrateSource(
+    rawState: string,
+    rawQueue: string,
+    backup: MigrationBackupV3,
+    repairOrphans = false,
+  ): Promise<{ record: RepositoryRecordV3; report: MigrationReportV3 }> {
     try {
-      const migrated: LegacyMigrationResultV3 = migrateLegacyToV3(rawState, rawQueue);
+      const migrated: LegacyMigrationResultV3 = migrateLegacyToV3(rawState, rawQueue, { repairOrphans });
       const envelope: StorageEnvelopeV3 = { schemaVersion: 3, revision: 1, deviceId: deviceId(), savedAt: now(), state: migrated.state };
       const record: RepositoryRecordV3 = { formatVersion: 1, envelope, outbox: [] };
       this.writeRecord(record);
@@ -276,7 +281,7 @@ export class RepositoryV3 {
     const stateSource = backup.sources.find((source) => source.key === LEGACY_STATE_KEY);
     const queueSource = backup.sources.find((source) => source.key === LEGACY_QUEUE_KEY);
     if (!stateSource || !queueSource) throw new RepositoryError('MIGRATION_BACKUP_INCOMPLETE');
-    const result = await this.migrateSource(stateSource.raw, queueSource.raw, backup);
+    const result = await this.migrateSource(stateSource.raw, queueSource.raw, backup, true);
     this.storage.removeItem(MIGRATION_LOCK_KEY);
     return result;
   }

@@ -23,7 +23,7 @@
       </transition>
     </router-view>
   </div>
-  <TabBar :class="shellClass" />
+  <TabBar :class="shellClass" :indicator-style="isSecondary ? undefined : tabIndicatorStyle" />
   <LaunchIntro v-if="showLaunch" @done="finishLaunch" />
   <AppDialogHost />
 </template>
@@ -42,7 +42,7 @@ import { useSwipeTabs, TAB_PATHS } from './lib/swipeTabs';
 import { shouldPlayStartupAnimation } from './lib/localPreferences';
 import { SHELL_PHASE_KEY, type ShellPhase } from './lib/shellPhase';
 
-const { trackStyle, pageStyle, isTabPage } = useSwipeTabs();
+const { trackStyle, pageStyle, isTabPage, tabIndicatorStyle } = useSwipeTabs();
 const route = useRoute();
 const isSecondary = computed(() => !isTabPage.value);
 const isActiveRootPage = (path: string) => isTabPage.value && route.path === path;

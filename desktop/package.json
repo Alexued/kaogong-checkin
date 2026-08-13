@@ -1,7 +1,7 @@
 {
   "name": "kaogong-checkin-desktop",
   "productName": "考公打卡电脑伴侣",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "description": "考公打卡 Windows 电脑同步伴侣",
   "main": "src/main.js",

@@ -5,6 +5,7 @@ import {
   activeAppDialog,
   cancelAllDialogs,
   confirmDialog,
+  continueAppDialogQueue,
   settleAppDialog,
 } from '../src/lib/appDialog.ts';
 
@@ -56,14 +57,54 @@ test('dialog requests settle in queue order and normalize their copy', async () 
   assert.deepEqual(activeAppDialog.value?.details, ['细节']);
   settleAppDialog(false);
   assert.equal(await first, false);
-  await Promise.resolve();
+  assert.equal(activeAppDialog.value, null);
+  continueAppDialogQueue();
   assert.equal(activeAppDialog.value?.title, '第二个');
   assert.equal(activeAppDialog.value?.variant, 'neutral');
   assert.equal(activeAppDialog.value?.cancelLabel, '取消');
   settleAppDialog(true);
   assert.equal(await second, true);
-  await Promise.resolve();
   assert.equal(activeAppDialog.value, null);
+});
+
+test('queued dialogs wait for the visible panel to leave before advancing', async () => {
+  const first = confirmDialog({ title: '设备一', message: '请求一', confirmLabel: '允许' });
+  const second = confirmDialog({ title: '设备二', message: '请求二', confirmLabel: '允许' });
+  const third = confirmDialog({ title: '设备三', message: '请求三', confirmLabel: '允许' });
+
+  settleAppDialog(false);
+  assert.equal(await first, false);
+  assert.equal(activeAppDialog.value, null);
+
+  continueAppDialogQueue();
+  assert.equal(activeAppDialog.value?.title, '设备二');
+  settleAppDialog(true);
+  assert.equal(await second, true);
+  assert.equal(activeAppDialog.value, null);
+
+  continueAppDialogQueue();
+  assert.equal(activeAppDialog.value?.title, '设备三');
+  settleAppDialog(false);
+  assert.equal(await third, false);
+  assert.equal(activeAppDialog.value, null);
+});
+
+test('explicit decisions cannot be converted into backdrop or back dismissals', async () => {
+  const host = await readFile(new URL('../src/components/AppDialogHost.vue', import.meta.url), 'utf8');
+  const pending = confirmDialog({
+    title: '接收设备记录',
+    message: '请选择允许或拒绝。',
+    confirmLabel: '允许接收',
+    cancelLabel: '拒绝本次',
+    explicitDecision: true,
+  });
+  assert.equal(activeAppDialog.value?.explicitDecision, true);
+  assert.equal(activeAppDialog.value?.cancelLabel, '拒绝本次');
+  assert.match(host, /dismissIfAllowed/);
+  assert.match(host, /!dialog\.value\?\.explicitDecision/);
+  assert.match(host, /dialog\.explicitDecision \? undefined : ''/);
+  settleAppDialog(true);
+  assert.equal(await pending, true);
 });
 
 test('cancelAllDialogs rejects the active request and every queued request', async () => {
