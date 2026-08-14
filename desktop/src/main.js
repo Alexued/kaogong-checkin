@@ -16,7 +16,7 @@ const QRCode = require('qrcode');
 const { selectCanonicalApk } = require('./apk-selection');
 const { version: DESKTOP_VERSION } = require('../package.json');
 
-const PRODUCT_NAME = '考公打卡电脑伴侣';
+const PRODUCT_NAME = '格记电脑伴侣';
 const DATA_FOLDER_NAME = 'KaogongCheckin';
 const DEFAULT_HTTP_PORT = 8321;
 const LAST_HTTP_PORT = 8330;

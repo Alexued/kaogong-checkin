@@ -1,9 +1,9 @@
 {
   "name": "kaogong-checkin-desktop",
-  "productName": "考公打卡电脑伴侣",
+  "productName": "格记电脑伴侣",
   "version": "0.13.1",
   "private": true,
-  "description": "考公打卡 Windows 电脑同步伴侣",
+  "description": "格记 Windows 电脑同步伴侣",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -26,7 +26,7 @@
   },
   "build": {
     "appId": "io.github.alexued.kaogong-checkin.companion",
-    "productName": "考公打卡电脑伴侣",
+    "productName": "格记电脑伴侣",
     "asar": true,
     "files": [
       "src/**/*",

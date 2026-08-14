@@ -1,0 +1,13 @@
+{
+  "version": "0.13.1",
+  "fileName": "kaogong-checkin-windows-x64-setup-v0.13.1.exe",
+  "size": 112138703,
+  "sha256": "fc78c351b760c2d9494055870eab19f2ce42e75b406e975143c7889910a9adbf",
+  "platform": "win32",
+  "arch": "x64",
+  "installer": "nsis",
+  "appId": "io.github.alexued.kaogong-checkin.companion",
+  "productName": "格记电脑伴侣",
+  "signed": false,
+  "embeddedApkSha256": "7b3a3ad5ae75ca47c8a83dc68a69cd21d6dfad0e98f135a2acd3748dca79f03f"
+}

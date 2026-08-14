@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>考公打卡｜Android 学习工具与 Windows 本地伴侣</title>
+    <title>格记｜通用打卡、考公训练与本地同步</title>
     <meta
       name="description"
-      content="考公打卡把每日计划、专注计时和背诵训练放进同一天，并提供可安装的 Windows 本地伴侣完成私有同步与手机安装。"
+      content="格记是一套本地优先的通用打卡工具，支持通用与考公双模式、番茄钟、速算和题目复盘，并提供手机平板直连与 Windows 本地伴侣。"
     />
     <meta name="theme-color" content="#f5f5f7" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="考公打卡" />
-    <meta property="og:description" content="Android 负责今天，Windows 负责本地备份。" />
+    <meta property="og:title" content="格记" />
+    <meta property="og:description" content="任何目标都能打卡，通用模式与考公模式随时切换。" />
     <meta property="og:url" content="https://alexued.github.io/kaogong-checkin/" />
     <meta property="og:image" content="https://alexued.github.io/kaogong-checkin/assets/app-icon.png" />
     <link rel="canonical" href="https://alexued.github.io/kaogong-checkin/" />
@@ -19,11 +19,11 @@
     <script>
       document.documentElement.className = 'js';
     </script>
-    <link rel="stylesheet" href="styles.css?v=20260807-v071-release" />
-    <link rel="stylesheet" href="styles/shared/style-switcher.css?v=20260807-v071-release" />
-    <script src="app.js?v=20260807-v071-release" defer></script>
-    <script src="styles/shared/release-data.js?v=20260807-v071-release" defer></script>
-    <script src="styles/shared/style-switcher.js?v=20260807-v071-release" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260814-v0131-release" />
+    <link rel="stylesheet" href="styles/shared/style-switcher.css?v=20260814-v0131-release" />
+    <script src="app.js?v=20260814-v0131-release" defer></script>
+    <script src="styles/shared/release-data.js?v=20260814-v0131-release" defer></script>
+    <script src="styles/shared/style-switcher.js?v=20260814-v0131-release" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -35,9 +35,9 @@
 
     <header class="site-header" aria-label="网站导航">
       <div class="nav-shell">
-        <a class="brand-link" href="#top" aria-label="考公打卡首页">
+        <a class="brand-link" href="#top" aria-label="格记首页">
           <img src="assets/app-icon.png" width="32" height="32" alt="" />
-          <span>考公打卡</span>
+          <span>格记</span>
         </a>
         <nav class="nav-actions" aria-label="主要链接">
           <a class="nav-source" href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">GitHub</a>
@@ -45,7 +45,7 @@
           <a
             class="nav-download"
             data-release-link="android"
-            href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk"
+            href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.13.1/kaogong-checkin-v0.13.1.apk"
           >
             下载 APK
           </a>
@@ -63,15 +63,15 @@
         style="--scene-color: #f5f5f7"
       >
         <div class="hero-copy" data-scene-part="copy">
-          <p class="hero-kicker" data-enter style="--enter-order: 0">Android 学习工具 · Windows 本地伴侣</p>
-          <h1 id="hero-title" data-enter style="--enter-order: 1">考公打卡</h1>
-          <p class="hero-statement" data-enter style="--enter-order: 2">把计划、专注和背诵，放进同一天。</p>
-          <p class="hero-description" data-enter style="--enter-order: 3">手机完成今天，电脑只在你需要时接手备份。</p>
+          <p class="hero-kicker" data-enter style="--enter-order: 0">通用打卡 · 考公训练 · 本地同步</p>
+          <h1 id="hero-title" data-enter style="--enter-order: 1">格记</h1>
+          <p class="hero-statement" data-enter style="--enter-order: 2">任何目标，都能在今天留下进度。</p>
+          <p class="hero-description" data-enter style="--enter-order: 3">手机和平板直接交换记录，电脑在你需要时接手本地备份。</p>
           <div class="hero-actions" data-enter style="--enter-order: 4">
             <a
               class="button button-primary"
               data-release-link="android"
-              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk"
+              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.13.1/kaogong-checkin-v0.13.1.apk"
             >
               <span aria-hidden="true">↓</span>
               下载 Android APK
@@ -85,7 +85,7 @@
               了解 Windows 伴侣
             </a>
           </div>
-          <p class="hero-meta" data-enter style="--enter-order: 5">v<span data-release="version">0.7.1</span> <span aria-hidden="true">·</span> Android 7+ <span aria-hidden="true">·</span> Windows 10/11</p>
+          <p class="hero-meta" data-enter style="--enter-order: 5">v<span data-release="version">0.13.1</span> <span aria-hidden="true">·</span> Android 7+ <span aria-hidden="true">·</span> Windows 10/11</p>
         </div>
 
         <div class="hero-stage" data-enter data-scene-part="visual" style="--enter-order: 6" aria-label="原生渲染的今日计划界面">
@@ -102,7 +102,7 @@
                   <span class="appbar-date">8 月 4 日</span>
                   <strong>今天</strong>
                 </div>
-                <span class="avatar-mark" aria-hidden="true">考</span>
+                <span class="avatar-mark" aria-hidden="true">记</span>
               </div>
               <div class="phone-progress">
                 <div>
@@ -112,8 +112,8 @@
                 <div class="mini-progress" aria-hidden="true"><span></span></div>
               </div>
               <div class="phone-task-list" aria-hidden="true">
-                <div class="phone-task is-complete"><span>✓</span><div><strong>判断推理巩固</strong><small>已完成 · 32 分钟</small></div></div>
-                <div class="phone-task is-complete"><span>✓</span><div><strong>申论晨读</strong><small>已完成 · 18 分钟</small></div></div>
+                <div class="phone-task is-complete"><span>✓</span><div><strong>晨间阅读</strong><small>已完成 · 32 分钟</small></div></div>
+                <div class="phone-task is-complete"><span>✓</span><div><strong>跑步训练</strong><small>已完成 · 3 公里</small></div></div>
                 <div class="phone-task"><span></span><div><strong>资料分析 40 题</strong><small>预计 50 分钟</small></div></div>
                 <div class="phone-task"><span></span><div><strong>常识错题复盘</strong><small>预计 25 分钟</small></div></div>
               </div>
@@ -142,9 +142,9 @@
       >
         <div class="chapter-shell">
           <div class="section-heading" data-reveal data-scene-part="copy">
-            <p class="section-index">01 / 今日计划</p>
+            <p class="section-index">01 / 通用打卡</p>
             <h2 id="today-title">打开，就是今天。</h2>
-            <p>任务、子任务、结转和进度都在同一屏。没做完的不会消失，完成项也不会突然换位置。</p>
+            <p>清单任务、数量目标、子任务、结转和进度都在同一屏。切换考公模式不会拆分或删除已有记录。</p>
           </div>
 
           <div class="today-layout" data-scene-part="visual">
@@ -229,9 +229,9 @@
       >
         <div class="focus-shell">
           <div class="section-heading focus-heading" data-reveal data-scene-part="copy">
-            <p class="section-index">02 / 专注计时</p>
-            <h2 id="focus-title">25 分钟，只做一件事。</h2>
-            <p>开始、暂停、继续。时间放在画面中央，其他内容都退到后面。</p>
+            <p class="section-index">02 / 计时与番茄钟</p>
+            <h2 id="focus-title">把一段时间，留给一件事。</h2>
+            <p>秒表、倒计时和番茄钟共用安静的计时界面，支持打点、暂停、继续与专注轮次。</p>
           </div>
 
           <div class="timer-stage" data-reveal data-scene-part="visual">
@@ -248,7 +248,7 @@
             <p class="timer-status" data-timer-status aria-live="polite">准备开始</p>
           </div>
         </div>
-        <a class="scene-next" href="#drill" data-scene-part="next"><span>03 / 背诵训练</span><span aria-hidden="true">↓</span></a>
+        <a class="scene-next" href="#drill" data-scene-part="next"><span>03 / 训练与复盘</span><span aria-hidden="true">↓</span></a>
       </section>
 
       <section
@@ -256,14 +256,14 @@
         id="drill"
         aria-labelledby="drill-title"
         data-scene
-        data-scene-label="背诵训练"
+        data-scene-label="训练与复盘"
         style="--scene-color: #e7f1ff"
       >
         <div class="chapter-shell drill-layout">
           <div class="section-heading drill-heading" data-reveal data-scene-part="copy">
-            <p class="section-index">03 / 背诵训练</p>
-            <h2 id="drill-title">答案，先藏起来。</h2>
-            <p>先回忆，再翻面。记住了就继续，没记住就让它更早回来。</p>
+            <p class="section-index">03 / 背诵、速算与复盘</p>
+            <h2 id="drill-title">先作答，再看方法。</h2>
+            <p>百化分、公式和速算练习负责日常训练；题库与名师 Skills 帮你把一道资料分析题讲清楚并留下复盘。</p>
           </div>
 
           <div class="drill-demo" data-reveal data-scene-part="visual">
@@ -315,7 +315,7 @@
             <a
               class="button button-primary windows-download-link"
               data-release-link="windows"
-              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-windows-x64-setup-v0.7.1.exe"
+              href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.13.1/kaogong-checkin-windows-x64-setup-v0.13.1.exe"
             >
               <span aria-hidden="true">↓</span>
               下载 Windows 版
@@ -327,7 +327,7 @@
             <div class="desktop-titlebar">
               <div class="window-brand">
                 <img src="assets/app-icon.png" width="24" height="24" alt="" />
-                <span>考公打卡</span>
+                <span>格记</span>
               </div>
               <div class="window-controls" aria-hidden="true"><span>—</span><span>□</span><span>×</span></div>
             </div>
@@ -375,7 +375,7 @@
             </div>
           </div>
         </div>
-        <a class="scene-next" href="#sync" data-scene-part="next"><span>05 / 电脑同步</span><span aria-hidden="true">↓</span></a>
+        <a class="scene-next" href="#sync" data-scene-part="next"><span>05 / 设备直连</span><span aria-hidden="true">↓</span></a>
       </section>
 
       <section
@@ -383,14 +383,14 @@
         id="sync"
         aria-labelledby="sync-title"
         data-scene
-        data-scene-label="电脑同步"
+        data-scene-label="设备直连"
         style="--scene-color: #ffffff"
       >
         <div class="chapter-shell">
           <div class="section-heading sync-heading" data-reveal data-scene-part="copy">
-            <p class="section-index">05 / 电脑同步</p>
-            <h2 id="sync-title">连接，由你决定。</h2>
-            <p>默认先保存在手机。需要电脑备份时再打开同步，不需要时就彻底停止局域网发现、连接和上传。开启并发现电脑后，应用会比较电脑 APK、GitHub 与当前版本，只提示可用更新；下载和系统安装仍由你确认。</p>
+            <p class="section-index">05 / 手机、平板与电脑</p>
+            <h2 id="sync-title">记录怎么走，由你决定。</h2>
+            <p>手机和平板分别打开“允许发现”和“主动搜索”后，可明确选择发送或接收并完整替换记录；目标设备每次确认，接收前自动建立恢复点。Windows 同步仍可独立关闭。</p>
           </div>
 
           <div class="sync-control" data-reveal data-scene-part="visual" data-sync-control>
@@ -409,7 +409,7 @@
             <div class="sync-device sync-phone" data-scan-node="phone">
               <span class="device-symbol" aria-hidden="true">▯</span>
               <small>Android 设备</small>
-              <strong>考公打卡</strong>
+              <strong>格记</strong>
               <span>128 条本地记录</span>
             </div>
             <div class="sync-route" aria-hidden="true">
@@ -452,7 +452,7 @@
       >
         <div class="download-shell">
           <div class="download-heading" data-reveal data-scene-part="copy">
-            <p class="section-index">v<span data-release="version">0.7.1</span> / Android + Windows</p>
+            <p class="section-index">v<span data-release="version">0.13.1</span> / Android + Windows</p>
             <h2 id="download-title">从今天开始。</h2>
             <p>手机写下第一项任务，电脑在需要时接手本地备份。两个安装包来自同一个版本。</p>
           </div>
@@ -464,16 +464,16 @@
                 <a
                   class="button button-download"
                   data-release-link="android"
-                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk"
+                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.13.1/kaogong-checkin-v0.13.1.apk"
                 ><span aria-hidden="true">↓</span>下载 APK</a>
               </div>
               <dl class="release-details">
                 <div><dt>系统</dt><dd>Android 7+</dd></div>
-                <div><dt>大小</dt><dd data-apk-size data-release="android-size">3.27 MiB</dd></div>
-                <div class="release-file"><dt>文件</dt><dd data-release="android-file">kaogong-checkin-v0.7.1.apk</dd></div>
+                <div><dt>大小</dt><dd data-apk-size data-release="android-size">46.49 MiB</dd></div>
+                <div class="release-file"><dt>文件</dt><dd data-release="android-file">kaogong-checkin-v0.13.1.apk</dd></div>
               </dl>
               <div class="checksum">
-                <div><span>SHA-256</span><code id="apk-checksum" data-release="android-sha">8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689</code></div>
+                <div><span>SHA-256</span><code id="apk-checksum" data-release="android-sha">7B3A3AD5AE75CA47C8A83DC68A69CD21D6DFAD0E98F135A2ACD3748DCA79F03F</code></div>
                 <button class="button button-copy" type="button" data-copy-checksum data-copy-target="apk-checksum" data-original-label="复制 APK 校验值">复制校验值</button>
               </div>
             </article>
@@ -484,16 +484,16 @@
                 <a
                   class="button button-download button-download-light"
                   data-release-link="windows"
-                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-windows-x64-setup-v0.7.1.exe"
+                  href="https://github.com/Alexued/kaogong-checkin/releases/download/v0.13.1/kaogong-checkin-windows-x64-setup-v0.13.1.exe"
                 ><span aria-hidden="true">↓</span>下载安装程序</a>
               </div>
               <dl class="release-details">
                 <div><dt>系统</dt><dd>Windows 10/11 x64</dd></div>
-                <div><dt>大小</dt><dd data-windows-size data-release="windows-size">91.38 MiB</dd></div>
-                <div class="release-file"><dt>文件</dt><dd data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.7.1.exe</dd></div>
+                <div><dt>大小</dt><dd data-windows-size data-release="windows-size">106.94 MiB</dd></div>
+                <div class="release-file"><dt>文件</dt><dd data-release="windows-file">kaogong-checkin-windows-x64-setup-v0.13.1.exe</dd></div>
               </dl>
               <div class="checksum">
-                <div><span>SHA-256</span><code id="windows-checksum" data-release="windows-sha">DECAD4791F4A93609E04D89CEE026F41E5FBFE4FDE380D51FEF84A73D45FE474</code></div>
+                <div><span>SHA-256</span><code id="windows-checksum" data-release="windows-sha">FC78C351B760C2D9494055870EAB19F2CE42E75B406E975143C7889910A9ADBF</code></div>
                 <button class="button button-copy" type="button" data-copy-checksum data-copy-target="windows-checksum" data-original-label="复制 Windows 校验值">复制校验值</button>
               </div>
             </article>
@@ -502,26 +502,26 @@
           <div class="download-note" data-reveal data-scene-part="visual">
             <div>
               <strong>本地优先</strong>
-              <span>不启用电脑同步时，Android 应用仍可完整使用。</span>
+              <span>不启用任何同步时，Android 应用仍可完整使用。</span>
             </div>
             <div><strong>专用网络</strong><span>Windows 伴侣仅建议在家庭或可信局域网中运行。</span></div>
           </div>
 
           <p class="release-links" data-reveal>
-            <a href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.7.1" target="_blank" rel="noreferrer">查看 v0.7.1 发布说明</a>
+            <a href="https://github.com/Alexued/kaogong-checkin/releases/tag/v0.13.1" target="_blank" rel="noreferrer">查看 v0.13.1 发布说明</a>
             <span aria-hidden="true">·</span>
             <a href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">查看源代码</a>
             <span aria-hidden="true">·</span>
             <a href="reports/">测试报告目录</a>
             <span aria-hidden="true">·</span>
-            <a href="reports/v0.7.1/adb-20260807T184457+0800/">v0.7.1 Android 真机报告</a>
+            <a href="reports/v0.13.1/TEST-REPORT.md">v0.13.1 双 Android 真机报告</a>
           </p>
         </div>
       </section>
     </main>
 
     <footer class="site-footer">
-      <p>考公打卡 <span aria-hidden="true">·</span> 把今天做完</p>
+      <p>格记 <span aria-hidden="true">·</span> 让每一天都有进度</p>
       <nav aria-label="页脚链接">
         <a href="#privacy">隐私说明</a>
         <a href="https://github.com/Alexued/kaogong-checkin" target="_blank" rel="noreferrer">源码仓库</a>
