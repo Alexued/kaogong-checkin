@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import TodayView from './views/TodayView.vue';
+import OverviewView from './views/OverviewView.vue';
 import TimerView from './views/TimerView.vue';
 import TimerHistoryView from './views/TimerHistoryView.vue';
 import DrillView from './views/DrillView.vue';
@@ -13,6 +14,12 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', name: 'today', component: TodayView },
+    {
+      path: '/overview',
+      name: 'overview',
+      component: OverviewView,
+      meta: { parentPath: '/', rootTab: '/' },
+    },
     { path: '/timer', name: 'timer', component: TimerView },
     {
       path: '/timer/history',

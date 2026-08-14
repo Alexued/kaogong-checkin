@@ -53,23 +53,38 @@ test('capability metrics remain finite with empty and malformed timer values', (
 });
 
 test('new surfaces expose the expected mobile workflows and PixelGrid feedback', async () => {
-  const [today, focus, stats, timer, appStyles, tabBar] = await Promise.all([
+  const [today, overview, taskCard, taskMenu, focus, stats, timer, appStyles, tabBar, router] = await Promise.all([
     readFile(new URL('../src/views/TodayView.vue', import.meta.url), 'utf8'),
+    readFile(new URL('../src/views/OverviewView.vue', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/TaskCard.vue', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/TaskContextMenu.vue', import.meta.url), 'utf8'),
     readFile(new URL('../src/components/drill/FocusQuestionPanel.vue', import.meta.url), 'utf8'),
     readFile(new URL('../src/views/StatsView.vue', import.meta.url), 'utf8'),
     readFile(new URL('../src/views/TimerView.vue', import.meta.url), 'utf8'),
     readFile(new URL('../src/styles/app.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/components/TabBar.vue', import.meta.url), 'utf8'),
+    readFile(new URL('../src/router.ts', import.meta.url), 'utf8'),
   ]);
-  assert.match(today, /dashboard-suggestion/);
-  assert.match(today, /runSuggestion/);
-  assert.match(today, /行动与习惯双轨/);
+  assert.doesNotMatch(today, /dashboard-suggestion/);
+  assert.ok(today.indexOf('<CalendarStrip') < today.indexOf('<!-- 结转任务 -->'));
+  assert.match(today, /path: '\/overview'/);
+  assert.match(overview, /dashboard-suggestion/);
+  assert.match(overview, /runSuggestion/);
+  assert.match(overview, /行动与习惯双轨/);
+  assert.match(router, /path: '\/overview'/);
+  assert.match(router, /parentPath: '\/'/);
+  assert.match(taskCard, /emit\('open-menu', props\.item, \{ x: startX, y: startY \}\)/);
+  assert.match(taskMenu, /positionTaskMenu/);
+  assert.match(taskMenu, /data-back-dismiss/);
+  assert.match(taskMenu, /PixelGrid/);
   assert.match(focus, /题目面板/);
   assert.match(focus, /收藏/);
   assert.match(focus, /标记/);
   assert.match(focus, /草稿/);
   assert.match(focus, /用 Skills 复盘/);
   assert.match(focus, /PixelGrid/);
+  assert.match(focus, /QuestionImage/);
+  assert.match(focus, /answer\.value = optionLetter\(optionIndex\)/);
   assert.match(focus, /closest<HTMLElement>\('\.swipe-page'\)/);
   assert.match(focus, /await nextTick\(\)/);
   assert.match(focus, /window\.scrollTo\(\{ top: 0, behavior: 'auto' \}\)/);

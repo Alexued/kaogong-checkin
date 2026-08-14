@@ -14,14 +14,29 @@ test('analysis skills expose an extensible registry with Chen Huaian available',
 });
 
 test('question bank searches source questions by terms and category', () => {
-  assert.equal(bank.ANALYSIS_BANK_COUNT, 72);
+  assert.equal(bank.ANALYSIS_BANK_COUNT, 3988);
   assert.equal(bank.ANALYSIS_BANK_CATEGORIES.length, 12);
+});
+
+test('all source questions load with unique ids, answers, analysis and category coverage', async () => {
+  const questions = await bank.loadAnalysisQuestionBank();
+  assert.equal(questions.length, 3988);
+  assert.equal(new Set(questions.map((question) => question.id)).size, questions.length);
+  assert.ok(questions.every((question) => /^[A-D]$/.test(question.answer)));
+  assert.ok(questions.every((question) => question.analysis.trim().length > 0));
+  assert.ok(questions.every((question) => question.categories.length > 0));
+  assert.ok(questions.every((question) => question.options.length === question.optionImages.length));
+  assert.deepEqual(
+    new Set(questions.flatMap((question) => question.categories)),
+    new Set(bank.ANALYSIS_BANK_CATEGORIES),
+  );
   const results = bank.searchAnalysisQuestionBank('研发经费');
   assert.ok(results.some((question) => question.stem.includes('研发经费')));
-  assert.ok(bank.searchAnalysisQuestionBank('', '增长率').every((question) => question.category === '增长率'));
+  assert.ok(bank.searchAnalysisQuestionBank('', '增长率').every((question) => question.categories.includes('增长率')));
   const first = results[0];
   assert.match(bank.questionBankText(first), /研发经费/);
   assert.match(bank.questionBankText(first), /A\./);
+  assert.equal(bank.analysisBankQuestion(first.id)?.analysis, first.analysis);
 });
 
 test('recovery and timer UI expose actionable paths and stable danger contrast', async () => {
@@ -40,6 +55,13 @@ test('recovery and timer UI expose actionable paths and stable danger contrast',
   assert.match(timer, /记录已删除/);
   assert.match(timer, /writeBlockedMessage/);
   assert.match(dialog, /\.dialog-confirm\.danger \{ background: var\(--danger\); color: #fff/);
+});
+
+test('bank review prepends the source explanation before the selected skill sections', async () => {
+  const panel = await readFile(new URL('../src/components/drill/AnalysisReviewPanel.vue', import.meta.url), 'utf8');
+  assert.match(panel, /analysisBankQuestion\(questionBankId\.value\)/);
+  assert.match(panel, /title: '原题解析'/);
+  assert.match(panel, /\.\.\.skillResult\.sections/);
 });
 
 test('wheel picker uses scroll snapping and no numeric input', async () => {

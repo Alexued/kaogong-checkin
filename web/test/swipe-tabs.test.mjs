@@ -4,11 +4,16 @@ import { readFile } from 'node:fs/promises';
 import { importTypeScript } from './import-typescript.mjs';
 
 const source = await readFile(new URL('../src/lib/swipeTabs.ts', import.meta.url), 'utf8');
+const appStyles = await readFile(new URL('../src/styles/app.css', import.meta.url), 'utf8');
 const {
   canPreventSwipeMove,
   shouldCancelSwipeForTouchCount,
   tabProgressFor,
 } = await importTypeScript(new URL('../src/lib/swipeTabs.ts', import.meta.url));
+
+test('swipe stage cannot be programmatically scrolled by focus restoration', () => {
+  assert.match(appStyles, /\.swipe-stage\s*\{[^}]*overflow:\s*hidden;[^}]*overflow:\s*clip;/s);
+});
 
 test('touch moves only claim cancelable browser events', () => {
   assert.equal(canPreventSwipeMove({ cancelable: true }), true);

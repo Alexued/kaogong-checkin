@@ -20,6 +20,7 @@
     @pointerup="onPointerUp"
     @pointercancel="onPointerCancel"
     @lostpointercapture="onPointerCancel"
+    @contextmenu.prevent="onContextMenu"
     >
     <div class="main-row">
       <CheckButton v-if="!isQuantity" :done="item.done" @toggle="onToggle" />
@@ -162,7 +163,7 @@ const emit = defineEmits<{
   (e: 'move', item: PlanItem, dir: -1 | 1): void;
   (e: 'toggle-sub', sub: SubItem, ev: MouseEvent): void;
   (e: 'toggle-expand', item: PlanItem): void;
-  (e: 'edit', item: PlanItem): void;
+  (e: 'open-menu', item: PlanItem, anchor: { x: number; y: number }): void;
   (e: 'adjust-progress', item: PlanItem, delta: -1 | 1, source: ProgressSource | undefined, ev: MouseEvent): void;
   (e: 'toggle-source', item: PlanItem, source: ProgressSource, ev: MouseEvent): void;
 }>();
@@ -251,10 +252,10 @@ function onPointerDown(ev: PointerEvent) {
     armClickSuppression();
     longPressActive.value = true;
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(12);
-    // Finish the card lift before establishing the editor overlay.
+    // Finish the card lift before establishing the anchored action layer.
     revealTimer = setTimeout(() => {
       revealTimer = null;
-      emit('edit', props.item);
+      emit('open-menu', props.item, { x: startX, y: startY });
       releaseTimer = setTimeout(() => {
         releaseTimer = null;
         longPressActive.value = false;
@@ -262,6 +263,13 @@ function onPointerDown(ev: PointerEvent) {
       }, 140);
     }, 220);
   }, LONG_PRESS_MS);
+}
+
+function onContextMenu(ev: MouseEvent) {
+  if (props.reorder || !isLongPressTarget(ev.target)) return;
+  resetPress();
+  armClickSuppression();
+  emit('open-menu', props.item, { x: ev.clientX, y: ev.clientY });
 }
 
 function onPointerMove(ev: PointerEvent) {

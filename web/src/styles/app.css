@@ -1,6 +1,6 @@
 /* 全局共享样式 */
 /* ViewPager 滑动结构：舞台定高裁切，轨道横向 flex 平移，
-   5 个 Tab 页常驻、各自独立竖向滚动（保留各自滚动位置）。
+   4 个 Tab 页常驻、各自独立竖向滚动（保留各自滚动位置）。
    注意：flex-basis 必须为 0（flex:1 1 0），若用 auto 会被最长页内容撑高，
    导致所有页高度虚高、短页内容排到视口外。 */
 .swipe-stage {
@@ -8,6 +8,7 @@
   min-height: 0;
   width: 100%;
   overflow: hidden;
+  overflow: clip;
 }
 
 html.app-dialog-open,

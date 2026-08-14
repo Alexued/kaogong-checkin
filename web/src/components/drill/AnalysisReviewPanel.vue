@@ -74,7 +74,7 @@ import { confirmDialog } from '../../lib/appDialog';
 import type { AnalysisReviewRecord } from '../../types';
 import { ANALYSIS_SKILLS, analysisSkill, analyzeWithSkill, DEFAULT_ANALYSIS_SKILL_ID } from '../../lib/analysisSkills';
 import QuestionBankPicker from './QuestionBankPicker.vue';
-import { ANALYSIS_BANK_COUNT, questionBankText, type AnalysisBankQuestion } from '../../lib/questionBank';
+import { ANALYSIS_BANK_COUNT, analysisBankQuestion, loadAnalysisQuestionBank, questionBankText, type AnalysisBankQuestion } from '../../lib/questionBank';
 
 const props = defineProps<{ seed?: { question: AnalysisBankQuestion; answer: string } | null }>();
 
@@ -136,7 +136,7 @@ async function onImageSelected(event: Event, nextSource: 'camera' | 'gallery') {
   const file = input.files?.[0];
   input.value = '';
   if (!file) return;
-  source.value = nextSource; result.value = null; ocrBusy.value = true; ocrMessage.value = '正在压缩图片并识别中文…';
+  source.value = nextSource; questionBankId.value = ''; result.value = null; ocrBusy.value = true; ocrMessage.value = '正在压缩图片并识别中文…';
   try {
     imagePreview.value = await resizeImage(file);
     if (!nativeTextRecognitionAvailable()) {
@@ -154,10 +154,21 @@ async function onImageSelected(event: Event, nextSource: 'camera' | 'gallery') {
   }
 }
 
-function runAnalysis() {
+async function runAnalysis() {
   const text = questionText.value.trim();
   if (!text) return;
-  result.value = analyzeWithSkill(skillId.value, text, userAnswer.value.trim(), correctAnswer.value.trim());
+  if (questionBankId.value) await loadAnalysisQuestionBank();
+  const skillResult = analyzeWithSkill(skillId.value, text, userAnswer.value.trim(), correctAnswer.value.trim());
+  const bankQuestion = analysisBankQuestion(questionBankId.value);
+  result.value = bankQuestion?.analysis
+    ? {
+        ...skillResult,
+        sections: [
+          { title: '原题解析', content: bankQuestion.analysis },
+          ...skillResult.sections,
+        ],
+      }
+    : skillResult;
   store.saveAnalysisReview({ source: source.value, questionText: text, userAnswer: userAnswer.value.trim(), correctAnswer: correctAnswer.value.trim(), categoryKey: result.value.categoryKey, categoryLabel: result.value.categoryLabel, skillId: selectedSkill.value.id, questionBankId: questionBankId.value || undefined, sections: result.value.sections });
   if ('vibrate' in navigator) navigator.vibrate?.(16);
 }
