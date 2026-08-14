@@ -1,5 +1,5 @@
 <template>
-  <div class="page timer-page">
+  <div class="page timer-page" :class="{ 'stopwatch-page-active': mode === 'stopwatch' && sessionActive }">
     <div class="timer-heading">
       <h1 class="sr-only">计时</h1>
       <div class="timer-mode" role="tablist" aria-label="计时模式">
@@ -9,7 +9,7 @@
       </div>
     </div>
 
-    <div class="timer-stage">
+    <div class="timer-stage" :class="{ 'stopwatch-session': mode === 'stopwatch' && sessionActive }">
       <div v-if="mode === 'pomodoro'" class="pomodoro-stage">
         <div class="pomo-meta">
           <span>{{ pomoStageLabel }}</span>
@@ -44,7 +44,7 @@
           <WheelPicker v-model="countdownSeconds" label="秒钟" :min="0" :max="59" suffix="秒" />
         </div>
       </div>
-      <div v-else class="countdown-clock-wrap" :class="{ completed: countdown.completed }">
+      <div v-else class="countdown-clock-wrap" :class="{ completed: countdown.completed, 'stopwatch-clock': mode === 'stopwatch' }" data-testid="timer-clock">
         <svg v-if="mode === 'countdown'" class="countdown-ring" viewBox="0 0 220 220" aria-hidden="true">
           <circle class="ring-track" cx="110" cy="110" r="98" />
           <circle class="ring-value" cx="110" cy="110" r="98" :style="{ strokeDashoffset: `${RING_LENGTH * (1 - countdownProgress)}` }" />
@@ -52,16 +52,17 @@
         <div class="clock">{{ clockText }}</div>
       </div>
 
-      <div v-if="mode === 'stopwatch' && sw.lapsElapsed.length" class="laps-area">
+      <div v-if="mode === 'stopwatch' && sessionActive" class="laps-area" :style="{ height: `${lapViewportHeight}px` }" data-testid="laps-viewport" aria-label="打点记录，最多显示五条，超出后可滚动">
         <div class="laps-head"><span class="laps-title">打点（{{ sw.lapsElapsed.length }}）</span><div class="font-ctl"><button class="font-btn" :disabled="lapsFont <= 13" @click="adjustFont(-1)">A−</button><button class="font-btn" :disabled="lapsFont >= 24" @click="adjustFont(1)">A＋</button></div></div>
         <div ref="lapsEl" class="laps-scroll" data-swipe-ignore>
+          <span v-if="!currentLaps.length" class="laps-empty" aria-hidden="true">—</span>
           <div v-for="(lap, i) in currentLaps" :key="i" class="lap" :style="{ fontSize: lapsFont + 'px' }"><span class="lap-no" :style="{ background: lapColor(i) }">{{ i + 1 }}</span><span class="lap-split" :style="{ color: lapColor(i) }">+{{ fmtDuration(lap.splitMs) }}</span><span class="lap-elapsed">{{ fmtDuration(lap.elapsedMs) }}</span></div>
         </div>
       </div>
       </template>
     </div>
 
-    <div class="controls">
+    <div class="controls" data-testid="timer-controls">
       <template v-if="mode === 'pomodoro'">
         <button v-if="pomodoro.stage !== 'focus' && !pomodoro.startedAt" class="round-btn sub stop" @click="skipPomodoroBreak"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 5 8 7-8 7z"/><path d="M18 5v14"/></svg><span>跳过</span></button>
         <button v-if="!pomodoro.startedAt" class="round-btn main start" @click="startPomodoro"><svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><span>开始{{ pomoStageLabel }}</span></button>
@@ -245,9 +246,11 @@ const currentLaps = computed(() => sw.laps());
 const LAP_COLORS = ['#14b8a6', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#22c55e'];
 const lapColor = (i: number) => LAP_COLORS[i % LAP_COLORS.length];
 const lapsEl = ref<HTMLElement | null>(null);
-watch(() => sw.lapsElapsed.length, async () => { await nextTick(); if (lapsEl.value) lapsEl.value.scrollTop = lapsEl.value.scrollHeight; });
 const FONT_KEY = 'kgc-laps-font-size';
+const MAX_VISIBLE_LAPS = 5;
 const lapsFont = ref(Math.min(24, Math.max(13, Number(localStorage.getItem(FONT_KEY)) || 17)));
+const lapViewportHeight = computed(() => Math.ceil(38 + (lapsFont.value * 1.7 + 12) * MAX_VISIBLE_LAPS));
+watch([() => sw.lapsElapsed.length, () => lapsFont.value], async () => { await nextTick(); if (lapsEl.value) lapsEl.value.scrollTop = lapsEl.value.scrollHeight; });
 function adjustFont(delta: number) { lapsFont.value = Math.min(24, Math.max(13, lapsFont.value + delta)); localStorage.setItem(FONT_KEY, String(lapsFont.value)); }
 
 const finishing = ref(false);
@@ -278,14 +281,15 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 </script>
 
 <style scoped>
-.timer-page { display: flex; flex-direction: column; }
+.timer-page { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
 .timer-heading { display: flex; align-items: center; justify-content: flex-start; min-height: 44px; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .timer-mode { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: var(--accent-soft); }
 .timer-mode button { min-width: 44px; min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--text-2); padding: 7px 10px; font-size: 12px; font-weight: 700; }
 .timer-mode button.on { background: var(--card); color: var(--accent-solid); box-shadow: var(--shadow); }
 .timer-mode button:disabled { opacity: .65; }
-.timer-stage { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; padding: 12px 0; }
+.timer-stage { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; padding: 12px 0; }
+.timer-stage.stopwatch-session { justify-content: flex-start; gap: 12px; padding: 8px 0 4px; }
 .countdown-clock-wrap { position: relative; display: grid; place-items: center; width: min(78vw, 300px); aspect-ratio: 1; margin: 0 auto; }
 .clock { text-align: center; font-size: clamp(72px, 21vw, 108px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; line-height: 1.1; background: linear-gradient(135deg, var(--accent-from), var(--accent-to)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .countdown-clock-wrap .clock { position: relative; z-index: 1; font-size: clamp(52px, 16vw, 88px); }
@@ -294,12 +298,27 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 .ring-track { stroke: var(--card-border); }.ring-value { stroke: var(--accent-solid); stroke-linecap: round; stroke-dasharray: 615.75; transition: stroke-dashoffset 180ms linear; }
 .countdown-clock-wrap.completed { animation: countdown-pulse 620ms cubic-bezier(0.22, 1, 0.36, 1); }
 @keyframes countdown-pulse { 50% { transform: scale(1.045); } }
+.stopwatch-clock { transition: height 320ms cubic-bezier(.22,1,.36,1); }
+.timer-stage.stopwatch-session .stopwatch-clock { flex: 0 0 clamp(94px, 15vh, 124px); width: 100%; height: clamp(94px, 15vh, 124px); aspect-ratio: auto; margin: 0 auto; animation: stopwatch-clock-rise 320ms cubic-bezier(.22,1,.36,1) both; }
+.timer-stage.stopwatch-session .stopwatch-clock .clock { font-size: clamp(52px, 17vw, 84px); }
+@keyframes stopwatch-clock-rise { from { opacity: .72; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .countdown-setup { display: grid; gap: 18px; place-items: center; }.preset-row { display: flex; gap: 8px; }.preset-row button { min-height: 44px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--card); color: var(--text-2); padding: 8px 12px; font-size: 12px; }.duration-wheels { display: grid; grid-template-columns: minmax(88px, 130px) auto minmax(88px, 130px); align-items: center; gap: 6px; }.duration-wheels :deep(.wheel-field) { width: 100%; }.duration-colon { margin-top: 22px; font-size: 28px; color: var(--text-3); }
 .pomodoro-stage { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }.pomo-meta { width:min(78vw,300px); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; color:var(--text-2); font-size:13px; font-weight:750; }.pomo-meta small { text-align:right; color:var(--text-3); }.pomo-dots { display:flex; gap:5px; }.pomo-dots i { width:8px; height:8px; border-radius:2px; background:var(--card-border); }.pomo-dots i.on { background:var(--accent-solid); }.pomo-settings { width:min(100%,430px); display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:10px; }.pomo-setting-button { min-width:0; min-height:76px; display:grid; align-content:center; gap:5px; border:1px solid var(--card-border); border-radius:8px; background:var(--bg-elev); color:var(--text-2); text-align:left; padding:9px; }.pomo-setting-button span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }.pomo-setting-button strong { color:var(--text); font-size:18px; font-variant-numeric:tabular-nums; }.pomo-setting-button small { margin-left:3px; color:var(--text-3); font-size:10px; font-weight:600; }.pomo-setting-button:active { border-color:var(--accent-solid); background:var(--accent-soft); }.pomo-settings .pomo-task { grid-column:1/-1; display:block; }.pomo-task .input { width:100%; margin-top:3px; font-size:12px; padding:7px 9px; }.pomo-complete-sheet { text-align:center; }.pomo-complete-sheet h2 { margin:12px 0 7px; font-size:22px; }.pomo-complete-sheet p { color:var(--text-2); font-size:13px; line-height:1.6; }.pomo-complete-sheet .btn { width:100%; margin-top:8px; }
-.laps-area { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 420px; margin: 10px auto 0; }.laps-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 6px; }.laps-title { font-size: 13px; font-weight: 700; color: var(--text-3); }.font-ctl { display: flex; gap: 6px; }.font-btn { border: 1px solid var(--card-border); background: var(--card); color: var(--text-2); border-radius: 9px; padding: 3px 10px; font-size: 13px; font-weight: 700; }.font-btn:disabled { opacity: .4; }.laps-scroll { flex: 1; min-height: 0; overflow-y: auto; }.lap { display: flex; align-items: center; gap: 14px; padding: 6px 8px; font-variant-numeric: tabular-nums; }.lap-no { width: 1.7em; height: 1.7em; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: .78em; font-weight: 800; flex: none; }.lap-split { font-weight: 700; flex: 1; }.lap-elapsed { color: var(--text-2); }
-.controls { display: flex; justify-content: center; align-items: center; gap: 24px; padding: 10px 0 18px; }.round-btn { border: none; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; cursor: pointer; transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }.round-btn span { font-size: 12px; font-weight: 700; }.round-btn:active { transform: scale(.92); }.round-btn:disabled { opacity: .45; }.round-btn.main { width: 96px; height: 96px; }.round-btn.lap { width: 80px; height: 80px; background: linear-gradient(135deg,#3b82f6,#6366f1); box-shadow: 0 8px 24px rgba(59,130,246,.35); }.round-btn.sub { width: 64px; height: 64px; }.round-btn.start { background: linear-gradient(135deg,#34d399,#10b981); box-shadow: 0 10px 30px rgba(16,185,129,.45); }.round-btn.pause { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 10px 30px rgba(245,158,11,.45); }.round-btn.stop { background: linear-gradient(135deg,#f87171,#64748b); box-shadow: 0 6px 18px rgba(100,116,139,.35); }
+.laps-area { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 420px; margin: 0 auto; overflow: hidden; border: 1px solid var(--card-border); border-radius: 12px; background: var(--card); }.laps-head { flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 2px; }.laps-title { font-size: 13px; font-weight: 700; color: var(--text-3); }.font-ctl { display: flex; gap: 6px; }.font-btn { border: 1px solid var(--card-border); background: var(--card); color: var(--text-2); border-radius: 9px; padding: 3px 10px; font-size: 13px; font-weight: 700; }.font-btn:disabled { opacity: .4; }.laps-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }.laps-empty { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 16px; }.lap { display: flex; align-items: center; gap: 14px; min-height: calc(1.7em + 12px); flex: 0 0 calc(1.7em + 12px); padding: 6px 8px; font-variant-numeric: tabular-nums; }.lap-no { width: 1.7em; height: 1.7em; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: .78em; font-weight: 800; flex: none; }.lap-split { font-weight: 700; flex: 1; }.lap-elapsed { color: var(--text-2); }
+.controls { flex: 0 0 auto; min-height: 116px; display: flex; justify-content: center; align-items: center; gap: 24px; padding: 10px 0 18px; }.round-btn { border: none; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; cursor: pointer; transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }.round-btn span { font-size: 12px; font-weight: 700; }.round-btn:active { transform: scale(.92); }.round-btn:disabled { opacity: .45; }.round-btn.main { width: 96px; height: 96px; }.round-btn.lap { width: 80px; height: 80px; background: linear-gradient(135deg,#3b82f6,#6366f1); box-shadow: 0 8px 24px rgba(59,130,246,.35); }.round-btn.sub { width: 64px; height: 64px; }.round-btn.start { background: linear-gradient(135deg,#34d399,#10b981); box-shadow: 0 10px 30px rgba(16,185,129,.45); }.round-btn.pause { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 10px 30px rgba(245,158,11,.45); }.round-btn.stop { background: linear-gradient(135deg,#f87171,#64748b); box-shadow: 0 6px 18px rgba(100,116,139,.35); }
 .history-entry { display: flex; align-items: center; gap: 10px; padding: 15px 18px; text-decoration: none; color: var(--text); }.he-label { flex: 1; font-size: 15.5px; font-weight: 600; }.he-count { font-size: 13px; color: var(--text-3); }.he-arrow { font-size: 20px; color: var(--text-3); }
 .sheet-mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }.sheet { width: 100%; max-width: 640px; max-height: 82vh; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); }.sheet-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; color:var(--accent-solid); }.sheet-title { margin: 0; font-size: 18px; color:var(--text); }.field { display: block; margin-bottom: 12px; }.field>span { display:block; font-size:13px; color:var(--text-2); margin-bottom:6px; }.save-summary { font-size:14px; color:var(--text-2); margin-bottom:12px; }.row-end { display:flex; align-items:center; }.row-end .gap { flex:1; }.row-end .btn+.btn { margin-left:8px; }
 .timer-sheet-enter-active,.timer-sheet-leave-active { transition: background-color 260ms cubic-bezier(.22,1,.36,1); }.timer-sheet-enter-active .sheet,.timer-sheet-leave-active .sheet { transition: transform 320ms cubic-bezier(.22,1,.36,1),opacity 240ms ease; }.timer-sheet-enter-from,.timer-sheet-leave-to { background-color: transparent; }.timer-sheet-enter-from .sheet,.timer-sheet-leave-to .sheet { transform: translateY(72px); opacity:0; }
-@media (prefers-reduced-motion: reduce) { .countdown-clock-wrap.completed { animation:none; }.ring-value { transition-duration:.01ms; }.timer-sheet-enter-active,.timer-sheet-leave-active,.timer-sheet-enter-active .sheet,.timer-sheet-leave-active .sheet { transition-duration:.01ms; } }
+@media (orientation: landscape) and (max-height: 500px) {
+  .timer-page.stopwatch-page-active { display: grid; grid-template-columns: minmax(0,1fr) minmax(272px,300px); grid-template-rows: 44px minmax(0,1fr); column-gap: 12px; }
+  .stopwatch-page-active .timer-heading { grid-column: 1 / -1; grid-row: 1; }
+  .stopwatch-page-active .timer-stage { grid-column: 1; grid-row: 2; }
+  .stopwatch-page-active .timer-stage.stopwatch-session { display: grid; grid-template-columns: minmax(210px,.85fr) minmax(250px,1.15fr); align-items: center; gap: 10px; padding: 4px 0; }
+  .stopwatch-page-active .timer-stage.stopwatch-session .stopwatch-clock { width: 100%; height: 94px; }
+  .stopwatch-page-active .timer-stage.stopwatch-session .stopwatch-clock .clock { font-size: clamp(34px,5vw,44px); line-height: 1; white-space: nowrap; }
+  .stopwatch-page-active .laps-area { width: 100%; height: 100% !important; max-height: 243px; min-height: 0; }
+  .stopwatch-page-active .controls { grid-column: 2; grid-row: 2; align-self: center; min-height: 124px; gap: 12px; padding: 0; }
+  .stopwatch-page-active .history-entry { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .countdown-clock-wrap.completed,.timer-stage.stopwatch-session .stopwatch-clock { animation:none; }.stopwatch-clock { transition-duration:.01ms; }.ring-value { transition-duration:.01ms; }.timer-sheet-enter-active,.timer-sheet-leave-active,.timer-sheet-enter-active .sheet,.timer-sheet-leave-active .sheet { transition-duration:.01ms; } }
 </style>

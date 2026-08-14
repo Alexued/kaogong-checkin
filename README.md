@@ -6,13 +6,13 @@
 
 产品介绍页：[https://alexued.github.io/kaogong-checkin/](https://alexued.github.io/kaogong-checkin/)
 
-测试报告：[报告目录](https://alexued.github.io/kaogong-checkin/reports/) · [v0.7.1 Android 真机验收](https://alexued.github.io/kaogong-checkin/reports/v0.7.1/adb-20260807T184457+0800/)
+测试报告：[报告目录](https://alexued.github.io/kaogong-checkin/reports/) · [v0.13.1 双 Android 真机验收](https://alexued.github.io/kaogong-checkin/reports/v0.13.1/TEST-REPORT.md)
 
-## 下载 v0.7.1
+## 下载
 
 | 平台 | 文件 | 大小 | 系统要求 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| Android | [kaogong-checkin-v0.7.1.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-v0.7.1.apk) | 3.27 MiB | Android 7.0 或更高版本 | 8D853018D8866DAA7123345166C6DE3F079C24AF9B7B09F0A8D8B7DDBB083689 |
+| Android | [kaogong-checkin-v0.13.1.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.13.1/kaogong-checkin-v0.13.1.apk) | 46.49 MiB | Android 7.0 或更高版本 | 7B3A3AD5AE75CA47C8A83DC68A69CD21D6DFAD0E98F135A2ACD3748DCA79F03F |
 | Windows | [kaogong-checkin-windows-x64-setup-v0.7.1.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.7.1/kaogong-checkin-windows-x64-setup-v0.7.1.exe) | 91.38 MiB | Windows 10/11 x64 | DECAD4791F4A93609E04D89CEE026F41E5FBFE4FDE380D51FEF84A73D45FE474 |
 
 本项目目前没有代码签名证书。首次运行 Windows 安装程序时，SmartScreen 可能显示“Windows 已保护你的电脑”。确认文件来自本仓库发布页并核对 SHA-256 后，可点击“更多信息”继续运行。
@@ -55,7 +55,7 @@ Windows 电脑伴侣还会显示一个局域网二维码。手机扫码后可以
 PowerShell：
 
 ```powershell
-Get-FileHash .\kaogong-checkin-v0.7.1.apk -Algorithm SHA256
+Get-FileHash .\kaogong-checkin-v0.13.1.apk -Algorithm SHA256
 Get-FileHash .\kaogong-checkin-windows-x64-setup-v0.7.1.exe -Algorithm SHA256
 ```
 

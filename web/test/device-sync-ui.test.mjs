@@ -23,6 +23,7 @@ test('device direct sync exposes two independent switches and explicit send/rece
   assert.match(panel, /PixelGrid/);
   assert.match(panel, /当前可发现和接收设备/);
   assert.match(panel, /store\.recoveryRequired/);
+  assert.match(panel, /\.host-foot button[^}]+min-height: 44px/);
 });
 
 test('discovery identity is independent from business data recovery', () => {
@@ -98,6 +99,58 @@ test('Android plugin owns NSD, framed TCP, approval, rate limiting and five atom
   assert.match(plugin, /for \(int index = 5;/);
   assert.match(mainActivity, /registerPlugin\(DeviceSyncPlugin\.class\)/);
   assert.match(manifest, /android:scheme="kgc" android:host="peer-connect"/);
+});
+
+test('device discovery advertises the canonical app version and serializes Android NSD resolution', () => {
+  assert.match(service, /import \{ APP_VERSION \} from '\.\/update'/);
+  assert.match(service, /appVersion: APP_VERSION/);
+  assert.doesNotMatch(service, /VITE_APP_VERSION|0\.12\.0/);
+  assert.match(plugin, /isOwnServiceName\(serviceName\)/);
+  assert.match(plugin, /pendingResolveNames/);
+  assert.match(plugin, /RESOLVE_GAP_MS = 250L/);
+  assert.match(plugin, /RESOLVE_RETRY_DELAYS_MS/);
+  assert.match(plugin, /candidate\.retry\(\)/);
+  assert.match(plugin, /localServicePrefix\(\) \+ "-" \+ suffix/);
+  assert.match(plugin, /sessionId\.substring/);
+  assert.match(plugin, /CONNECT_RETRY_DELAYS_MS/);
+  assert.match(plugin, /Thread\.sleep\(CONNECT_RETRY_DELAYS_MS\[attempt\]\)/);
+});
+
+test('Android discovery restart waits for the previous NSD session to stop', () => {
+  assert.match(plugin, /DISCOVERY_STOP_TIMEOUT_MS = 2_000L/);
+  assert.match(plugin, /discoveryStopCallbacks/);
+  assert.match(plugin, /discoveryStopping/);
+  assert.match(plugin, /stopDiscoveryInternal\(\(\) -> \{/);
+  assert.match(plugin, /onDiscoveryStopped\(String serviceType\) \{ finishDiscoveryStop\(this\); \}/);
+  assert.match(plugin, /completeDiscoveryStopLocked/);
+  assert.match(plugin, /resolving\.set\(false\)/);
+  assert.match(plugin, /invalidateDiscoveryRequests\(\)/);
+});
+
+test('Android discovery has a bounded UDP broadcast fallback without pairing secrets', () => {
+  assert.match(plugin, /PEER_DISCOVERY_PORT = 43_879/);
+  assert.match(plugin, /MAX_PEER_DISCOVERY_BYTES = 2_048/);
+  assert.match(plugin, /PEER_ADVERTISEMENT_INTERVAL_MS = 1_500L/);
+  assert.match(plugin, /PEER_PROBE_INTERVAL_MS = 1_000L/);
+  assert.match(plugin, /startPeerAdvertising\(\)/);
+  assert.match(plugin, /startPeerSearchFallback\(\)/);
+  assert.match(plugin, /peerProbe = scheduler\.scheduleAtFixedRate/);
+  assert.match(plugin, /kgc-peer-probe-v1/);
+  assert.match(plugin, /respondToPeerProbe/);
+  assert.match(plugin, /sendPeerAdvertisement\(peerDiscoverySocket/);
+  assert.match(plugin, /boolean udpStarted = startPeerSearchFallback\(\)/);
+  assert.match(plugin, /if \(udpStarted\) \{\s*call\.resolve\(\)/);
+  assert.match(plugin, /packet\.getAddress\(\)\.getHostAddress\(\)/);
+  assert.match(plugin, /closePeerDiscoverySocketIfIdle\(\)/);
+  const advertisement = plugin.slice(
+    plugin.indexOf('private void broadcastPeerAdvertisement'),
+    plugin.indexOf('private List<InetAddress> peerBroadcastAddresses'),
+  );
+  assert.match(advertisement, /"kgc-peer-v1"/);
+  assert.match(advertisement, /"protocolVersion"/);
+  assert.match(advertisement, /"deviceId"/);
+  assert.match(advertisement, /"port"/);
+  assert.doesNotMatch(advertisement, /pairingCode|snapshot|recovery/);
 });
 
 test('incoming decisions are explicit and an enabled host survives a brief Android pause', () => {

@@ -11,8 +11,8 @@ import { isSyncEnabled } from './sync-preference';
 export { compareVersions } from './update-selection';
 
 export const GITHUB_REPO = 'Alexued/kaogong-checkin';
-export const APP_VERSION = '0.13.0';
-export const ANDROID_VERSION_CODE = 16;
+export const APP_VERSION = '0.13.1';
+export const ANDROID_VERSION_CODE = 17;
 export const RELEASE_STATE_SCHEMA_VERSION = 3;
 export const RELEASE_SYNC_PROTOCOL_VERSION = 3;
 export const BACKUP_FORMAT_VERSION = 1;

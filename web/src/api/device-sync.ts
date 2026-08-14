@@ -4,6 +4,7 @@ import { readonly, shallowRef } from 'vue';
 import { confirmDialog } from '../lib/appDialog';
 import { useAppStore } from '../stores/app';
 import { setComputerSyncEnabled } from './computer-sync';
+import { APP_VERSION } from './update';
 import {
   buildPeerConnectUri,
   parsePeerConnectUri,
@@ -121,10 +122,6 @@ export const deviceSyncState = {
   peerRevision: readonly(peerRevision),
 };
 
-function appVersion(): string {
-  return String(import.meta.env.VITE_APP_VERSION || '0.12.0');
-}
-
 function normalizePeer(peer: PeerDevice): PeerDevice {
   return {
     ...peer,
@@ -187,7 +184,7 @@ async function startHostingIfNeeded() {
   if (!nativeSupported || !discoverable.value || hostingInfo.value) return;
   const info = await NativeDeviceSync.startHosting({
     deviceId: await ensureIdentity(),
-    appVersion: appVersion(),
+    appVersion: APP_VERSION,
     protocolVersion: 1,
   });
   hostingInfo.value = withQr(info);

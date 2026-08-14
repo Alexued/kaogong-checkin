@@ -358,7 +358,7 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); });
 .live-badge { flex: none; margin: 0 !important; padding: 4px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-solid) !important; font-weight: 700; }
 .pair-code { margin: 14px 0 8px; color: var(--text); font-size: clamp(32px, 10vw, 44px); font-weight: 750; letter-spacing: .15em; line-height: 1; font-variant-numeric: tabular-nums; text-align: center; }
 .host-foot { color: var(--text-3); font-size: 11px; }
-.host-foot button, .peer-heading button, .recovery-head button { border: 0; padding: 5px 0; background: transparent; color: var(--accent-solid); font-size: 12px; font-weight: 700; }
+.host-foot button, .peer-heading button, .recovery-head button { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; border: 0; padding: 8px 0; background: transparent; color: var(--accent-solid); font-size: 12px; font-weight: 700; }
 .qr-row { display: grid; grid-template-columns: 132px 1fr; align-items: center; gap: 14px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--card-border); }
 .qr-row img { width: 132px; height: 132px; padding: 6px; border-radius: 12px; background: #fff; }
 .qr-row strong, .qr-row span { display: block; }

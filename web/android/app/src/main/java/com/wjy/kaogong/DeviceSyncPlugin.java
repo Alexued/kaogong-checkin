@@ -19,9 +19,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -38,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -58,11 +62,21 @@ public class DeviceSyncPlugin extends Plugin {
   private static final int MAX_FRAME_BYTES = 10 * 1024 * 1024;
   private static final int MAX_RECOVERY_BYTES = 12 * 1024 * 1024;
   private static final int SOCKET_TIMEOUT_MS = 120_000;
-  private static final int CONNECT_TIMEOUT_MS = 8_000;
+  private static final int CONNECT_TIMEOUT_MS = 4_000;
   private static final long PAIRING_LIFETIME_MS = 10 * 60 * 1000L;
   private static final int MAX_PAIRING_FAILURES = 5;
   private static final long FAILURE_WINDOW_MS = 60_000L;
   private static final long BLOCK_TIME_MS = 60_000L;
+  private static final long DISCOVERY_STOP_TIMEOUT_MS = 2_000L;
+  private static final int PEER_DISCOVERY_PORT = 43_879;
+  private static final int MAX_PEER_DISCOVERY_BYTES = 2_048;
+  private static final long PEER_ADVERTISEMENT_INTERVAL_MS = 1_500L;
+  private static final long PEER_PROBE_INTERVAL_MS = 1_000L;
+  private static final long PEER_REPUBLISH_INTERVAL_MS = 4_500L;
+  private static final long PEER_STALE_AFTER_MS = 6_000L;
+  private static final long RESOLVE_GAP_MS = 250L;
+  private static final long[] RESOLVE_RETRY_DELAYS_MS = { 400L, 1_200L };
+  private static final long[] CONNECT_RETRY_DELAYS_MS = { 350L, 900L };
 
   private final ExecutorService io = Executors.newCachedThreadPool();
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -71,19 +85,31 @@ public class DeviceSyncPlugin extends Plugin {
   private final Map<String, PendingPull> outgoingPulls = new ConcurrentHashMap<>();
   private final Map<String, AttemptWindow> pairingAttempts = new ConcurrentHashMap<>();
   private final Map<String, String> serviceDeviceIds = new ConcurrentHashMap<>();
+  private final Map<String, Long> udpPeerLastSeen = new ConcurrentHashMap<>();
+  private final Map<String, Long> udpPeerLastPublished = new ConcurrentHashMap<>();
   private final Queue<ResolveCandidate> resolveQueue = new ConcurrentLinkedQueue<>();
+  private final Set<String> pendingResolveNames = ConcurrentHashMap.newKeySet();
+  private final List<Runnable> discoveryStopCallbacks = new ArrayList<>();
   private final AtomicBoolean resolving = new AtomicBoolean(false);
 
   private NsdManager nsdManager;
   private WifiManager.MulticastLock multicastLock;
   private ServerSocket serverSocket;
+  private DatagramSocket peerDiscoverySocket;
   private NsdManager.RegistrationListener registrationListener;
   private NsdManager.DiscoveryListener discoveryListener;
   private ScheduledFuture<?> pairingRotation;
+  private ScheduledFuture<?> discoveryStopTimeout;
+  private ScheduledFuture<?> peerAdvertisement;
+  private ScheduledFuture<?> peerProbe;
+  private ScheduledFuture<?> peerExpiry;
+  private boolean discoveryStopping;
+  private int discoveryRequestGeneration;
   private volatile boolean hosting;
   private volatile boolean discovering;
   private volatile int discoveryGeneration;
   private volatile String localDeviceId = "";
+  private volatile String registeredServiceName = "";
   private volatile String appVersion = "";
   private volatile String localAddress = "";
   private volatile int localPort;
@@ -117,6 +143,7 @@ public class DeviceSyncPlugin extends Plugin {
       hosting = true;
       acquireMulticastLock();
       registerService();
+      startPeerAdvertising();
       io.execute(this::acceptLoop);
       pairingRotation = scheduler.scheduleAtFixedRate(
         () -> rotatePairingCode(true),
@@ -144,50 +171,94 @@ public class DeviceSyncPlugin extends Plugin {
       call.reject("INVALID_DEVICE_ID", "INVALID_DEVICE_ID");
       return;
     }
-    stopDiscoveryInternal();
-    localDeviceId = deviceId;
-    discovering = true;
-    int generation = ++discoveryGeneration;
-    acquireMulticastLock();
-    discoveryListener = new NsdManager.DiscoveryListener() {
+    final int requestGeneration;
+    synchronized (this) {
+      requestGeneration = ++discoveryRequestGeneration;
+    }
+    stopDiscoveryInternal(() -> {
+      synchronized (DeviceSyncPlugin.this) {
+        if (requestGeneration != discoveryRequestGeneration) {
+          call.resolve();
+          return;
+        }
+      }
+      beginDiscovery(deviceId, requestGeneration, call);
+    });
+  }
+
+  private void beginDiscovery(String deviceId, int requestGeneration, PluginCall call) {
+    final int generation;
+    final NsdManager.DiscoveryListener listener;
+    synchronized (this) {
+      if (requestGeneration != discoveryRequestGeneration) {
+        call.resolve();
+        return;
+      }
+      localDeviceId = deviceId;
+      discovering = true;
+      generation = ++discoveryGeneration;
+      listener = new NsdManager.DiscoveryListener() {
       @Override public void onDiscoveryStarted(String serviceType) {}
       @Override public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-        if (generation != discoveryGeneration) return;
-        discovering = false;
+        if (!isCurrentDiscovery(this, generation)) return;
         notifyError("DISCOVERY_START_FAILED", errorCode);
+        finishDiscoveryStop(this);
       }
       @Override public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-        if (generation == discoveryGeneration) notifyError("DISCOVERY_STOP_FAILED", errorCode);
+        if (isCurrentDiscoveryListener(this)) notifyError("DISCOVERY_STOP_FAILED", errorCode);
+        finishDiscoveryStop(this);
       }
-      @Override public void onDiscoveryStopped(String serviceType) {}
+      @Override public void onDiscoveryStopped(String serviceType) { finishDiscoveryStop(this); }
       @Override public void onServiceFound(NsdServiceInfo serviceInfo) {
-        if (!discovering || generation != discoveryGeneration) return;
-        resolveQueue.offer(new ResolveCandidate(serviceInfo, generation));
+        if (!isCurrentDiscovery(this, generation)) return;
+        String serviceName = normalized(serviceInfo.getServiceName());
+        if (
+          serviceName.isEmpty()
+          || isOwnServiceName(serviceName)
+          || serviceDeviceIds.containsKey(serviceName)
+          || !pendingResolveNames.add(serviceName)
+        ) return;
+        resolveQueue.offer(new ResolveCandidate(serviceInfo, generation, serviceName, 0));
         resolveNext();
       }
       @Override public void onServiceLost(NsdServiceInfo serviceInfo) {
-        if (generation != discoveryGeneration) return;
-        String id = serviceDeviceIds.remove(serviceInfo.getServiceName());
-        if (id != null) {
+        if (!isCurrentDiscovery(this, generation)) return;
+        String serviceName = normalized(serviceInfo.getServiceName());
+        pendingResolveNames.remove(serviceName);
+        String id = serviceDeviceIds.remove(serviceName);
+        if (id != null && !serviceDeviceIds.containsValue(id)) {
           JSObject event = new JSObject();
           event.put("deviceId", id);
           notifyListeners("peerLost", event);
         }
       }
-    };
+      };
+      discoveryListener = listener;
+    }
+    acquireMulticastLock();
+    boolean udpStarted = startPeerSearchFallback();
     try {
-      nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener);
+      nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener);
       call.resolve();
     } catch (Exception error) {
-      stopDiscoveryInternal();
-      call.reject(errorCode(error, "DISCOVERY_START_FAILED"), "DISCOVERY_START_FAILED", error);
+      finishDiscoveryStop(listener);
+      if (udpStarted) {
+        call.resolve();
+      } else {
+        synchronized (this) {
+          discovering = false;
+          discoveryGeneration += 1;
+        }
+        stopPeerSearchFallback();
+        call.reject(errorCode(error, "DISCOVERY_START_FAILED"), "DISCOVERY_START_FAILED", error);
+      }
     }
   }
 
   @PluginMethod
   public void stopDiscovery(PluginCall call) {
-    stopDiscoveryInternal();
-    call.resolve();
+    invalidateDiscoveryRequests();
+    stopDiscoveryInternal(call::resolve);
   }
 
   @PluginMethod
@@ -518,11 +589,23 @@ public class DeviceSyncPlugin extends Plugin {
     String host = normalized(peer.optString("host", ""));
     int port = peer.optInt("port", 0);
     if (host.isEmpty() || port < 1 || port > 65535) throw new ProtocolException("INVALID_PEER_ENDPOINT");
-    Socket socket = new Socket();
-    socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
-    socket.setSoTimeout(SOCKET_TIMEOUT_MS);
-    socket.setTcpNoDelay(true);
-    return socket;
+    IOException lastError = null;
+    for (int attempt = 0; attempt <= CONNECT_RETRY_DELAYS_MS.length; attempt += 1) {
+      Socket socket = new Socket();
+      try {
+        socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
+        socket.setSoTimeout(SOCKET_TIMEOUT_MS);
+        socket.setTcpNoDelay(true);
+        return socket;
+      } catch (IOException error) {
+        closeQuietly(socket);
+        lastError = error;
+        if (attempt < CONNECT_RETRY_DELAYS_MS.length) {
+          Thread.sleep(CONNECT_RETRY_DELAYS_MS[attempt]);
+        }
+      }
+    }
+    throw lastError == null ? new IOException("PEER_CONNECT_FAILED") : lastError;
   }
 
   private JSONObject baseOffer(String kind, String requestId, JSONObject peer, String code) throws Exception {
@@ -568,7 +651,7 @@ public class DeviceSyncPlugin extends Plugin {
 
   private void registerService() {
     NsdServiceInfo info = new NsdServiceInfo();
-    info.setServiceName("格记-" + localDeviceId.substring(0, Math.min(6, localDeviceId.length())));
+    info.setServiceName(localServiceName());
     info.setServiceType(SERVICE_TYPE);
     info.setPort(localPort);
     info.setAttribute("v", String.valueOf(PROTOCOL_VERSION));
@@ -577,7 +660,9 @@ public class DeviceSyncPlugin extends Plugin {
     info.setAttribute("app", appVersion);
     info.setAttribute("platform", "Android " + Build.VERSION.RELEASE);
     registrationListener = new NsdManager.RegistrationListener() {
-      @Override public void onServiceRegistered(NsdServiceInfo serviceInfo) {}
+      @Override public void onServiceRegistered(NsdServiceInfo serviceInfo) {
+        registeredServiceName = normalized(serviceInfo.getServiceName());
+      }
       @Override public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) { notifyError("NSD_REGISTER_FAILED", errorCode); }
       @Override public void onServiceUnregistered(NsdServiceInfo serviceInfo) {}
       @Override public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) { notifyError("NSD_UNREGISTER_FAILED", errorCode); }
@@ -587,30 +672,56 @@ public class DeviceSyncPlugin extends Plugin {
 
   private void resolveNext() {
     if (!discovering || !resolving.compareAndSet(false, true)) return;
-    ResolveCandidate candidate = resolveQueue.poll();
-    if (candidate == null) {
+    ResolveCandidate queued = resolveQueue.poll();
+    while (
+      queued != null
+      && (queued.generation != discoveryGeneration || !pendingResolveNames.contains(queued.serviceName))
+    ) queued = resolveQueue.poll();
+    if (queued == null) {
       resolving.set(false);
       return;
     }
+    final ResolveCandidate candidate = queued;
     try {
       nsdManager.resolveService(candidate.info, new NsdManager.ResolveListener() {
         @Override public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
-          resolving.set(false);
-          resolveNext();
+          finishResolve(candidate, false);
         }
         @Override public void onServiceResolved(NsdServiceInfo serviceInfo) {
           try {
             if (discovering && candidate.generation == discoveryGeneration) publishResolvedPeer(serviceInfo);
           } finally {
-            resolving.set(false);
-            resolveNext();
+            finishResolve(candidate, true);
           }
         }
       });
     } catch (Exception error) {
-      resolving.set(false);
-      resolveNext();
+      finishResolve(candidate, false);
     }
+  }
+
+  private void finishResolve(ResolveCandidate candidate, boolean succeeded) {
+    resolving.set(false);
+    if (!discovering || candidate.generation != discoveryGeneration) {
+      resolveNext();
+      return;
+    }
+    if (!succeeded && candidate.attempt < RESOLVE_RETRY_DELAYS_MS.length) {
+      long delay = RESOLVE_RETRY_DELAYS_MS[candidate.attempt];
+      scheduler.schedule(() -> {
+        if (discovering && candidate.generation == discoveryGeneration) {
+          resolveQueue.offer(candidate.retry());
+          resolveNext();
+        } else {
+          pendingResolveNames.remove(candidate.serviceName);
+        }
+      }, delay, TimeUnit.MILLISECONDS);
+    } else {
+      pendingResolveNames.remove(candidate.serviceName);
+    }
+    scheduler.schedule(() -> {
+      if (discovering && candidate.generation == discoveryGeneration) resolveNext();
+    }, RESOLVE_GAP_MS, TimeUnit.MILLISECONDS);
   }
 
   private void publishResolvedPeer(NsdServiceInfo info) {
@@ -634,6 +745,23 @@ public class DeviceSyncPlugin extends Plugin {
   private String attribute(NsdServiceInfo info, String key) {
     byte[] value = info.getAttributes().get(key);
     return value == null ? "" : new String(value, StandardCharsets.UTF_8);
+  }
+
+  private String localServicePrefix() {
+    return "格记-" + localDeviceId.substring(0, Math.min(6, localDeviceId.length()));
+  }
+
+  private String localServiceName() {
+    String suffix = sessionId.substring(0, Math.min(4, sessionId.length()));
+    return suffix.isEmpty() ? localServicePrefix() : localServicePrefix() + "-" + suffix;
+  }
+
+  private boolean isOwnServiceName(String serviceName) {
+    String prefix = localServicePrefix();
+    return serviceName.equals(registeredServiceName)
+      || serviceName.equals(prefix)
+      || serviceName.startsWith(prefix + "-")
+      || serviceName.startsWith(prefix + " (");
   }
 
   private synchronized boolean pairingAllowed(String remoteAddress, String providedCode) {
@@ -676,6 +804,7 @@ public class DeviceSyncPlugin extends Plugin {
 
   private void stopHostingInternal() {
     hosting = false;
+    stopPeerAdvertising();
     if (pairingRotation != null) {
       pairingRotation.cancel(true);
       pairingRotation = null;
@@ -688,22 +817,367 @@ public class DeviceSyncPlugin extends Plugin {
     serverSocket = null;
     localPort = 0;
     localAddress = "";
+    registeredServiceName = "";
     pairingCode = "";
     sessionId = "";
     cancelIncoming();
     releaseMulticastLockIfIdle();
   }
 
-  private void stopDiscoveryInternal() {
-    discovering = false;
-    discoveryGeneration += 1;
-    resolveQueue.clear();
-    serviceDeviceIds.clear();
-    if (discoveryListener != null && nsdManager != null) {
-      try { nsdManager.stopServiceDiscovery(discoveryListener); } catch (Exception ignored) {}
-      discoveryListener = null;
+  private void stopDiscoveryInternal() { stopDiscoveryInternal(null); }
+
+  private void stopDiscoveryInternal(Runnable afterStopped) {
+    NsdManager.DiscoveryListener listenerToStop = null;
+    List<Runnable> completedCallbacks = null;
+    synchronized (this) {
+      discovering = false;
+      discoveryGeneration += 1;
+      resolving.set(false);
+      resolveQueue.clear();
+      pendingResolveNames.clear();
+      serviceDeviceIds.clear();
+      if (afterStopped != null) discoveryStopCallbacks.add(afterStopped);
+      if (discoveryListener == null || nsdManager == null) {
+        completedCallbacks = completeDiscoveryStopLocked(null);
+      } else if (!discoveryStopping) {
+        discoveryStopping = true;
+        listenerToStop = discoveryListener;
+        NsdManager.DiscoveryListener timeoutListener = listenerToStop;
+        discoveryStopTimeout = scheduler.schedule(
+          () -> finishDiscoveryStop(timeoutListener),
+          DISCOVERY_STOP_TIMEOUT_MS,
+          TimeUnit.MILLISECONDS
+        );
+      }
     }
+    stopPeerSearchFallback();
+    if (completedCallbacks != null) {
+      releaseMulticastLockIfIdle();
+      runDiscoveryStopCallbacks(completedCallbacks);
+    }
+    if (listenerToStop == null) return;
+    try {
+      nsdManager.stopServiceDiscovery(listenerToStop);
+    } catch (Exception ignored) {
+      finishDiscoveryStop(listenerToStop);
+    }
+  }
+
+  private void finishDiscoveryStop(NsdManager.DiscoveryListener stoppedListener) {
+    List<Runnable> callbacks;
+    synchronized (this) {
+      callbacks = completeDiscoveryStopLocked(stoppedListener);
+    }
+    if (callbacks == null) return;
     releaseMulticastLockIfIdle();
+    runDiscoveryStopCallbacks(callbacks);
+  }
+
+  private List<Runnable> completeDiscoveryStopLocked(NsdManager.DiscoveryListener stoppedListener) {
+    if (stoppedListener != null && discoveryListener != stoppedListener) return null;
+    if (discoveryStopTimeout != null) {
+      discoveryStopTimeout.cancel(false);
+      discoveryStopTimeout = null;
+    }
+    discoveryListener = null;
+    discoveryStopping = false;
+    List<Runnable> callbacks = new ArrayList<>(discoveryStopCallbacks);
+    discoveryStopCallbacks.clear();
+    return callbacks;
+  }
+
+  private void runDiscoveryStopCallbacks(List<Runnable> callbacks) {
+    for (Runnable callback : callbacks) {
+      try { callback.run(); } catch (Exception ignored) {}
+    }
+  }
+
+  private synchronized boolean isCurrentDiscovery(NsdManager.DiscoveryListener listener, int generation) {
+    return discovering && generation == discoveryGeneration && listener == discoveryListener;
+  }
+
+  private synchronized boolean isCurrentDiscoveryListener(NsdManager.DiscoveryListener listener) {
+    return listener == discoveryListener;
+  }
+
+  private synchronized void invalidateDiscoveryRequests() {
+    discoveryRequestGeneration += 1;
+  }
+
+  private void startPeerAdvertising() {
+    try {
+      ensurePeerDiscoverySocket();
+      synchronized (this) {
+        if (peerAdvertisement == null) {
+          peerAdvertisement = scheduler.scheduleAtFixedRate(
+            this::broadcastPeerAdvertisement,
+            0L,
+            PEER_ADVERTISEMENT_INTERVAL_MS,
+            TimeUnit.MILLISECONDS
+          );
+        }
+      }
+    } catch (Exception error) {
+      notifyError("UDP_DISCOVERY_START_FAILED", 0);
+    }
+  }
+
+  private void stopPeerAdvertising() {
+    synchronized (this) {
+      if (peerAdvertisement != null) {
+        peerAdvertisement.cancel(false);
+        peerAdvertisement = null;
+      }
+    }
+    closePeerDiscoverySocketIfIdle();
+  }
+
+  private boolean startPeerSearchFallback() {
+    try {
+      ensurePeerDiscoverySocket();
+      synchronized (this) {
+        if (peerExpiry == null) {
+          peerExpiry = scheduler.scheduleAtFixedRate(
+            this::expireUdpPeers,
+            PEER_STALE_AFTER_MS,
+            2_000L,
+            TimeUnit.MILLISECONDS
+          );
+        }
+        if (peerProbe == null) {
+          peerProbe = scheduler.scheduleAtFixedRate(
+            this::broadcastPeerProbe,
+            0L,
+            PEER_PROBE_INTERVAL_MS,
+            TimeUnit.MILLISECONDS
+          );
+        }
+      }
+      return true;
+    } catch (Exception error) {
+      notifyError("UDP_DISCOVERY_START_FAILED", 0);
+      return false;
+    }
+  }
+
+  private void stopPeerSearchFallback() {
+    synchronized (this) {
+      if (peerExpiry != null) {
+        peerExpiry.cancel(false);
+        peerExpiry = null;
+      }
+      if (peerProbe != null) {
+        peerProbe.cancel(false);
+        peerProbe = null;
+      }
+      udpPeerLastSeen.clear();
+      udpPeerLastPublished.clear();
+    }
+    closePeerDiscoverySocketIfIdle();
+  }
+
+  private synchronized void ensurePeerDiscoverySocket() throws IOException {
+    if (peerDiscoverySocket != null && !peerDiscoverySocket.isClosed()) return;
+    DatagramSocket socket = new DatagramSocket(null);
+    try {
+      socket.setReuseAddress(true);
+      socket.setBroadcast(true);
+      socket.setSoTimeout(2_000);
+      socket.bind(new InetSocketAddress(PEER_DISCOVERY_PORT));
+      peerDiscoverySocket = socket;
+      io.execute(() -> peerDiscoveryLoop(socket));
+    } catch (Exception error) {
+      socket.close();
+      if (error instanceof IOException) throw (IOException) error;
+      throw new IOException("UDP_DISCOVERY_START_FAILED", error);
+    }
+  }
+
+  private void peerDiscoveryLoop(DatagramSocket socket) {
+    byte[] buffer = new byte[MAX_PEER_DISCOVERY_BYTES];
+    while (isCurrentPeerDiscoverySocket(socket)) {
+      DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+      try {
+        socket.receive(packet);
+        if (!respondToPeerProbe(packet)) publishUdpPeer(packet);
+      } catch (SocketTimeoutException ignored) {
+        // Periodically re-check whether this shared socket is still current.
+      } catch (IOException error) {
+        if (isCurrentPeerDiscoverySocket(socket)) notifyError("UDP_DISCOVERY_RECEIVE_FAILED", 0);
+        break;
+      }
+    }
+  }
+
+  private void publishUdpPeer(DatagramPacket packet) {
+    if (!discovering || packet.getLength() <= 0 || packet.getLength() > MAX_PEER_DISCOVERY_BYTES) return;
+    try {
+      JSONObject payload = new JSONObject(new String(
+        packet.getData(),
+        packet.getOffset(),
+        packet.getLength(),
+        StandardCharsets.UTF_8
+      ));
+      if (!"kgc-peer-v1".equals(payload.optString("kind", ""))) return;
+      if (payload.optInt("protocolVersion", 0) != PROTOCOL_VERSION) return;
+      String deviceId = normalized(payload.optString("deviceId", ""));
+      int port = payload.optInt("port", 0);
+      if (!validIdentifier(deviceId) || deviceId.equals(localDeviceId) || port < 1 || port > 65_535) return;
+      long now = System.currentTimeMillis();
+      udpPeerLastSeen.put(deviceId, now);
+      Long lastPublished = udpPeerLastPublished.get(deviceId);
+      if (lastPublished != null && now - lastPublished < PEER_REPUBLISH_INTERVAL_MS) return;
+      udpPeerLastPublished.put(deviceId, now);
+
+      String version = normalized(payload.optString("appVersion", ""));
+      if (version.length() > 32 || version.matches(".*[\\x00-\\x1f\\x7f].*")) version = "";
+      JSObject event = new JSObject();
+      event.put("deviceId", deviceId);
+      event.put("name", safeName(payload.optString("name", "Android 设备")));
+      event.put("host", packet.getAddress().getHostAddress());
+      event.put("port", port);
+      event.put("appVersion", version);
+      event.put("platform", safeName(payload.optString("platform", "Android")));
+      event.put("online", true);
+      event.put("lastSeenAt", Instant.ofEpochMilli(now).toString());
+      notifyListeners("peerFound", event);
+    } catch (Exception ignored) {
+      // Ignore malformed or unrelated LAN datagrams.
+    }
+  }
+
+  private boolean respondToPeerProbe(DatagramPacket packet) {
+    try {
+      JSONObject probe = new JSONObject(new String(
+        packet.getData(),
+        packet.getOffset(),
+        packet.getLength(),
+        StandardCharsets.UTF_8
+      ));
+      if (!"kgc-peer-probe-v1".equals(probe.optString("kind", ""))) return false;
+      if (probe.optInt("protocolVersion", 0) != PROTOCOL_VERSION) return true;
+      String deviceId = normalized(probe.optString("deviceId", ""));
+      if (!hosting || !validIdentifier(deviceId) || deviceId.equals(localDeviceId)) return true;
+      JSONObject advertisement = localPeerAdvertisement();
+      if (advertisement != null && packet.getPort() > 0 && packet.getPort() <= 65_535) {
+        sendPeerAdvertisement(peerDiscoverySocket, advertisement, packet.getAddress(), packet.getPort());
+      }
+      return true;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
+  private void broadcastPeerAdvertisement() {
+    DatagramSocket socket;
+    JSONObject payload = localPeerAdvertisement();
+    synchronized (this) {
+      if (payload == null || peerDiscoverySocket == null || peerDiscoverySocket.isClosed()) return;
+      socket = peerDiscoverySocket;
+    }
+    for (InetAddress address : peerBroadcastAddresses()) {
+      sendPeerAdvertisement(socket, payload, address, PEER_DISCOVERY_PORT);
+    }
+  }
+
+  private void broadcastPeerProbe() {
+    DatagramSocket socket;
+    JSONObject probe = new JSONObject();
+    synchronized (this) {
+      if (!discovering || peerDiscoverySocket == null || peerDiscoverySocket.isClosed()) return;
+      socket = peerDiscoverySocket;
+      try {
+        probe.put("kind", "kgc-peer-probe-v1");
+        probe.put("protocolVersion", PROTOCOL_VERSION);
+        probe.put("deviceId", localDeviceId);
+      } catch (JSONException ignored) {
+        return;
+      }
+    }
+    byte[] bytes = probe.toString().getBytes(StandardCharsets.UTF_8);
+    for (InetAddress address : peerBroadcastAddresses()) {
+      try {
+        socket.send(new DatagramPacket(bytes, bytes.length, address, PEER_DISCOVERY_PORT));
+      } catch (IOException ignored) {
+        // NSD and manual address entry remain available when one interface rejects broadcast.
+      }
+    }
+  }
+
+  private JSONObject localPeerAdvertisement() {
+    JSONObject payload = new JSONObject();
+    synchronized (this) {
+      if (!hosting) return null;
+      try {
+        payload.put("kind", "kgc-peer-v1");
+        payload.put("protocolVersion", PROTOCOL_VERSION);
+        payload.put("deviceId", localDeviceId);
+        payload.put("name", deviceName());
+        payload.put("port", localPort);
+        payload.put("appVersion", appVersion);
+        payload.put("platform", "Android " + Build.VERSION.RELEASE);
+      } catch (JSONException ignored) {
+        return null;
+      }
+    }
+    return payload;
+  }
+
+  private void sendPeerAdvertisement(DatagramSocket socket, JSONObject payload, InetAddress address, int port) {
+    if (socket == null || socket.isClosed() || address == null || port < 1 || port > 65_535) return;
+    byte[] bytes = payload.toString().getBytes(StandardCharsets.UTF_8);
+    if (bytes.length > MAX_PEER_DISCOVERY_BYTES) return;
+    try {
+      socket.send(new DatagramPacket(bytes, bytes.length, address, port));
+    } catch (IOException ignored) {
+      // NSD and manual address entry remain available when one interface rejects broadcast.
+    }
+  }
+
+  private List<InetAddress> peerBroadcastAddresses() {
+    List<InetAddress> addresses = new ArrayList<>();
+    Set<String> seen = ConcurrentHashMap.newKeySet();
+    try {
+      Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+      while (interfaces != null && interfaces.hasMoreElements()) {
+        NetworkInterface network = interfaces.nextElement();
+        if (!network.isUp() || network.isLoopback()) continue;
+        for (InterfaceAddress item : network.getInterfaceAddresses()) {
+          InetAddress broadcast = item.getBroadcast();
+          if (broadcast instanceof Inet4Address && seen.add(broadcast.getHostAddress())) addresses.add(broadcast);
+        }
+      }
+      InetAddress limited = InetAddress.getByName("255.255.255.255");
+      if (seen.add(limited.getHostAddress())) addresses.add(limited);
+    } catch (Exception ignored) {}
+    return addresses;
+  }
+
+  private void expireUdpPeers() {
+    if (!discovering) return;
+    long cutoff = System.currentTimeMillis() - PEER_STALE_AFTER_MS;
+    for (Map.Entry<String, Long> entry : udpPeerLastSeen.entrySet()) {
+      if (entry.getValue() >= cutoff || !udpPeerLastSeen.remove(entry.getKey(), entry.getValue())) continue;
+      udpPeerLastPublished.remove(entry.getKey());
+      if (serviceDeviceIds.containsValue(entry.getKey())) continue;
+      JSObject event = new JSObject();
+      event.put("deviceId", entry.getKey());
+      notifyListeners("peerLost", event);
+    }
+  }
+
+  private synchronized boolean isCurrentPeerDiscoverySocket(DatagramSocket socket) {
+    return peerDiscoverySocket == socket && !socket.isClosed();
+  }
+
+  private void closePeerDiscoverySocketIfIdle() {
+    DatagramSocket socket;
+    synchronized (this) {
+      if (hosting || discovering || peerDiscoverySocket == null) return;
+      socket = peerDiscoverySocket;
+      peerDiscoverySocket = null;
+    }
+    socket.close();
   }
 
   private void cancelIncoming() {
@@ -964,12 +1438,14 @@ public class DeviceSyncPlugin extends Plugin {
   protected void handleOnPause() {
     // Discovery is only useful while the list is visible. Keep an explicitly
     // enabled host and any approved socket alive across brief system pauses.
+    invalidateDiscoveryRequests();
     stopDiscoveryInternal();
   }
 
   @Override
   protected void handleOnDestroy() {
     stopHostingInternal();
+    invalidateDiscoveryRequests();
     stopDiscoveryInternal();
     cancelIncoming();
     for (PendingPull pending : outgoingPulls.values()) pending.close();
@@ -1027,7 +1503,15 @@ public class DeviceSyncPlugin extends Plugin {
   private static final class ResolveCandidate {
     final NsdServiceInfo info;
     final int generation;
-    ResolveCandidate(NsdServiceInfo info, int generation) { this.info = info; this.generation = generation; }
+    final String serviceName;
+    final int attempt;
+    ResolveCandidate(NsdServiceInfo info, int generation, String serviceName, int attempt) {
+      this.info = info;
+      this.generation = generation;
+      this.serviceName = serviceName;
+      this.attempt = attempt;
+    }
+    ResolveCandidate retry() { return new ResolveCandidate(info, generation, serviceName, attempt + 1); }
   }
 
   private static final class ProtocolException extends Exception {
