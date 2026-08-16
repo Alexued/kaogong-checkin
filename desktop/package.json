@@ -1,7 +1,7 @@
 {
   "name": "kaogong-checkin-desktop",
   "productName": "格记电脑伴侣",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "description": "格记 Windows 电脑同步伴侣",
   "main": "src/main.js",

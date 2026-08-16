@@ -6,7 +6,7 @@
       done: item.done,
       carried: item.overdueDays > 0,
       sorting: reorder,
-      'long-press-active': longPressActive,
+      'long-press-active': lifted,
     }"
     :initial="{ opacity: 0, y: 18 }"
     :enter="{
@@ -155,8 +155,9 @@ const props = withDefaults(
     subItems?: SubItem[];
     expanded?: boolean;
     general?: boolean;
+    menuActive?: boolean;
   }>(),
-  { reorder: false, first: false, last: false, subItems: () => [], expanded: false, general: false }
+  { reorder: false, first: false, last: false, subItems: () => [], expanded: false, general: false, menuActive: false }
 );
 const emit = defineEmits<{
   (e: 'toggle', item: PlanItem, ev: MouseEvent): void;
@@ -180,9 +181,9 @@ const hasDetails = computed(() => props.subItems.length > 0 || debtSources.value
 const LONG_PRESS_MS = 450;
 const MOVE_CANCEL_PX = 10;
 const longPressActive = ref(false);
+const lifted = computed(() => longPressActive.value || props.menuActive);
 let pressTimer: ReturnType<typeof setTimeout> | null = null;
 let revealTimer: ReturnType<typeof setTimeout> | null = null;
-let releaseTimer: ReturnType<typeof setTimeout> | null = null;
 let pointerId: number | null = null;
 let startX = 0;
 let startY = 0;
@@ -200,10 +201,6 @@ function clearRevealTimer() {
   if (revealTimer) {
     clearTimeout(revealTimer);
     revealTimer = null;
-  }
-  if (releaseTimer) {
-    clearTimeout(releaseTimer);
-    releaseTimer = null;
   }
 }
 
@@ -256,11 +253,7 @@ function onPointerDown(ev: PointerEvent) {
     revealTimer = setTimeout(() => {
       revealTimer = null;
       emit('open-menu', props.item, { x: startX, y: startY });
-      releaseTimer = setTimeout(() => {
-        releaseTimer = null;
-        longPressActive.value = false;
-        pointerId = null;
-      }, 140);
+      pointerId = null;
     }, 220);
   }, LONG_PRESS_MS);
 }
@@ -299,6 +292,13 @@ watch(
   }
 );
 
+watch(
+  () => props.menuActive,
+  (active) => {
+    if (active) longPressActive.value = false;
+  },
+);
+
 onUnmounted(resetPress);
 
 function onToggle(ev: MouseEvent) {
@@ -329,7 +329,7 @@ function onCardClick(ev: MouseEvent) {
   user-select: none;
   -webkit-user-select: none;
   transition:
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
     background-color 280ms ease,
     opacity 300ms ease;
 }
@@ -342,6 +342,8 @@ function onCardClick(ev: MouseEvent) {
 .task-card.long-press-active {
   z-index: 81;
   transform: translateY(-6px) scale(1.015) !important;
+  transition-duration: 220ms, 280ms, 300ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1), ease, ease;
   /* The wide spread dims the current scroll surface while this card stays above it. */
   box-shadow: var(--shadow-lg), 0 0 0 100vmax rgba(15, 23, 42, 0.16);
 }

@@ -1,7 +1,7 @@
 {
   "name": "kaogong-checkin-server",
   "private": true,
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "考公打卡 本地服务器（REST + WebSocket + UDP 广播 + 静态托管）",
   "main": "src/index.js",
   "scripts": {

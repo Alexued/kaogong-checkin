@@ -1,6 +1,6 @@
 <template>
   <teleport to="body">
-    <Transition name="task-menu">
+    <Transition name="task-menu" @after-leave="emit('after-leave')">
       <div
         v-if="open && item"
         class="task-menu-mask"
@@ -53,6 +53,7 @@ const emit = defineEmits<{
   focus: [];
   reorder: [];
   delete: [];
+  'after-leave': [];
 }>();
 const menuEl = ref<HTMLElement | null>(null);
 const menuStyle = ref<CSSProperties>({ left: '12px', top: '12px' });
@@ -92,6 +93,27 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.task-menu-mask{position:fixed;inset:0;z-index:150;background:rgba(15,23,42,.12);touch-action:none}.task-menu{position:fixed;width:216px;max-width:calc(100vw - 24px);overflow:hidden;border:1px solid color-mix(in srgb,var(--card-border) 78%,var(--text-3));border-radius:12px;background:var(--bg-elev);box-shadow:0 16px 42px rgba(15,23,42,.22),0 3px 12px rgba(15,23,42,.12);transform-origin:var(--task-menu-origin,center);overscroll-behavior:contain}.task-menu-head{min-height:48px;display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;gap:9px;padding:7px 12px;border-bottom:1px solid var(--card-border)}.task-menu-head strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.task-menu button{width:100%;min-height:48px;display:grid;grid-template-columns:24px minmax(0,1fr);align-items:center;gap:10px;border:0;border-bottom:1px solid var(--card-border);padding:0 13px;background:transparent;color:var(--text);font:inherit;font-size:14px;text-align:left}.task-menu button:last-child{border-bottom:0}.task-menu button:active{background:var(--accent-soft);transform:scale(.98)}.task-menu button.danger{color:var(--danger)}.task-menu svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.task-menu-enter-active{transition:opacity 140ms ease-out}.task-menu-leave-active{transition:opacity 110ms ease-in}.task-menu-enter-active .task-menu{transition:transform 210ms cubic-bezier(.16,1,.3,1),opacity 140ms ease-out}.task-menu-leave-active .task-menu{transition:transform 110ms ease-in,opacity 100ms ease-in}.task-menu-enter-from,.task-menu-leave-to{opacity:0}.task-menu-enter-from .task-menu{opacity:0;transform:scale(.88) translateY(4px)}.task-menu-leave-to .task-menu{opacity:0;transform:scale(.96)}
-@media(prefers-reduced-motion:reduce){.task-menu-enter-active,.task-menu-leave-active,.task-menu-enter-active .task-menu,.task-menu-leave-active .task-menu{transition-duration:.01ms}}
+.task-menu-mask { position: fixed; inset: 0; z-index: 150; background: rgba(15, 23, 42, .12); touch-action: none; }
+.task-menu { position: fixed; width: 216px; max-width: calc(100vw - 24px); overflow: hidden; border: 1px solid color-mix(in srgb, var(--card-border) 78%, var(--text-3)); border-radius: 12px; background: var(--bg-elev); box-shadow: 0 16px 42px rgba(15, 23, 42, .22), 0 3px 12px rgba(15, 23, 42, .12); transform-origin: var(--task-menu-origin, center); overscroll-behavior: contain; }
+.task-menu-head { min-height: 48px; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 9px; padding: 7px 12px; border-bottom: 1px solid var(--card-border); }
+.task-menu-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.task-menu button { width: 100%; min-height: 48px; display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 10px; border: 0; border-bottom: 1px solid var(--card-border); padding: 0 13px; background: transparent; color: var(--text); font: inherit; font-size: 14px; text-align: left; }
+.task-menu button:last-child { border-bottom: 0; }
+.task-menu button:active { background: var(--accent-soft); transform: scale(.98); }
+.task-menu button.danger { color: var(--danger); }
+.task-menu svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.task-menu-enter-active { transition: opacity 160ms ease-out; }
+.task-menu-leave-active { transition: opacity 150ms cubic-bezier(.4, 0, 1, 1); }
+.task-menu-enter-active .task-menu { transition: transform 240ms cubic-bezier(.16, 1, .3, 1), opacity 160ms ease-out; }
+.task-menu-leave-active .task-menu { transition: transform 150ms cubic-bezier(.4, 0, 1, 1), opacity 130ms cubic-bezier(.4, 0, 1, 1); }
+.task-menu-enter-from,
+.task-menu-leave-to { opacity: 0; }
+.task-menu-enter-from .task-menu { opacity: 0; transform: scale(.88) translateY(4px); }
+.task-menu-leave-to .task-menu { opacity: 0; transform: scale(.96) translateY(2px); }
+@media (prefers-reduced-motion: reduce) {
+  .task-menu-enter-active,
+  .task-menu-leave-active,
+  .task-menu-enter-active .task-menu,
+  .task-menu-leave-active .task-menu { transition-duration: .01ms; }
+}
 </style>

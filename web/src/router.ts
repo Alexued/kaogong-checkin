@@ -54,7 +54,21 @@ export const router = createRouter({
       meta: { parentPath: '/drill', rootTab: '/drill' },
       beforeEnter: (to) => resolveStatsDayNavigation(to.params.date),
     },
-    { path: '/settings', name: 'settings', component: SettingsView },
+    { path: '/settings', name: 'settings', component: SettingsView, props: { section: 'main' } },
+    {
+      path: '/settings/device-sync',
+      name: 'settings-device-sync',
+      component: SettingsView,
+      props: { section: 'device' },
+      meta: { parentPath: '/settings', rootTab: '/settings' },
+    },
+    {
+      path: '/settings/computer-sync',
+      name: 'settings-computer-sync',
+      component: SettingsView,
+      props: { section: 'computer' },
+      meta: { parentPath: '/settings', rootTab: '/settings' },
+    },
     { path: '/:pathMatch(.*)*', redirect: resolveUnknownRoute },
   ],
 });

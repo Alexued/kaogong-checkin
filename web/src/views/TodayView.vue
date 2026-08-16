@@ -70,6 +70,7 @@
           :item="item"
           :index="plan.today.length + i"
           :general="isGeneral"
+          :menu-active="liftedTaskId === itemKey(item)"
           :expanded="expandedItems.has(itemKey(item))"
           @toggle="onToggle"
           @toggle-source="onToggleSource"
@@ -90,6 +91,7 @@
           :item="item"
           :index="i"
           :general="isGeneral"
+          :menu-active="liftedTaskId === itemKey(item)"
           :reorder="reordering"
           :first="i === 0"
           :last="i === plan.today.length - 1"
@@ -151,6 +153,7 @@
       @focus="focusMenuTask"
       @reorder="reorderFromMenu"
       @delete="deleteMenuTask"
+      @after-leave="onTaskMenuAfterLeave"
     />
 
     <CelebrationOverlay :show="showCelebration" @close="showCelebration = false" />
@@ -186,6 +189,8 @@ const reordering = ref(false);
 const sheetOpen = ref(false);
 const editingTask = ref<Task | null>(null);
 const taskMenu = ref<{ item: PlanItem; anchor: { x: number; y: number } } | null>(null);
+const liftedTaskId = ref<string | null>(null);
+let pendingMenuAction: (() => void) | null = null;
 const isGeneral = computed(() => store.settings.appMode === 'general');
 const copy = computed(() => modeCopy(store.settings.appMode));
 const planEndDate = computed(() => effectivePlanEnd(store.settings));
@@ -336,36 +341,49 @@ function openNewTask(ev?: MouseEvent) {
 
 function openTaskMenu(item: PlanItem, anchor: { x: number; y: number }) {
   if (reordering.value) return;
+  pendingMenuAction = null;
+  liftedTaskId.value = itemKey(item);
   taskMenu.value = { item, anchor };
 }
 
-function closeTaskMenu() {
+function closeTaskMenu(afterLeave?: () => void) {
+  pendingMenuAction = afterLeave || null;
   taskMenu.value = null;
+}
+
+function onTaskMenuAfterLeave() {
+  liftedTaskId.value = null;
+  const action = pendingMenuAction;
+  pendingMenuAction = null;
+  action?.();
 }
 
 function editMenuTask() {
   const item = taskMenu.value?.item;
-  closeTaskMenu();
   if (!item) return;
-  editingTask.value = item.task;
-  sheetOpen.value = true;
+  closeTaskMenu(() => {
+    editingTask.value = item.task;
+    sheetOpen.value = true;
+  });
 }
 
 function focusMenuTask() {
   const item = taskMenu.value?.item;
-  closeTaskMenu();
-  if (item) void router.push({ path: '/timer', query: { taskId: item.task.id } });
+  if (!item) return;
+  closeTaskMenu(() => { void router.push({ path: '/timer', query: { taskId: item.task.id } }); });
 }
 
 function reorderFromMenu() {
-  closeTaskMenu();
-  reordering.value = true;
+  closeTaskMenu(() => { reordering.value = true; });
 }
 
-async function deleteMenuTask() {
+function deleteMenuTask() {
   const menu = taskMenu.value;
-  closeTaskMenu();
   if (!menu) return;
+  closeTaskMenu(() => { void confirmDeleteMenuTask(menu); });
+}
+
+async function confirmDeleteMenuTask(menu: { item: PlanItem; anchor: { x: number; y: number } }) {
   const noun = isGeneral.value ? '打卡项' : '任务';
   const accepted = await confirmDialog({
     title: `删除${noun}“${menu.item.task.title}”`,

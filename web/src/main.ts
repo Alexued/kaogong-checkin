@@ -57,6 +57,6 @@ if (Capacitor.isNativePlatform()) {
 }
 
 void initializeComputerSync();
-void initializeDeviceSync(() => { void router.push('/settings'); });
+void initializeDeviceSync(() => { void router.push('/settings/device-sync'); });
 
 app.mount('#app');

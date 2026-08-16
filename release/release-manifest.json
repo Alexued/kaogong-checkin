@@ -1,12 +1,12 @@
 {
-  "version": "0.14.0",
-  "versionCode": 18,
+  "version": "0.15.0",
+  "versionCode": 19,
   "stateSchemaVersion": 3,
   "syncProtocolVersion": 3,
   "backupFormatVersion": 1,
-  "fileName": "kaogong-checkin-v0.14.0.apk",
-  "size": 49899114,
-  "sha256": "2b8fd60031c241e5c09ed56563354f6fa430e332401815b6e7f0c386cfbc3013",
+  "fileName": "kaogong-checkin-v0.15.0.apk",
+  "size": 50269385,
+  "sha256": "38b99f0d4a577adbda3a6a08b0930314907024e3b4bf782c69b16b4f55644da2",
   "applicationId": "com.wjy.kaogong",
   "releaseChannel": "internal-debug"
 }

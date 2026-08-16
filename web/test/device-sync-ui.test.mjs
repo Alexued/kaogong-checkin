@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [panel, settings, service, sync, plugin, manifest, mainActivity] = await Promise.all([
+const [panel, settings, service, sync, plugin, manifest, mainActivity, router, androidBuild] = await Promise.all([
   readFile(new URL('../src/components/DeviceSyncPanel.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/views/SettingsView.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/api/device-sync.ts', import.meta.url), 'utf8'),
@@ -10,6 +10,8 @@ const [panel, settings, service, sync, plugin, manifest, mainActivity] = await P
   readFile(new URL('../android/app/src/main/java/com/wjy/kaogong/DeviceSyncPlugin.java', import.meta.url), 'utf8'),
   readFile(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8'),
   readFile(new URL('../android/app/src/main/java/com/wjy/kaogong/MainActivity.java', import.meta.url), 'utf8'),
+  readFile(new URL('../src/router.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8'),
 ]);
 
 test('device direct sync exposes two independent switches and explicit send/receive actions', () => {
@@ -19,11 +21,24 @@ test('device direct sync exposes two independent switches and explicit send/rece
   assert.match(panel, /@change="toggleSearching"/);
   assert.match(panel, /发送本机记录/);
   assert.match(panel, /接收对方记录/);
-  assert.match(panel, /系统相机扫描/);
+  assert.match(panel, /应用内扫码/);
+  assert.match(panel, /发送配对请求/);
+  assert.match(panel, /paired: isPaired\(peer\)/);
+  assert.doesNotMatch(panel, /使用地址和配对码/);
   assert.match(panel, /PixelGrid/);
   assert.match(panel, /当前可发现和接收设备/);
   assert.match(panel, /store\.recoveryRequired/);
-  assert.match(panel, /\.host-foot button[^}]+min-height: 44px/);
+  assert.match(panel, /data-back-priority="175"/);
+});
+
+test('settings keeps connection summaries on the root and details on secondary routes', () => {
+  assert.match(settings, /连接与同步/);
+  assert.match(settings, /to="\/settings\/device-sync"/);
+  assert.match(settings, /to="\/settings\/computer-sync"/);
+  assert.match(settings, /section === 'device'/);
+  assert.match(settings, /section === 'computer'/);
+  assert.match(router, /path: '\/settings\/device-sync'[\s\S]*parentPath: '\/settings'[\s\S]*rootTab: '\/settings'/);
+  assert.match(router, /path: '\/settings\/computer-sync'[\s\S]*parentPath: '\/settings'[\s\S]*rootTab: '\/settings'/);
 });
 
 test('discovery identity is independent from business data recovery', () => {
@@ -101,6 +116,32 @@ test('Android plugin owns NSD, framed TCP, approval, rate limiting and five atom
   assert.match(manifest, /android:scheme="kgc" android:host="peer-connect"/);
 });
 
+test('Android pairing v2 persists native-only tokens and completes a two-sided acknowledgement', () => {
+  assert.match(plugin, /PROTOCOL_VERSION = 2/);
+  assert.match(plugin, /SharedPreferences pairingPreferences/);
+  assert.match(plugin, /public void requestPairing/);
+  assert.match(plugin, /public void approvePairing/);
+  assert.match(plugin, /"paired-ack"/);
+  assert.match(plugin, /waitForPairingAck/);
+  assert.match(plugin, /new byte\[32\]/);
+  assert.match(plugin, /MessageDigest\.isEqual/);
+  assert.match(plugin, /PAIRING_KEY_PREFIX/);
+  assert.match(plugin, /public void forgetPairing/);
+  assert.match(service, /NativeDeviceSync\.push\(\{ peer, transfer \}\)/);
+  assert.match(service, /NativeDeviceSync\.pull\(\{ peer \}\)/);
+  assert.doesNotMatch(service, /NativeDeviceSync\.push\(\{ peer, pairingCode/);
+});
+
+test('pairing QR scan stays inside the Android app and validates through the web parser', () => {
+  assert.match(plugin, /public void scanPeerQr/);
+  assert.match(plugin, /PeerQrCaptureActivity\.class/);
+  assert.match(plugin, /IntentIntegrator\.QR_CODE/);
+  assert.match(service, /return parsePeerConnectUri\(result\.value\)/);
+  assert.match(manifest, /android\.permission\.CAMERA/);
+  assert.match(manifest, /\.PeerQrCaptureActivity/);
+  assert.match(androidBuild, /zxing-android-embedded:4\.3\.0/);
+});
+
 test('device discovery advertises the canonical app version and serializes Android NSD resolution', () => {
   assert.match(service, /import \{ APP_VERSION \} from '\.\/update'/);
   assert.match(service, /appVersion: APP_VERSION/);
@@ -135,7 +176,7 @@ test('Android discovery has a bounded UDP broadcast fallback without pairing sec
   assert.match(plugin, /startPeerAdvertising\(\)/);
   assert.match(plugin, /startPeerSearchFallback\(\)/);
   assert.match(plugin, /peerProbe = scheduler\.scheduleAtFixedRate/);
-  assert.match(plugin, /kgc-peer-probe-v1/);
+  assert.match(plugin, /kgc-peer-probe-v2/);
   assert.match(plugin, /respondToPeerProbe/);
   assert.match(plugin, /sendPeerAdvertisement\(peerDiscoverySocket/);
   assert.match(plugin, /boolean udpStarted = startPeerSearchFallback\(\)/);
@@ -146,7 +187,7 @@ test('Android discovery has a bounded UDP broadcast fallback without pairing sec
     plugin.indexOf('private void broadcastPeerAdvertisement'),
     plugin.indexOf('private List<InetAddress> peerBroadcastAddresses'),
   );
-  assert.match(advertisement, /"kgc-peer-v1"/);
+  assert.match(advertisement, /"kgc-peer-v2"/);
   assert.match(advertisement, /"protocolVersion"/);
   assert.match(advertisement, /"deviceId"/);
   assert.match(advertisement, /"port"/);

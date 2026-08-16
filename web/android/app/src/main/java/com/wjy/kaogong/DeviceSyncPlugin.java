@@ -1,16 +1,22 @@
 package com.wjy.kaogong;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
+import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
@@ -58,7 +64,9 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "DeviceSync")
 public class DeviceSyncPlugin extends Plugin {
   private static final String SERVICE_TYPE = "_kgc-sync._tcp.";
-  private static final int PROTOCOL_VERSION = 1;
+  private static final int PROTOCOL_VERSION = 2;
+  private static final String PAIRING_PREFERENCES = "kgc-device-pairings-v1";
+  private static final String PAIRING_KEY_PREFIX = "peer:";
   private static final int MAX_FRAME_BYTES = 10 * 1024 * 1024;
   private static final int MAX_RECOVERY_BYTES = 12 * 1024 * 1024;
   private static final int SOCKET_TIMEOUT_MS = 120_000;
@@ -82,6 +90,7 @@ public class DeviceSyncPlugin extends Plugin {
   private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
   private final SecureRandom random = new SecureRandom();
   private final Map<String, PendingIncoming> incoming = new ConcurrentHashMap<>();
+  private final Map<String, PendingPairing> incomingPairings = new ConcurrentHashMap<>();
   private final Map<String, PendingPull> outgoingPulls = new ConcurrentHashMap<>();
   private final Map<String, AttemptWindow> pairingAttempts = new ConcurrentHashMap<>();
   private final Map<String, String> serviceDeviceIds = new ConcurrentHashMap<>();
@@ -93,6 +102,7 @@ public class DeviceSyncPlugin extends Plugin {
   private final AtomicBoolean resolving = new AtomicBoolean(false);
 
   private NsdManager nsdManager;
+  private SharedPreferences pairingPreferences;
   private WifiManager.MulticastLock multicastLock;
   private ServerSocket serverSocket;
   private DatagramSocket peerDiscoverySocket;
@@ -120,6 +130,73 @@ public class DeviceSyncPlugin extends Plugin {
   @Override
   public void load() {
     nsdManager = (NsdManager) getContext().getSystemService(Context.NSD_SERVICE);
+    pairingPreferences = getContext().getSharedPreferences(PAIRING_PREFERENCES, Context.MODE_PRIVATE);
+  }
+
+  @PluginMethod
+  public void configureIdentity(PluginCall call) {
+    String deviceId = normalized(call.getString("deviceId", ""));
+    if (!validIdentifier(deviceId)) {
+      call.reject("INVALID_DEVICE_ID", "INVALID_DEVICE_ID");
+      return;
+    }
+    localDeviceId = deviceId;
+    appVersion = normalized(call.getString("appVersion", ""));
+    try {
+      call.resolve(localDeviceInfo());
+    } catch (Exception error) {
+      call.reject(errorCode(error, "IDENTITY_CONFIG_FAILED"), "IDENTITY_CONFIG_FAILED", error);
+    }
+  }
+
+  @PluginMethod
+  public void listPairedDevices(PluginCall call) {
+    try {
+      JSObject result = new JSObject();
+      result.put("devices", pairedDevicesArray());
+      call.resolve(result);
+    } catch (Exception error) {
+      call.reject(errorCode(error, "PAIRING_LIST_FAILED"), "PAIRING_LIST_FAILED", error);
+    }
+  }
+
+  @PluginMethod
+  public void forgetPairing(PluginCall call) {
+    String deviceId = normalized(call.getString("deviceId", ""));
+    if (!validIdentifier(deviceId)) {
+      call.reject("INVALID_DEVICE_ID", "INVALID_DEVICE_ID");
+      return;
+    }
+    removePairing(deviceId);
+    notifyPairingChanged(deviceId, false);
+    call.resolve();
+  }
+
+  @PluginMethod
+  public void scanPeerQr(PluginCall call) {
+    IntentIntegrator integrator = new IntentIntegrator(getActivity());
+    integrator.setCaptureActivity(PeerQrCaptureActivity.class);
+    integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
+    integrator.setPrompt("扫描另一台设备的格记配对二维码");
+    integrator.setBeepEnabled(false);
+    integrator.setBarcodeImageEnabled(false);
+    integrator.setOrientationLocked(true);
+    Intent intent = integrator.createScanIntent();
+    startActivityForResult(call, intent, "handlePeerQrResult");
+  }
+
+  @ActivityCallback
+  private void handlePeerQrResult(PluginCall call, ActivityResult activityResult) {
+    if (call == null) return;
+    IntentResult scan = IntentIntegrator.parseActivityResult(activityResult.getResultCode(), activityResult.getData());
+    JSObject result = new JSObject();
+    if (scan == null || scan.getContents() == null) {
+      result.put("cancelled", true);
+    } else {
+      result.put("cancelled", false);
+      result.put("value", scan.getContents());
+    }
+    call.resolve(result);
   }
 
   @PluginMethod
@@ -262,11 +339,92 @@ public class DeviceSyncPlugin extends Plugin {
   }
 
   @PluginMethod
+  public void requestPairing(PluginCall call) {
+    JSONObject peer = call.getObject("peer");
+    String code = normalized(call.getString("pairingCode", ""));
+    if (peer == null || !code.matches("\\d{6}") || !validIdentifier(localDeviceId)) {
+      call.reject("INVALID_PAIR_REQUEST", "INVALID_PAIR_REQUEST");
+      return;
+    }
+    String peerDeviceId = normalized(peer.optString("deviceId", ""));
+    if (!validIdentifier(peerDeviceId) || peerDeviceId.equals(localDeviceId)) {
+      call.reject("INVALID_PAIR_TARGET", "INVALID_PAIR_TARGET");
+      return;
+    }
+    io.execute(() -> {
+      Socket socket = null;
+      boolean saved = false;
+      try {
+        socket = connect(peer);
+        DataInputStream input = input(socket);
+        DataOutputStream output = output(socket);
+        String requestId = UUID.randomUUID().toString();
+        writeFrame(output, baseOffer("pair-request", requestId, peer, code));
+        JSONObject response = readFrame(input);
+        requireKind(response, requestId, "paired");
+        String token = normalized(response.optString("pairToken", ""));
+        int accentIndex = response.optInt("accentIndex", -1);
+        if (!validPairToken(token) || accentIndex < 0 || accentIndex > 5) throw new ProtocolException("PAIRING_RESPONSE_INVALID");
+        JSONObject remoteDevice = validatedSourceDevice(response.getJSONObject("sourceDevice"), socket.getInetAddress().getHostAddress());
+        if (!peerDeviceId.equals(remoteDevice.optString("deviceId", ""))) throw new ProtocolException("TARGET_MISMATCH");
+        savePairing(remoteDevice, token, accentIndex);
+        saved = true;
+        JSONObject acknowledgement = new JSONObject();
+        acknowledgement.put("kind", "paired-ack");
+        acknowledgement.put("requestId", requestId);
+        writeFrame(output, acknowledgement);
+        notifyPairingChanged(peerDeviceId, true);
+        JSObject result = new JSObject();
+        result.put("pairedDevice", pairingMetadata(readPairing(peerDeviceId)));
+        call.resolve(result);
+      } catch (Exception error) {
+        if (saved) removePairing(peerDeviceId);
+        rejectNetwork(call, error, "PAIRING_FAILED");
+      } finally {
+        closeQuietly(socket);
+      }
+    });
+  }
+
+  @PluginMethod
+  public void approvePairing(PluginCall call) {
+    String requestId = normalized(call.getString("requestId", ""));
+    PendingPairing pending = incomingPairings.get(requestId);
+    if (pending == null || !pending.state.compareAndSet(PairingState.WAITING_APPROVAL, PairingState.APPROVED)) {
+      call.reject("REQUEST_NOT_FOUND", "REQUEST_NOT_FOUND");
+      return;
+    }
+    boolean accepted = Boolean.TRUE.equals(call.getBoolean("accepted", false));
+    if (!accepted) {
+      try { writeFrame(pending.output, resultFrame(requestId, false, "REJECTED")); } catch (Exception ignored) {}
+      removePairingRequest(requestId);
+      call.resolve();
+      return;
+    }
+    try {
+      String token = newPairToken();
+      int accentIndex = random.nextInt(6);
+      JSONObject response = new JSONObject();
+      response.put("kind", "paired");
+      response.put("requestId", requestId);
+      response.put("pairToken", token);
+      response.put("accentIndex", accentIndex);
+      response.put("sourceDevice", localSourceDevice());
+      writeFrame(pending.output, response);
+      pending.state.set(PairingState.WAITING_ACK);
+      call.resolve();
+      io.execute(() -> waitForPairingAck(pending, token, accentIndex));
+    } catch (Exception error) {
+      removePairingRequest(requestId);
+      call.reject(errorCode(error, "PAIRING_APPROVAL_FAILED"), "PAIRING_APPROVAL_FAILED", error);
+    }
+  }
+
+  @PluginMethod
   public void push(PluginCall call) {
     JSONObject peer = call.getObject("peer");
     JSONObject transfer = call.getObject("transfer");
-    String code = normalized(call.getString("pairingCode", ""));
-    if (peer == null || transfer == null || !code.matches("\\d{6}")) {
+    if (peer == null || transfer == null) {
       call.reject("INVALID_PUSH_REQUEST", "INVALID_PUSH_REQUEST");
       return;
     }
@@ -278,7 +436,7 @@ public class DeviceSyncPlugin extends Plugin {
         DataInputStream input = input(socket);
         DataOutputStream output = output(socket);
         String requestId = UUID.randomUUID().toString();
-        JSONObject offer = baseOffer("push-offer", requestId, peer, code);
+        JSONObject offer = baseOffer("push-offer", requestId, peer, pairTokenForPeer(peer));
         offer.put("summary", transfer.getJSONObject("summary"));
         offer.put("snapshotSha256", transfer.getString("snapshotSha256"));
         offer.put("snapshotUtf8Bytes", transfer.getInt("snapshotUtf8Bytes"));
@@ -307,8 +465,7 @@ public class DeviceSyncPlugin extends Plugin {
   @PluginMethod
   public void pull(PluginCall call) {
     JSONObject peer = call.getObject("peer");
-    String code = normalized(call.getString("pairingCode", ""));
-    if (peer == null || !code.matches("\\d{6}")) {
+    if (peer == null) {
       call.reject("INVALID_PULL_REQUEST", "INVALID_PULL_REQUEST");
       return;
     }
@@ -319,7 +476,7 @@ public class DeviceSyncPlugin extends Plugin {
         DataInputStream input = input(socket);
         DataOutputStream output = output(socket);
         String requestId = UUID.randomUUID().toString();
-        writeFrame(output, baseOffer("pull-offer", requestId, peer, code));
+        writeFrame(output, baseOffer("pull-offer", requestId, peer, pairTokenForPeer(peer)));
         JSONObject response = readFrame(input);
         requireKind(response, requestId, "snapshot");
         JSONObject transfer = response.getJSONObject("transfer");
@@ -433,6 +590,7 @@ public class DeviceSyncPlugin extends Plugin {
     String bundleJson = call.getString("bundleJson", "");
     String sourceName = normalized(call.getString("sourceName", "设备传输前"));
     String sourceDeviceId = normalized(call.getString("sourceDeviceId", "unknown-device"));
+    String sourceModel = safeName(call.getString("sourceModel", sourceName));
     JSONObject summary = call.getObject("summary");
     byte[] bytes = bundleJson.getBytes(StandardCharsets.UTF_8);
     if (bytes.length == 0 || bytes.length > MAX_RECOVERY_BYTES || summary == null) {
@@ -450,6 +608,7 @@ public class DeviceSyncPlugin extends Plugin {
         wrapper.put("createdAt", createdAt);
         wrapper.put("sourceName", sourceName.isEmpty() ? "设备传输前" : sourceName);
         wrapper.put("sourceDeviceId", sourceDeviceId);
+        wrapper.put("sourceModel", sourceModel);
         wrapper.put("utf8Bytes", bytes.length);
         wrapper.put("sha256", sha256(bundleJson));
         wrapper.put("summary", new JSONObject(summary.toString()));
@@ -521,19 +680,35 @@ public class DeviceSyncPlugin extends Plugin {
       JSONObject offer = readFrame(input);
       String kind = offer.optString("kind", "");
       String requestId = offer.optString("requestId", "");
-      if (!("push-offer".equals(kind) || "pull-offer".equals(kind)) || !validIdentifier(requestId)) {
+      if (!("pair-request".equals(kind) || "push-offer".equals(kind) || "pull-offer".equals(kind)) || !validIdentifier(requestId)) {
         throw new ProtocolException("INVALID_OFFER");
       }
       if (offer.optInt("protocolVersion", 0) != PROTOCOL_VERSION) throw new ProtocolException("PROTOCOL_INCOMPATIBLE");
       String target = offer.optString("targetDeviceId", "");
       if (!target.isEmpty() && !localDeviceId.equals(target)) throw new ProtocolException("TARGET_MISMATCH");
       String remoteAddress = socket.getInetAddress().getHostAddress();
-      if (!pairingAllowed(remoteAddress, offer.optString("pairingCode", ""))) {
-        writeFrame(output, errorFrame(requestId, "PAIRING_INVALID"));
-        return;
-      }
       JSONObject source = validatedSourceDevice(offer.getJSONObject("sourceDevice"), remoteAddress);
       if (localDeviceId.equals(source.optString("deviceId"))) throw new ProtocolException("SELF_CONNECTION");
+      if ("pair-request".equals(kind)) {
+        if (!pairingAllowed(remoteAddress, offer.optString("pairingCode", ""))) {
+          writeFrame(output, errorFrame(requestId, "PAIRING_CODE_INVALID"));
+          return;
+        }
+        PendingPairing pending = new PendingPairing(requestId, socket, input, output, source);
+        if (incomingPairings.putIfAbsent(requestId, pending) != null) throw new ProtocolException("DUPLICATE_REQUEST");
+        retained = true;
+        scheduler.schedule(() -> expirePairingRequest(requestId), SOCKET_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        JSObject event = new JSObject();
+        event.put("requestId", requestId);
+        event.put("sourceDevice", source);
+        notifyListeners("incomingPairRequest", event);
+        return;
+      }
+      if (!pairedTokenAllowed(source.optString("deviceId", ""), offer.optString("pairToken", ""))) {
+        writeFrame(output, errorFrame(requestId, "PAIRING_REQUIRED"));
+        return;
+      }
+      touchPairing(source);
       JSONObject summary = offer.optJSONObject("summary");
       PendingIncoming pending = new PendingIncoming(requestId, kind, socket, input, output, source);
       if (incoming.putIfAbsent(requestId, pending) != null) throw new ProtocolException("DUPLICATE_REQUEST");
@@ -585,6 +760,19 @@ public class DeviceSyncPlugin extends Plugin {
     }
   }
 
+  private void waitForPairingAck(PendingPairing pending, String token, int accentIndex) {
+    try {
+      JSONObject response = readFrame(pending.input);
+      requireKind(response, pending.requestId, "paired-ack");
+      savePairing(pending.sourceDevice, token, accentIndex);
+      notifyPairingChanged(pending.sourceDevice.optString("deviceId", ""), true);
+    } catch (Exception error) {
+      notifyError(errorCode(error, "PAIRING_ACK_FAILED"), 0);
+    } finally {
+      removePairingRequest(pending.requestId);
+    }
+  }
+
   private Socket connect(JSONObject peer) throws Exception {
     String host = normalized(peer.optString("host", ""));
     int port = peer.optInt("port", 0);
@@ -608,7 +796,7 @@ public class DeviceSyncPlugin extends Plugin {
     throw lastError == null ? new IOException("PEER_CONNECT_FAILED") : lastError;
   }
 
-  private JSONObject baseOffer(String kind, String requestId, JSONObject peer, String code) throws Exception {
+  private JSONObject baseOffer(String kind, String requestId, JSONObject peer, String credential) throws Exception {
     JSONObject offer = new JSONObject();
     offer.put("protocolVersion", PROTOCOL_VERSION);
     offer.put("requestId", requestId);
@@ -617,7 +805,8 @@ public class DeviceSyncPlugin extends Plugin {
     String targetDeviceId = peer.optString("deviceId", "");
     offer.put("targetDeviceId", targetDeviceId.startsWith("manual-") ? "" : targetDeviceId);
     offer.put("createdAt", Instant.now().toString());
-    offer.put("pairingCode", code);
+    if ("pair-request".equals(kind)) offer.put("pairingCode", credential);
+    else offer.put("pairToken", credential);
     return offer;
   }
 
@@ -625,6 +814,7 @@ public class DeviceSyncPlugin extends Plugin {
     JSONObject source = new JSONObject();
     source.put("deviceId", localDeviceId);
     source.put("name", deviceName());
+    source.put("model", deviceModel());
     source.put("host", localAddress.isEmpty() ? findLocalIpv4() : localAddress);
     source.put("port", localPort);
     source.put("platform", "Android " + Build.VERSION.RELEASE);
@@ -640,6 +830,7 @@ public class DeviceSyncPlugin extends Plugin {
     JSONObject normalized = new JSONObject();
     normalized.put("deviceId", id);
     normalized.put("name", safeName(source.optString("name", "Android 设备")));
+    normalized.put("model", safeName(source.optString("model", source.optString("name", "Android 设备"))));
     normalized.put("host", remoteAddress);
     normalized.put("port", source.optInt("port", 0));
     normalized.put("platform", safeName(source.optString("platform", "Android")));
@@ -657,6 +848,7 @@ public class DeviceSyncPlugin extends Plugin {
     info.setAttribute("v", String.valueOf(PROTOCOL_VERSION));
     info.setAttribute("id", localDeviceId);
     info.setAttribute("name", deviceName());
+    info.setAttribute("model", deviceModel());
     info.setAttribute("app", appVersion);
     info.setAttribute("platform", "Android " + Build.VERSION.RELEASE);
     registrationListener = new NsdManager.RegistrationListener() {
@@ -726,12 +918,14 @@ public class DeviceSyncPlugin extends Plugin {
 
   private void publishResolvedPeer(NsdServiceInfo info) {
     try {
+      if (!String.valueOf(PROTOCOL_VERSION).equals(attribute(info, "v"))) return;
       String id = attribute(info, "id");
       if (!validIdentifier(id) || id.equals(localDeviceId) || info.getHost() == null) return;
       serviceDeviceIds.put(info.getServiceName(), id);
       JSObject peer = new JSObject();
       peer.put("deviceId", id);
       peer.put("name", safeName(attribute(info, "name")));
+      peer.put("model", safeName(attribute(info, "model")));
       peer.put("host", info.getHost().getHostAddress());
       peer.put("port", info.getPort());
       peer.put("platform", safeName(attribute(info, "platform")));
@@ -764,6 +958,131 @@ public class DeviceSyncPlugin extends Plugin {
       || serviceName.startsWith(prefix + " (");
   }
 
+  private JSONObject readPairing(String deviceId) {
+    if (pairingPreferences == null || !validIdentifier(deviceId)) return null;
+    String value = pairingPreferences.getString(PAIRING_KEY_PREFIX + deviceId, "");
+    if (value == null || value.isEmpty()) return null;
+    try {
+      JSONObject pairing = new JSONObject(value);
+      if (!deviceId.equals(pairing.optString("peerDeviceId", "")) || !validPairToken(pairing.optString("token", ""))) {
+        removePairing(deviceId);
+        return null;
+      }
+      return pairing;
+    } catch (Exception error) {
+      removePairing(deviceId);
+      return null;
+    }
+  }
+
+  private void savePairing(JSONObject peer, String token, int accentIndex) throws Exception {
+    String deviceId = normalized(peer.optString("deviceId", ""));
+    if (!validIdentifier(deviceId) || !validPairToken(token) || accentIndex < 0 || accentIndex > 5) {
+      throw new ProtocolException("PAIRING_RECORD_INVALID");
+    }
+    JSONObject existing = readPairing(deviceId);
+    JSONObject pairing = new JSONObject();
+    pairing.put("peerDeviceId", deviceId);
+    pairing.put("peerName", safeName(peer.optString("name", "Android 设备")));
+    pairing.put("peerModel", safeName(peer.optString("model", peer.optString("name", "Android 设备"))));
+    pairing.put("token", token);
+    pairing.put("accentIndex", accentIndex);
+    pairing.put("pairedAt", existing == null ? Instant.now().toString() : existing.optString("pairedAt", Instant.now().toString()));
+    pairing.put("lastSeenAt", Instant.now().toString());
+    if (!pairingPreferences.edit().putString(PAIRING_KEY_PREFIX + deviceId, pairing.toString()).commit()) {
+      throw new IOException("PAIRING_STORE_FAILED");
+    }
+  }
+
+  private void touchPairing(JSONObject peer) {
+    String deviceId = normalized(peer.optString("deviceId", ""));
+    JSONObject existing = readPairing(deviceId);
+    if (existing == null) return;
+    try {
+      savePairing(peer, existing.getString("token"), existing.optInt("accentIndex", 0));
+    } catch (Exception ignored) {}
+  }
+
+  private void removePairing(String deviceId) {
+    if (pairingPreferences != null && validIdentifier(deviceId)) {
+      pairingPreferences.edit().remove(PAIRING_KEY_PREFIX + deviceId).commit();
+    }
+  }
+
+  private String pairTokenForPeer(JSONObject peer) throws ProtocolException {
+    String deviceId = normalized(peer.optString("deviceId", ""));
+    JSONObject pairing = readPairing(deviceId);
+    if (pairing == null) throw new ProtocolException("PAIRING_REQUIRED");
+    return pairing.optString("token", "");
+  }
+
+  private boolean pairedTokenAllowed(String deviceId, String providedToken) {
+    JSONObject pairing = readPairing(deviceId);
+    if (pairing == null || !validPairToken(providedToken)) return false;
+    byte[] expected = pairing.optString("token", "").getBytes(StandardCharsets.UTF_8);
+    byte[] provided = providedToken.getBytes(StandardCharsets.UTF_8);
+    return MessageDigest.isEqual(expected, provided);
+  }
+
+  private String newPairToken() {
+    byte[] bytes = new byte[32];
+    random.nextBytes(bytes);
+    StringBuilder builder = new StringBuilder(64);
+    for (byte item : bytes) builder.append(String.format(Locale.ROOT, "%02x", item & 0xff));
+    return builder.toString();
+  }
+
+  private static boolean validPairToken(String value) {
+    return value != null && value.matches("[a-f0-9]{64}");
+  }
+
+  private JSObject pairingMetadata(JSONObject pairing) throws JSONException {
+    JSObject result = new JSObject();
+    result.put("deviceId", pairing.getString("peerDeviceId"));
+    result.put("name", pairing.optString("peerName", "Android 设备"));
+    result.put("model", pairing.optString("peerModel", "Android 设备"));
+    result.put("accentIndex", pairing.optInt("accentIndex", 0));
+    result.put("pairedAt", pairing.optString("pairedAt", ""));
+    result.put("lastSeenAt", pairing.optString("lastSeenAt", ""));
+    return result;
+  }
+
+  private JSArray pairedDevicesArray() throws JSONException {
+    JSArray result = new JSArray();
+    if (pairingPreferences == null) return result;
+    List<JSONObject> pairings = new ArrayList<>();
+    for (Map.Entry<String, ?> entry : pairingPreferences.getAll().entrySet()) {
+      if (!entry.getKey().startsWith(PAIRING_KEY_PREFIX) || !(entry.getValue() instanceof String)) continue;
+      String deviceId = entry.getKey().substring(PAIRING_KEY_PREFIX.length());
+      JSONObject pairing = readPairing(deviceId);
+      if (pairing != null) pairings.add(pairing);
+    }
+    pairings.sort((left, right) -> right.optString("lastSeenAt", "").compareTo(left.optString("lastSeenAt", "")));
+    for (JSONObject pairing : pairings) result.put(pairingMetadata(pairing));
+    return result;
+  }
+
+  private void notifyPairingChanged(String deviceId, boolean paired) {
+    try {
+      JSObject event = new JSObject();
+      event.put("deviceId", deviceId);
+      event.put("paired", paired);
+      JSONObject pairing = paired ? readPairing(deviceId) : null;
+      if (pairing != null) event.put("pairedDevice", pairingMetadata(pairing));
+      notifyListeners("pairingChanged", event);
+    } catch (Exception ignored) {}
+  }
+
+  private JSObject localDeviceInfo() throws Exception {
+    JSObject source = new JSObject();
+    source.put("deviceId", localDeviceId);
+    source.put("name", deviceName());
+    source.put("model", deviceModel());
+    source.put("platform", "Android " + Build.VERSION.RELEASE);
+    source.put("appVersion", appVersion);
+    return source;
+  }
+
   private synchronized boolean pairingAllowed(String remoteAddress, String providedCode) {
     long now = System.currentTimeMillis();
     AttemptWindow attempt = pairingAttempts.computeIfAbsent(remoteAddress, ignored -> new AttemptWindow(now));
@@ -794,6 +1113,7 @@ public class DeviceSyncPlugin extends Plugin {
     JSObject result = new JSObject();
     result.put("deviceId", localDeviceId);
     result.put("name", deviceName());
+    result.put("model", deviceModel());
     result.put("address", localAddress);
     result.put("port", localPort);
     result.put("pairingCode", pairingCode);
@@ -821,6 +1141,7 @@ public class DeviceSyncPlugin extends Plugin {
     pairingCode = "";
     sessionId = "";
     cancelIncoming();
+    cancelPairingRequests();
     releaseMulticastLockIfIdle();
   }
 
@@ -1018,7 +1339,7 @@ public class DeviceSyncPlugin extends Plugin {
         packet.getLength(),
         StandardCharsets.UTF_8
       ));
-      if (!"kgc-peer-v1".equals(payload.optString("kind", ""))) return;
+      if (!"kgc-peer-v2".equals(payload.optString("kind", ""))) return;
       if (payload.optInt("protocolVersion", 0) != PROTOCOL_VERSION) return;
       String deviceId = normalized(payload.optString("deviceId", ""));
       int port = payload.optInt("port", 0);
@@ -1034,6 +1355,7 @@ public class DeviceSyncPlugin extends Plugin {
       JSObject event = new JSObject();
       event.put("deviceId", deviceId);
       event.put("name", safeName(payload.optString("name", "Android 设备")));
+      event.put("model", safeName(payload.optString("model", payload.optString("name", "Android 设备"))));
       event.put("host", packet.getAddress().getHostAddress());
       event.put("port", port);
       event.put("appVersion", version);
@@ -1054,7 +1376,7 @@ public class DeviceSyncPlugin extends Plugin {
         packet.getLength(),
         StandardCharsets.UTF_8
       ));
-      if (!"kgc-peer-probe-v1".equals(probe.optString("kind", ""))) return false;
+      if (!"kgc-peer-probe-v2".equals(probe.optString("kind", ""))) return false;
       if (probe.optInt("protocolVersion", 0) != PROTOCOL_VERSION) return true;
       String deviceId = normalized(probe.optString("deviceId", ""));
       if (!hosting || !validIdentifier(deviceId) || deviceId.equals(localDeviceId)) return true;
@@ -1087,7 +1409,7 @@ public class DeviceSyncPlugin extends Plugin {
       if (!discovering || peerDiscoverySocket == null || peerDiscoverySocket.isClosed()) return;
       socket = peerDiscoverySocket;
       try {
-        probe.put("kind", "kgc-peer-probe-v1");
+        probe.put("kind", "kgc-peer-probe-v2");
         probe.put("protocolVersion", PROTOCOL_VERSION);
         probe.put("deviceId", localDeviceId);
       } catch (JSONException ignored) {
@@ -1109,10 +1431,11 @@ public class DeviceSyncPlugin extends Plugin {
     synchronized (this) {
       if (!hosting) return null;
       try {
-        payload.put("kind", "kgc-peer-v1");
+        payload.put("kind", "kgc-peer-v2");
         payload.put("protocolVersion", PROTOCOL_VERSION);
         payload.put("deviceId", localDeviceId);
         payload.put("name", deviceName());
+        payload.put("model", deviceModel());
         payload.put("port", localPort);
         payload.put("appVersion", appVersion);
         payload.put("platform", "Android " + Build.VERSION.RELEASE);
@@ -1182,6 +1505,22 @@ public class DeviceSyncPlugin extends Plugin {
 
   private void cancelIncoming() {
     for (String requestId : new ArrayList<>(incoming.keySet())) removeIncoming(requestId);
+  }
+
+  private void cancelPairingRequests() {
+    for (String requestId : new ArrayList<>(incomingPairings.keySet())) removePairingRequest(requestId);
+  }
+
+  private void expirePairingRequest(String requestId) {
+    PendingPairing pending = incomingPairings.remove(requestId);
+    if (pending == null) return;
+    try { writeFrame(pending.output, errorFrame(requestId, "REQUEST_TIMEOUT")); } catch (Exception ignored) {}
+    pending.close();
+  }
+
+  private void removePairingRequest(String requestId) {
+    PendingPairing pending = incomingPairings.remove(requestId);
+    if (pending != null) pending.close();
   }
 
   private void expireIncoming(String requestId) {
@@ -1361,6 +1700,7 @@ public class DeviceSyncPlugin extends Plugin {
     point.put("createdAt", wrapper.getString("createdAt"));
     point.put("sourceName", wrapper.optString("sourceName", "设备传输前"));
     point.put("sourceDeviceId", wrapper.optString("sourceDeviceId", ""));
+    point.put("sourceModel", wrapper.optString("sourceModel", wrapper.optString("sourceName", "Android 设备")));
     point.put("utf8Bytes", wrapper.getInt("utf8Bytes"));
     point.put("sha256", wrapper.getString("sha256"));
     point.put("summary", wrapper.getJSONObject("summary"));
@@ -1424,6 +1764,10 @@ public class DeviceSyncPlugin extends Plugin {
     return safeName((manufacturer + " " + model).trim());
   }
 
+  private static String deviceModel() {
+    return safeName(Build.MODEL == null ? "Android 设备" : Build.MODEL.trim());
+  }
+
   private static void closeQuietly(Socket socket) {
     if (socket == null) return;
     try { socket.close(); } catch (IOException ignored) {}
@@ -1448,6 +1792,7 @@ public class DeviceSyncPlugin extends Plugin {
     invalidateDiscoveryRequests();
     stopDiscoveryInternal();
     cancelIncoming();
+    cancelPairingRequests();
     for (PendingPull pending : outgoingPulls.values()) pending.close();
     outgoingPulls.clear();
     io.shutdownNow();
@@ -1455,6 +1800,26 @@ public class DeviceSyncPlugin extends Plugin {
   }
 
   private enum PendingState { WAITING_APPROVAL, APPROVED, WAITING_SNAPSHOT, WAITING_LOCAL_COMMIT, WAITING_REMOTE_COMMIT }
+  private enum PairingState { WAITING_APPROVAL, APPROVED, WAITING_ACK }
+
+  private static final class PendingPairing {
+    final String requestId;
+    final Socket socket;
+    final DataInputStream input;
+    final DataOutputStream output;
+    final JSONObject sourceDevice;
+    final java.util.concurrent.atomic.AtomicReference<PairingState> state = new java.util.concurrent.atomic.AtomicReference<>(PairingState.WAITING_APPROVAL);
+
+    PendingPairing(String requestId, Socket socket, DataInputStream input, DataOutputStream output, JSONObject sourceDevice) {
+      this.requestId = requestId;
+      this.socket = socket;
+      this.input = input;
+      this.output = output;
+      this.sourceDevice = sourceDevice;
+    }
+
+    void close() { closeQuietly(socket); }
+  }
 
   private static final class PendingIncoming {
     final String requestId;

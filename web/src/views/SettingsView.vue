@@ -1,9 +1,10 @@
 <template>
   <div class="page settings-page">
-    <h1 class="page-title">设置</h1>
-    <p class="page-sub">{{ copy.overviewSubtitle }}</p>
+    <template v-if="section === 'main'">
+      <h1 class="page-title">设置</h1>
+      <p class="page-sub">{{ copy.overviewSubtitle }}</p>
 
-    <DataRecoveryPanel />
+      <DataRecoveryPanel />
 
     <div class="section-title">使用模式</div>
     <section class="card mode-card" aria-labelledby="mode-title">
@@ -84,9 +85,34 @@
       </div>
     </div>
 
-    <DeviceSyncPanel />
+    <div class="section-title">连接与同步</div>
+    <section class="card connection-hub" aria-label="连接与同步方式">
+      <router-link to="/settings/device-sync" class="connection-row">
+        <span class="connection-icon device" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="connection-copy"><strong>设备直连</strong><small>{{ deviceSyncSummary }}</small></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </router-link>
+      <router-link to="/settings/computer-sync" class="connection-row">
+        <span class="connection-icon computer" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </span>
+        <span class="connection-copy"><strong>电脑同步</strong><small>{{ syncStatusText }}</small></span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+      </router-link>
+    </section>
+    </template>
 
-    <div class="section-title">电脑同步</div>
+    <div v-if="section !== 'main'" class="subpage-head">
+      <button type="button" :aria-label="'返回设置'" @click="router.push('/settings')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+      </button>
+      <div><h1>{{ section === 'device' ? '设备直连' : '电脑同步' }}</h1><p>连接与同步</p></div>
+    </div>
+
+    <DeviceSyncPanel v-if="section === 'device'" :show-title="false" />
+
+    <template v-if="section === 'computer'">
+    <div class="section-title">连接与覆盖</div>
     <div class="card block server-card">
       <div class="setting-row top-row">
         <div>
@@ -172,9 +198,10 @@
         {{ syncMessage }}
       </div>
     </div>
+    </template>
 
-    <div class="section-title">版本更新</div>
-    <div class="card block update-card">
+    <div v-if="section === 'main'" class="section-title">版本更新</div>
+    <div v-if="section === 'main'" class="card block update-card">
       <div class="row-end version-hold" @pointerdown="startVersionHold" @pointermove="moveVersionHold" @pointerup="cancelVersionHold" @pointercancel="cancelVersionHold" @pointerleave="cancelVersionHold">
         <span class="version-label">当前版本 v{{ APP_VERSION }}<small>长按查看历史版本</small></span>
         <button class="btn" :disabled="checking" @click="checkUpdate">
@@ -256,7 +283,7 @@
       </div>
     </div>
 
-    <teleport to="body">
+    <teleport v-if="section === 'main'" to="body">
       <Transition name="history-sheet">
         <div v-if="historyOpen" class="history-mask" data-back-dismiss data-back-priority="120" @click.self="historyOpen = false">
           <div class="history-sheet card">
@@ -276,6 +303,7 @@
     </teleport>
 
     <DatePickerSheet
+      v-if="section === 'main'"
       v-model:open="planPickerOpen"
       :model-value="planEnd"
       title="选择备考计划结束日"
@@ -342,12 +370,15 @@ import {
 import DatePickerSheet from '../components/DatePickerSheet.vue';
 import PixelGrid from '../components/PixelGrid.vue';
 import DeviceSyncPanel from '../components/DeviceSyncPanel.vue';
+import { deviceSyncState } from '../api/device-sync';
 import { runViewTransition } from '../lib/motion';
 import { effectivePlanEnd, modeCopy } from '../lib/appMode';
 import type { AppMode } from '../types';
 
+const props = withDefaults(defineProps<{ section?: 'main' | 'device' | 'computer' }>(), { section: 'main' });
 const store = useAppStore();
 const router = useRouter();
+const section = computed(() => props.section);
 const isGeneral = computed(() => store.settings.appMode === 'general');
 const copy = computed(() => modeCopy(store.settings.appMode));
 const planEnd = ref(store.settings.planEndDate || '');
@@ -419,6 +450,13 @@ const syncStatusText = computed(() => {
   if (needsPairing.value || store.syncPhase === 'pairing') return '等待与电脑配对';
   if (store.pendingSyncCount > 0) return `${store.pendingSyncCount} 条本地变更未同步`;
   return store.online ? '已连接，数据已同步' : '未连接服务器';
+});
+const deviceSyncSummary = computed(() => {
+  if (!deviceSyncState.supported) return '仅 Android 应用可用';
+  const states = [`${deviceSyncState.pairedDevices.value.length} 台已配对`];
+  if (deviceSyncState.discoverable.value) states.push('可被发现');
+  if (deviceSyncState.searching.value) states.push('正在搜索');
+  return states.join(' · ');
 });
 
 const checking = ref(false);
@@ -910,6 +948,26 @@ onUnmounted(() => {
 <style scoped>
 .settings-page { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .overview-card, .block { padding: 16px; }
+.connection-hub { overflow: hidden; padding: 0; }
+.connection-row { min-height: 76px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 20px; align-items: center; gap: 12px; padding: 11px 15px; color: var(--text); text-decoration: none; transition: transform 150ms cubic-bezier(.16, 1, .3, 1), background-color 150ms ease; }
+.connection-row + .connection-row { border-top: 1px solid var(--card-border); }
+.connection-row:active { transform: scale(.985); background: var(--bg); }
+.connection-row > svg, .connection-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.connection-row > svg { color: var(--text-3); }
+.connection-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; background: var(--accent-soft); color: var(--accent-solid); }
+.connection-icon.device { grid-template-columns: repeat(2, 7px); grid-template-rows: repeat(2, 7px); gap: 3px; }
+.connection-icon.device i { width: 7px; height: 7px; border-radius: 1px; background: currentColor; opacity: .28; }
+.connection-icon.device i:nth-child(2), .connection-icon.device i:nth-child(3) { opacity: 1; }
+.connection-icon.computer { background: color-mix(in srgb, var(--warn) 12%, var(--card)); color: var(--warn); }
+.connection-copy { min-width: 0; }
+.connection-copy strong, .connection-copy small { display: block; }
+.connection-copy strong { font-size: 14px; }
+.connection-copy small { margin-top: 4px; overflow: hidden; color: var(--text-3); font-size: 11px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.subpage-head { min-height: 58px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.subpage-head > button { width: 44px; height: 44px; display: grid; place-items: center; flex: none; border: 0; border-radius: 8px; background: var(--bg-elev); color: var(--text); box-shadow: var(--shadow-sm); }
+.subpage-head svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.subpage-head h1 { margin: 0; color: var(--text); font-size: 21px; line-height: 1.2; }
+.subpage-head p { margin: 3px 0 0; color: var(--text-3); font-size: 11px; }
 .mode-card { padding: 16px; }
 .mode-head { min-height: 42px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .mode-head strong, .mode-head span { display: block; }

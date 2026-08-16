@@ -232,7 +232,7 @@ test('style switching animates material shape, preserves direction, and reduces 
   assert.match(reducedOverlay, /transition-duration:\s*80ms\s*!important/);
 });
 
-test('all showcase pages use the v0.14.0 cache key for release and local assets', async () => {
+test('all showcase pages use the v0.15.0 cache key for release and local assets', async () => {
   const pages = [
     await readFile(new URL('../../docs/index.html', import.meta.url), 'utf8'),
     ...stylePages.map(({ html }) => html),
@@ -240,8 +240,8 @@ test('all showcase pages use the v0.14.0 cache key for release and local assets'
 
   for (const page of pages) {
     assert.doesNotMatch(page, /v0131-release|v071-release|v070-release/);
-    assert.match(page, /release-data\.js\?v=20260814-v0140-release/);
-    assert.match(page, /styles?\.css\?v=20260814-v0140-release/);
-    assert.match(page, /app\.js\?v=20260814-v0140-release/);
+    assert.match(page, /release-data\.js\?v=20260816-v0150-release/);
+    assert.match(page, /styles?\.css\?v=20260816-v0150-release/);
+    assert.match(page, /app\.js\?v=20260816-v0150-release/);
   }
 });

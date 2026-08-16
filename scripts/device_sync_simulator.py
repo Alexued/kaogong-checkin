@@ -93,6 +93,7 @@ def source_device(now):
     return {
         "deviceId": "simulator-device-1234",
         "name": "桌面协议模拟器",
+        "model": "Codex TCP Peer",
         "host": "127.0.0.1",
         "port": 0,
         "platform": "Desktop simulator",
@@ -102,24 +103,49 @@ def source_device(now):
     }
 
 
-def offer(args, kind, request_id, now):
-    return {
+def offer(args, kind, request_id, now, credential):
+    request = {
         "protocolVersion": args.protocol_version,
         "requestId": request_id,
         "kind": kind,
         "sourceDevice": source_device(now),
         "targetDeviceId": args.target_device,
         "createdAt": now,
-        "pairingCode": args.code,
     }
+    request["pairingCode" if kind == "pair-request" else "pairToken"] = credential
+    return request
 
 
-def pull_from_phone(args):
+def pair_with_phone(args):
+    if not args.code or len(args.code) != 6 or not args.code.isdigit():
+        raise RuntimeError("a six-digit --code is required for first pairing")
     now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
     request_id = str(uuid.uuid4())
     with socket.create_connection((args.host, args.port), timeout=8) as sock:
         sock.settimeout(120)
-        frame(sock, offer(args, "pull-offer", request_id, now))
+        frame(sock, offer(args, "pair-request", request_id, now, args.code))
+        response = read_frame(sock)
+        print(json.dumps({"stage": "pair-response", "response": response}, ensure_ascii=False), flush=True)
+        if response.get("kind") != "paired" or response.get("requestId") != request_id:
+            raise RuntimeError(f"unexpected pair response: {response}")
+        token = response.get("pairToken", "")
+        if len(token) != 64:
+            raise RuntimeError("pair token missing")
+        frame(sock, {"kind": "paired-ack", "requestId": request_id})
+        print(json.dumps({
+            "stage": "pair-complete",
+            "accentIndex": response.get("accentIndex"),
+            "token": token,
+        }, ensure_ascii=False), flush=True)
+        return token
+
+
+def pull_from_phone(args, token):
+    now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+    request_id = str(uuid.uuid4())
+    with socket.create_connection((args.host, args.port), timeout=8) as sock:
+        sock.settimeout(120)
+        frame(sock, offer(args, "pull-offer", request_id, now, token))
         response = read_frame(sock)
         print(json.dumps({"stage": "pull-snapshot", "kind": response.get("kind")}, ensure_ascii=False), flush=True)
         if response.get("kind") != "snapshot" or response.get("requestId") != request_id:
@@ -142,11 +168,11 @@ def pull_from_phone(args):
         return transfer, summary
 
 
-def push_to_phone(args, transfer):
+def push_to_phone(args, transfer, token):
     envelope = validate_transfer(transfer)
     now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
     request_id = str(uuid.uuid4())
-    request = offer(args, "push-offer", request_id, now)
+    request = offer(args, "push-offer", request_id, now, token)
     request.update({
         "summary": transfer["summary"],
         "snapshotSha256": transfer["snapshotSha256"],
@@ -174,18 +200,23 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", required=True, type=int)
-    parser.add_argument("--code", required=True)
+    parser.add_argument("--code", default="")
+    parser.add_argument("--token", default="")
     parser.add_argument("--target-device", required=True)
-    parser.add_argument("--protocol-version", type=int, default=1)
-    parser.add_argument("--mode", choices=("push", "pull", "roundtrip"), default="push")
+    parser.add_argument("--protocol-version", type=int, default=2)
+    parser.add_argument("--mode", choices=("pair", "push", "pull", "roundtrip"), default="push")
     parser.add_argument("--corrupt-sha", action="store_true")
     parser.add_argument("--corrupt-size", action="store_true")
     args = parser.parse_args()
 
+    token = args.token or pair_with_phone(args)
+    if args.mode == "pair":
+        return 0
+
     if args.mode in ("pull", "roundtrip"):
-        pulled, summary = pull_from_phone(args)
+        pulled, summary = pull_from_phone(args, token)
         if args.mode == "roundtrip":
-            push_to_phone(args, pulled)
+            push_to_phone(args, pulled, token)
             print(json.dumps({"stage": "roundtrip-complete", "summary": summary}, ensure_ascii=False), flush=True)
         return 0
 
@@ -210,7 +241,7 @@ def main():
     if args.corrupt_size:
         transfer["snapshotUtf8Bytes"] += 1
     request_id = str(uuid.uuid4())
-    request = offer(args, "push-offer", request_id, envelope["savedAt"])
+    request = offer(args, "push-offer", request_id, envelope["savedAt"], token)
     request.update({
         "summary": transfer["summary"],
         "snapshotSha256": transfer["snapshotSha256"],

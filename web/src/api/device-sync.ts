@@ -7,6 +7,7 @@ import { setComputerSyncEnabled } from './computer-sync';
 import { APP_VERSION } from './update';
 import {
   buildPeerConnectUri,
+  PEER_PROTOCOL_VERSION,
   parsePeerConnectUri,
   parsePeerTransfer,
   type PeerConnectTarget,
@@ -26,6 +27,7 @@ const DEVICE_ID_KEY = 'kgc-device-sync-id-v1';
 export interface PeerDevice {
   deviceId: string;
   name: string;
+  model: string;
   host: string;
   port: number;
   platform: string;
@@ -37,6 +39,7 @@ export interface PeerDevice {
 export interface HostingInfo {
   deviceId: string;
   name: string;
+  model: string;
   address: string;
   port: number;
   pairingCode: string;
@@ -50,9 +53,27 @@ export interface RecoveryPoint {
   createdAt: string;
   sourceName: string;
   sourceDeviceId: string;
+  sourceModel: string;
   utf8Bytes: number;
   sha256: string;
   summary: PeerSnapshotSummary;
+}
+
+export interface LocalDeviceInfo {
+  deviceId: string;
+  name: string;
+  model: string;
+  platform: string;
+  appVersion: string;
+}
+
+export interface PairedDevice {
+  deviceId: string;
+  name: string;
+  model: string;
+  accentIndex: number;
+  pairedAt: string;
+  lastSeenAt: string;
 }
 
 interface IncomingRequestEvent {
@@ -68,23 +89,36 @@ interface IncomingSnapshotEvent {
   transfer: PeerTransfer;
 }
 
+interface IncomingPairRequestEvent {
+  requestId: string;
+  sourceDevice: PeerDevice;
+}
+
 interface NativeDeviceSyncPlugin {
+  configureIdentity(options: { deviceId: string; appVersion: string }): Promise<LocalDeviceInfo>;
   startHosting(options: { deviceId: string; appVersion: string; protocolVersion: number }): Promise<Omit<HostingInfo, 'qrUri'>>;
   stopHosting(): Promise<void>;
   startDiscovery(options: { deviceId: string }): Promise<void>;
   stopDiscovery(): Promise<void>;
-  push(options: { peer: PeerDevice; pairingCode: string; transfer: PeerTransfer }): Promise<{ requestId: string; status: string }>;
-  pull(options: { peer: PeerDevice; pairingCode: string }): Promise<{ requestId: string; transfer: PeerTransfer }>;
+  requestPairing(options: { peer: PeerDevice; pairingCode: string }): Promise<{ pairedDevice: PairedDevice }>;
+  approvePairing(options: { requestId: string; accepted: boolean }): Promise<void>;
+  listPairedDevices(): Promise<{ devices: PairedDevice[] }>;
+  forgetPairing(options: { deviceId: string }): Promise<void>;
+  scanPeerQr(): Promise<{ cancelled: boolean; value?: string }>;
+  push(options: { peer: PeerDevice; transfer: PeerTransfer }): Promise<{ requestId: string; status: string }>;
+  pull(options: { peer: PeerDevice }): Promise<{ requestId: string; transfer: PeerTransfer }>;
   completePull(options: { requestId: string; committed: boolean; error?: string }): Promise<void>;
   approveIncoming(options: { requestId: string; accepted: boolean; transfer?: PeerTransfer }): Promise<void>;
   completeIncoming(options: { requestId: string; committed: boolean; error?: string }): Promise<void>;
-  saveRecoveryPoint(options: { bundleJson: string; sourceName: string; sourceDeviceId: string; summary: PeerSnapshotSummary }): Promise<RecoveryPoint>;
+  saveRecoveryPoint(options: { bundleJson: string; sourceName: string; sourceDeviceId: string; sourceModel: string; summary: PeerSnapshotSummary }): Promise<RecoveryPoint>;
   listRecoveryPoints(): Promise<{ points: RecoveryPoint[] }>;
   readRecoveryPoint(options: { id: string }): Promise<{ point: RecoveryPoint; bundleJson: string }>;
   addListener(eventName: 'peerFound', listener: (event: PeerDevice) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'peerLost', listener: (event: { deviceId: string }) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'incomingRequest', listener: (event: IncomingRequestEvent) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'incomingSnapshot', listener: (event: IncomingSnapshotEvent) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: 'incomingPairRequest', listener: (event: IncomingPairRequestEvent) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: 'pairingChanged', listener: (event: { deviceId: string; paired: boolean; pairedDevice?: PairedDevice }) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'hostingChanged', listener: (event: Omit<HostingInfo, 'qrUri'>) => void): Promise<PluginListenerHandle>;
 }
 
@@ -94,7 +128,9 @@ const discoverable = shallowRef(localStorage.getItem(DISCOVERABLE_KEY) === 'true
 const searching = shallowRef(localStorage.getItem(SEARCHING_KEY) === 'true');
 const foreground = shallowRef(true);
 const hostingInfo = shallowRef<HostingInfo | null>(null);
+const localDeviceInfo = shallowRef<LocalDeviceInfo | null>(null);
 const peers = shallowRef<PeerDevice[]>([]);
+const pairedDevices = shallowRef<PairedDevice[]>([]);
 const recoveryPoints = shallowRef<RecoveryPoint[]>([]);
 const pendingPeerTarget = shallowRef<PeerConnectTarget | null>(null);
 const statusMessage = shallowRef('');
@@ -102,6 +138,7 @@ const busy = shallowRef(false);
 const searchRevision = shallowRef(0);
 const successRevision = shallowRef(0);
 const peerRevision = shallowRef(0);
+const pairingRevision = shallowRef(0);
 const listeners: PluginListenerHandle[] = [];
 let initialized = false;
 let localDeviceId = '';
@@ -112,7 +149,9 @@ export const deviceSyncState = {
   searching: readonly(searching),
   foreground: readonly(foreground),
   hostingInfo: readonly(hostingInfo),
+  localDeviceInfo: readonly(localDeviceInfo),
   peers: readonly(peers),
+  pairedDevices: readonly(pairedDevices),
   recoveryPoints: readonly(recoveryPoints),
   pendingPeerTarget: readonly(pendingPeerTarget),
   statusMessage: readonly(statusMessage),
@@ -120,11 +159,13 @@ export const deviceSyncState = {
   searchRevision: readonly(searchRevision),
   successRevision: readonly(successRevision),
   peerRevision: readonly(peerRevision),
+  pairingRevision: readonly(pairingRevision),
 };
 
 function normalizePeer(peer: PeerDevice): PeerDevice {
   return {
     ...peer,
+    model: peer.model || peer.name || 'Android 设备',
     port: Number(peer.port),
     online: peer.online !== false,
     lastSeenAt: peer.lastSeenAt || new Date().toISOString(),
@@ -185,7 +226,7 @@ async function startHostingIfNeeded() {
   const info = await NativeDeviceSync.startHosting({
     deviceId: await ensureIdentity(),
     appVersion: APP_VERSION,
-    protocolVersion: 1,
+    protocolVersion: PEER_PROTOCOL_VERSION,
   });
   hostingInfo.value = withQr(info);
 }
@@ -204,10 +245,12 @@ async function applyIncomingTransfer(
   const wasRecoveryRequired = useAppStore().recoveryRequired;
   if (!wasRecoveryRequired) {
     const recovery = await exportLocalPeerRecoveryPoint();
+    const local = localDeviceInfo.value;
     await NativeDeviceSync.saveRecoveryPoint({
       bundleJson: recovery.bundleJson,
-      sourceName: source.name,
-      sourceDeviceId: source.deviceId,
+      sourceName: local?.name || '本机记录',
+      sourceDeviceId: local?.deviceId || localDeviceId || 'local-device',
+      sourceModel: local?.model || 'Android 设备',
       summary: recovery.transfer.summary,
     });
   }
@@ -218,6 +261,22 @@ async function applyIncomingTransfer(
   statusMessage.value = wasRecoveryRequired
     ? `已用 ${source.name} 的记录完成恢复，电脑同步已暂停`
     : `已接收 ${source.name} 的记录，电脑同步已暂停`;
+}
+
+async function handleIncomingPairRequest(event: IncomingPairRequestEvent) {
+  const accepted = await confirmDialog({
+    title: `与“${event.sourceDevice.name}”配对`,
+    message: '接受后，这两台设备以后传输记录时不再重复输入六位码。',
+    details: ['每次发送或完整替换仍需要目标设备确认', `对方机型：${event.sourceDevice.model || 'Android 设备'}`],
+    confirmLabel: '接受配对',
+    cancelLabel: '拒绝配对',
+    variant: 'warning',
+    explicitDecision: true,
+  });
+  await NativeDeviceSync.approvePairing({ requestId: event.requestId, accepted });
+  statusMessage.value = accepted
+    ? `已接受 ${event.sourceDevice.name} 的配对请求，正在完成确认`
+    : `已拒绝 ${event.sourceDevice.name} 的配对请求`;
 }
 
 async function handleIncomingRequest(event: IncomingRequestEvent) {
@@ -296,11 +355,17 @@ async function applyLifecycle() {
 export async function initializeDeviceSync(onPeerLink?: () => void) {
   if (initialized || !nativeSupported) return;
   initialized = true;
+  localDeviceInfo.value = await NativeDeviceSync.configureIdentity({
+    deviceId: await ensureIdentity(),
+    appVersion: APP_VERSION,
+  });
   listeners.push(
     await NativeDeviceSync.addListener('peerFound', rememberPeer),
     await NativeDeviceSync.addListener('peerLost', ({ deviceId }) => markPeerLost(deviceId)),
     await NativeDeviceSync.addListener('incomingRequest', (event) => { void handleIncomingRequest(event); }),
     await NativeDeviceSync.addListener('incomingSnapshot', (event) => { void handleIncomingSnapshot(event); }),
+    await NativeDeviceSync.addListener('incomingPairRequest', (event) => { void handleIncomingPairRequest(event); }),
+    await NativeDeviceSync.addListener('pairingChanged', () => { void refreshPairedDevices(); }),
     await NativeDeviceSync.addListener('hostingChanged', (event) => { hostingInfo.value = withQr(event); }),
     await CapApp.addListener('appStateChange', ({ isActive }) => {
       foreground.value = isActive;
@@ -324,6 +389,7 @@ export async function initializeDeviceSync(onPeerLink?: () => void) {
       // Ignore unrelated launch URLs.
     }
   }
+  await refreshPairedDevices();
   await refreshRecoveryPoints();
   await applyLifecycle();
 }
@@ -360,7 +426,52 @@ export function clearPendingPeerTarget() {
   pendingPeerTarget.value = null;
 }
 
-export async function sendRecordsToPeer(peer: PeerDevice, pairingCode: string) {
+export async function refreshPairedDevices() {
+  if (!nativeSupported) return;
+  const result = await NativeDeviceSync.listPairedDevices();
+  pairedDevices.value = (result.devices || []).map((device) => ({
+    ...device,
+    accentIndex: Math.max(0, Math.min(5, Number(device.accentIndex) || 0)),
+  }));
+  pairingRevision.value += 1;
+}
+
+export async function pairWithPeer(peer: PeerDevice, pairingCode: string) {
+  if (!/^\d{6}$/.test(pairingCode)) throw new Error('PAIRING_CODE_INVALID');
+  busy.value = true;
+  statusMessage.value = `等待 ${peer.name} 接受配对`;
+  try {
+    await NativeDeviceSync.requestPairing({ peer, pairingCode });
+    await refreshPairedDevices();
+    successRevision.value += 1;
+    statusMessage.value = `已与 ${peer.name} 配对`;
+    return true;
+  } finally {
+    busy.value = false;
+  }
+}
+
+export async function scanPeerPairingQr(): Promise<PeerConnectTarget | null> {
+  const result = await NativeDeviceSync.scanPeerQr();
+  if (result.cancelled || !result.value) return null;
+  return parsePeerConnectUri(result.value);
+}
+
+export async function forgetPeerPairing(peer: Pick<PeerDevice, 'deviceId' | 'name'>) {
+  const accepted = await confirmDialog({
+    title: `解除与“${peer.name}”的配对`,
+    message: '解除后，下次传输前需要重新输入六位码或扫描二维码。',
+    confirmLabel: '解除配对',
+    variant: 'danger',
+  });
+  if (!accepted) return false;
+  await NativeDeviceSync.forgetPairing({ deviceId: peer.deviceId });
+  await refreshPairedDevices();
+  statusMessage.value = `已解除与 ${peer.name} 的配对`;
+  return true;
+}
+
+export async function sendRecordsToPeer(peer: PeerDevice) {
   const accepted = await confirmDialog({
     title: `向“${peer.name}”发送本机记录`,
     message: '对方确认后，其现有记录会被完整替换。本机记录不会改变。',
@@ -372,16 +483,19 @@ export async function sendRecordsToPeer(peer: PeerDevice, pairingCode: string) {
   statusMessage.value = `等待 ${peer.name} 确认接收`;
   try {
     const transfer = await exportLocalPeerTransfer();
-    await NativeDeviceSync.push({ peer, pairingCode, transfer });
+    await NativeDeviceSync.push({ peer, transfer });
     successRevision.value += 1;
     statusMessage.value = `已将记录发送给 ${peer.name}`;
     return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('PAIRING')) await refreshPairedDevices();
+    throw error;
   } finally {
     busy.value = false;
   }
 }
 
-export async function receiveRecordsFromPeer(peer: PeerDevice, pairingCode: string) {
+export async function receiveRecordsFromPeer(peer: PeerDevice) {
   const accepted = await confirmDialog({
     title: `接收“${peer.name}”的完整记录`,
     message: '本机任务、打卡、计时和训练记录会被对方记录完整替换。',
@@ -394,7 +508,7 @@ export async function receiveRecordsFromPeer(peer: PeerDevice, pairingCode: stri
   statusMessage.value = `等待 ${peer.name} 确认发送`;
   let requestId = '';
   try {
-    const result = await NativeDeviceSync.pull({ peer, pairingCode });
+    const result = await NativeDeviceSync.pull({ peer });
     requestId = result.requestId;
     await applyIncomingTransfer(result.transfer, peer);
     await NativeDeviceSync.completePull({ requestId, committed: true });
@@ -405,6 +519,7 @@ export async function receiveRecordsFromPeer(peer: PeerDevice, pairingCode: stri
       await NativeDeviceSync.completePull({ requestId, committed: false, error: message });
     }
     statusMessage.value = '接收失败，本机原记录已保留';
+    if (error instanceof Error && error.message.includes('PAIRING')) await refreshPairedDevices();
     throw error;
   } finally {
     busy.value = false;
@@ -431,8 +546,9 @@ export async function restoreRecoveryPoint(point: RecoveryPoint) {
       const current = await exportLocalPeerRecoveryPoint();
       await NativeDeviceSync.saveRecoveryPoint({
         bundleJson: current.bundleJson,
-        sourceName: '恢复前的本机记录',
-        sourceDeviceId: localDeviceId || 'local-device',
+        sourceName: localDeviceInfo.value?.name || '恢复前的本机记录',
+        sourceDeviceId: localDeviceInfo.value?.deviceId || localDeviceId || 'local-device',
+        sourceModel: localDeviceInfo.value?.model || 'Android 设备',
         summary: current.transfer.summary,
       });
     }
@@ -454,6 +570,7 @@ export function peerFromTarget(target: PeerConnectTarget, name = '手动连接�
   return {
     deviceId: target.deviceId || `manual-${target.host}-${target.port}`,
     name,
+    model: name,
     host: target.host,
     port: target.port,
     platform: 'Android',

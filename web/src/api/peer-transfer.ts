@@ -1,6 +1,6 @@
 import { validateDomainState, type StorageEnvelopeV3 } from '../domain/v3.ts';
 
-export const PEER_PROTOCOL_VERSION = 1 as const;
+export const PEER_PROTOCOL_VERSION = 2 as const;
 export const PEER_TRANSFER_FORMAT_VERSION = 1 as const;
 export const MAX_PEER_SNAPSHOT_BYTES = 8 * 1024 * 1024;
 

@@ -6,14 +6,14 @@
 
 产品介绍页：[https://alexued.github.io/kaogong-checkin/](https://alexued.github.io/kaogong-checkin/)
 
-测试报告：[报告目录](https://alexued.github.io/kaogong-checkin/reports/) · [v0.14.0 Android 与 Windows 发布验收](https://alexued.github.io/kaogong-checkin/reports/v0.14.0/TEST-REPORT.md)
+测试报告：[报告目录](https://alexued.github.io/kaogong-checkin/reports/) · [v0.15.0 Android 与 Windows 发布验收](https://alexued.github.io/kaogong-checkin/reports/v0.15.0/TEST-REPORT.md)
 
 ## 下载
 
 | 平台 | 文件 | 大小 | 系统要求 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| Android | [kaogong-checkin-v0.14.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.14.0/kaogong-checkin-v0.14.0.apk) | 47.59 MiB | Android 7.0 或更高版本 | 2B8FD60031C241E5C09ED56563354F6FA430E332401815B6E7F0C386CFBC3013 |
-| Windows | [kaogong-checkin-windows-x64-setup-v0.14.0.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.14.0/kaogong-checkin-windows-x64-setup-v0.14.0.exe) | 108.80 MiB | Windows 10/11 x64 | 73BD388210BF32AB3F03D05A61A73AEA6B27DB1B43E9ADE92FF541AA56706AF9 |
+| Android | [kaogong-checkin-v0.15.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.15.0/kaogong-checkin-v0.15.0.apk) | 47.94 MiB | Android 7.0 或更高版本 | 38B99F0D4A577ADBDA3A6A08B0930314907024E3B4BF782C69B16B4F55644DA2 |
+| Windows | [kaogong-checkin-windows-x64-setup-v0.15.0.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.15.0/kaogong-checkin-windows-x64-setup-v0.15.0.exe) | 109.11 MiB | Windows 10/11 x64 | 8A9243EC786D420FE03EA5B42D6DDADAEA37FD73CAA27071D60F07EF22F47EA0 |
 
 本项目目前没有代码签名证书。首次运行 Windows 安装程序时，SmartScreen 可能显示“Windows 已保护你的电脑”。确认文件来自本仓库发布页并核对 SHA-256 后，可点击“更多信息”继续运行。
 
@@ -55,8 +55,8 @@ Windows 电脑伴侣还会显示一个局域网二维码。手机扫码后可以
 PowerShell：
 
 ```powershell
-Get-FileHash .\kaogong-checkin-v0.14.0.apk -Algorithm SHA256
-Get-FileHash .\kaogong-checkin-windows-x64-setup-v0.14.0.exe -Algorithm SHA256
+Get-FileHash .\kaogong-checkin-v0.15.0.apk -Algorithm SHA256
+Get-FileHash .\kaogong-checkin-windows-x64-setup-v0.15.0.exe -Algorithm SHA256
 ```
 
 输出应与发布页和上方下载表一致。

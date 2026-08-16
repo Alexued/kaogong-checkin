@@ -1,8 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { importTypeScript } from './import-typescript.mjs';
 
 const { positionTaskMenu } = await importTypeScript(new URL('../src/lib/taskMenu.ts', import.meta.url));
+const [taskCard, taskMenu, todayView] = await Promise.all([
+  readFile(new URL('../src/components/TaskCard.vue', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/TaskContextMenu.vue', import.meta.url), 'utf8'),
+  readFile(new URL('../src/views/TodayView.vue', import.meta.url), 'utf8'),
+]);
 const viewport = { width: 375, height: 812 };
 const menu = { width: 216, height: 240 };
 
@@ -33,4 +39,15 @@ test('task menu honors a shifted visual viewport', () => {
   assert.ok(position.y >= 52);
   assert.ok(position.x + menu.width <= 338);
   assert.ok(position.y + menu.height <= 594);
+});
+
+test('task stays lifted through menu exit and settles only after leave completes', () => {
+  assert.match(taskCard, /menuActive\?: boolean/);
+  assert.match(taskCard, /longPressActive\.value \|\| props\.menuActive/);
+  assert.doesNotMatch(taskCard, /releaseTimer/);
+  assert.match(taskCard, /transform 320ms cubic-bezier\(0\.22, 0\.61, 0\.36, 1\)/);
+  assert.match(taskMenu, /@after-leave="emit\('after-leave'\)"/);
+  assert.match(todayView, /liftedTaskId/);
+  assert.match(todayView, /function onTaskMenuAfterLeave\(\)[\s\S]*liftedTaskId\.value = null/);
+  assert.match(todayView, /pendingMenuAction/);
 });

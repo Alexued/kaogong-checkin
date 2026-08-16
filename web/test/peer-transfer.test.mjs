@@ -74,7 +74,7 @@ test('manual address and QR deep link parsing reject ambiguous endpoints', () =>
     deviceId: 'device-test-1234',
     sessionId: 'session-test-5678',
   });
-  assert.throws(() => parsePeerConnectUri(uri.replace('v=1', 'v=2')), /UNSUPPORTED_PEER_PROTOCOL/);
+  assert.throws(() => parsePeerConnectUri(uri.replace('v=2', 'v=1')), /UNSUPPORTED_PEER_PROTOCOL/);
   assert.throws(() => parsePeerConnectUri(uri.replace('code=042913', 'code=123')), /INVALID_PAIRING_CODE/);
 });
 
