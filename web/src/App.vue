@@ -1,28 +1,35 @@
 <template>
-  <!-- 4 个 Tab 页常驻轨道，ViewPager 式滑动切换（只挂载一次，不卸载） -->
-  <div v-show="!isSecondary" class="swipe-stage" :class="shellClass">
-    <div class="swipe-track" :style="trackStyle">
-      <div
-        v-for="(p, index) in tabPages"
-        :key="p.path"
-        class="swipe-page"
-        :inert="!isActiveRootPage(p.path)"
-        :aria-hidden="isActiveRootPage(p.path) ? undefined : 'true'"
-      >
-        <div class="swipe-page-content" :style="pageStyle(index)">
-          <component :is="p.component" />
+  <main class="route-shell">
+    <!-- 4 个 Tab 页常驻轨道，进入二级页时仅隐藏，保留滚动与计时状态。 -->
+    <Transition name="root-depth">
+      <div v-show="!isSecondary" class="swipe-stage route-layer" :class="shellClass">
+        <div class="swipe-track" :style="trackStyle">
+          <div
+            v-for="(p, index) in tabPages"
+            :key="p.path"
+            class="swipe-page"
+            :inert="!isActiveRootPage(p.path)"
+            :aria-hidden="isActiveRootPage(p.path) ? undefined : 'true'"
+          >
+            <div class="swipe-page-content" :style="pageStyle(index)">
+              <component :is="p.component" />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-  <!-- 二级页（任务管理 / 计时历史 / 日期详情）走 router-view -->
-  <div v-if="isSecondary" class="page-layer" :class="shellClass">
-    <router-view v-slot="{ Component }">
-      <transition name="fade-slide" mode="out-in">
-        <component :is="Component" />
-      </transition>
-    </router-view>
-  </div>
+    </Transition>
+
+    <!-- 所有二级页共享深度过渡；fullPath 确保复用组件的二级路由也能动画。 -->
+    <Transition name="secondary-depth">
+      <div v-if="isSecondary" class="page-layer route-layer" :class="shellClass">
+        <router-view v-slot="{ Component, route: resolvedRoute }">
+          <Transition name="fade-slide" mode="out-in">
+            <component :is="Component" :key="resolvedRoute.fullPath" />
+          </Transition>
+        </router-view>
+      </div>
+    </Transition>
+  </main>
   <TabBar :class="shellClass" :indicator-style="isSecondary ? undefined : tabIndicatorStyle" />
   <LaunchIntro v-if="showLaunch" @done="finishLaunch" />
   <AppDialogHost />

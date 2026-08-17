@@ -49,7 +49,7 @@
         step.classList.toggle('is-current-step', index === steps.length - 1);
       });
       steps.at(-1)?.setAttribute('aria-current', 'step');
-      output.textContent = '发现局域网更新 v0.15.0，等待用户确认下载';
+      output.textContent = '发现局域网更新 v0.15.1，等待用户确认下载';
       run.disabled = false;
       run.setAttribute('aria-busy', 'false');
       return;
@@ -63,7 +63,7 @@
           if (itemIndex === index) item.setAttribute('aria-current', 'step');
           else item.removeAttribute('aria-current');
         });
-        output.textContent = index === steps.length - 1 ? '发现局域网更新 v0.15.0，等待用户确认下载' : `步骤 ${String(index + 1).padStart(2, '0')} 已完成`;
+        output.textContent = index === steps.length - 1 ? '发现局域网更新 v0.15.1，等待用户确认下载' : `步骤 ${String(index + 1).padStart(2, '0')} 已完成`;
         if (index === steps.length - 1) {
           run.disabled = false;
           run.setAttribute('aria-busy', 'false');

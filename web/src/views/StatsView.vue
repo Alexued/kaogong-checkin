@@ -39,19 +39,34 @@
 
     <div class="overview-grid">
       <section class="card section-panel heatmap-panel" style="--enter-order: 1">
-        <div class="panel-head">
+        <button
+          type="button"
+          class="panel-head heatmap-toggle"
+          :aria-expanded="heatmapExpanded"
+          aria-controls="monthly-completion-heatmap"
+          @click="heatmapExpanded = !heatmapExpanded"
+        >
           <div>
             <h2>月度完成</h2>
             <p>{{ monthRecordedCount }} 个记录日</p>
           </div>
+          <span class="heatmap-chevron" aria-hidden="true"></span>
+        </button>
+        <div
+          id="monthly-completion-heatmap"
+          class="heatmap-collapse"
+          :class="{ expanded: heatmapExpanded }"
+        >
+          <div class="heatmap-collapse-inner" :inert="!heatmapExpanded">
+            <MonthlyHeatmap
+              :model="month"
+              :can-go-next="month.month < today.slice(0, 7)"
+              @previous="visibleMonth = month.previousMonth"
+              @next="visibleMonth = month.nextMonth"
+              @select="goDay"
+            />
+          </div>
         </div>
-        <MonthlyHeatmap
-          :model="month"
-          :can-go-next="month.month < today.slice(0, 7)"
-          @previous="visibleMonth = month.previousMonth"
-          @next="visibleMonth = month.nextMonth"
-          @select="goDay"
-        />
       </section>
 
       <section class="card section-panel rate-panel" style="--enter-order: 2">
@@ -142,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BarChart, { type ChartBar } from '../components/BarChart.vue';
 import MonthlyHeatmap from '../components/MonthlyHeatmap.vue';
@@ -168,6 +183,8 @@ const router = useRouter();
 const route = useRoute();
 const today = todayStr();
 const visibleMonth = ref(today.slice(0, 7));
+const HEATMAP_EXPANDED_KEY = 'kgc-stats-heatmap-expanded';
+const heatmapExpanded = ref(readHeatmapPreference());
 const isGeneral = computed(() => store.settings.appMode === 'general');
 const capabilityMetrics = computed(() => buildCapabilityMetrics({
   mode: store.settings.appMode,
@@ -242,6 +259,22 @@ const recordDays = computed(() => recentRecordDays(
   today,
   planEndDate.value,
 ));
+
+watch(heatmapExpanded, (expanded) => {
+  try {
+    localStorage.setItem(HEATMAP_EXPANDED_KEY, String(expanded));
+  } catch {
+    // Private browsing or a full storage quota should not block the panel.
+  }
+});
+
+function readHeatmapPreference(): boolean {
+  try {
+    return localStorage.getItem(HEATMAP_EXPANDED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 function goDay(date: string) {
   router.push(`${route.path === '/drill' ? '/review/day' : '/stats/day'}/${date}`);
@@ -354,6 +387,65 @@ function recordSummary(day: RecordDay): string {
 
 .heatmap-panel {
   padding-inline: 12px;
+}
+
+.heatmap-toggle {
+  width: 100%;
+  border: 0;
+  margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  touch-action: manipulation;
+}
+
+.heatmap-toggle:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--accent-solid);
+  outline-offset: 3px;
+}
+
+.heatmap-chevron {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin: 7px 7px 0 0;
+  border-inline-end: 2px solid var(--text-3);
+  border-block-end: 2px solid var(--text-3);
+  transform: rotate(45deg);
+  transition: transform 320ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.heatmap-toggle[aria-expanded='true'] .heatmap-chevron {
+  transform: translateY(4px) rotate(225deg);
+}
+
+.heatmap-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.heatmap-collapse.expanded {
+  grid-template-rows: 1fr;
+}
+
+.heatmap-collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity 220ms ease,
+    transform 320ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.heatmap-collapse.expanded .heatmap-collapse-inner {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .panel-head,
@@ -591,5 +683,8 @@ function recordSummary(day: RecordDay): string {
   .summary-strip,
   .section-panel { animation: none; }
   .record-row { transition-duration: .01ms; }
+  .heatmap-chevron,
+  .heatmap-collapse,
+  .heatmap-collapse-inner { transition-duration: .01ms; }
 }
 </style>

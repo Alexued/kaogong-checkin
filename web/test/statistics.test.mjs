@@ -245,3 +245,14 @@ test('statistics components keep accessible, stable, responsive chart geometry',
   assert.match(statsViewSource, /@media \(max-height: 420px\) and \(orientation: landscape\)/);
   assert.match(statsViewSource, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+test('monthly heatmap is collapsible, keyboard-safe, persistent, and animated', () => {
+  assert.match(statsViewSource, /aria-expanded="heatmapExpanded"/);
+  assert.match(statsViewSource, /aria-controls="monthly-completion-heatmap"/);
+  assert.match(statsViewSource, /:inert="!heatmapExpanded"/);
+  assert.match(statsViewSource, /kgc-stats-heatmap-expanded/);
+  assert.match(statsViewSource, /localStorage\.setItem\(HEATMAP_EXPANDED_KEY/);
+  assert.match(statsViewSource, /grid-template-rows: 0fr/);
+  assert.match(statsViewSource, /grid-template-rows: 1fr/);
+  assert.match(statsViewSource, /heatmap-collapse-inner[\s\S]+opacity: 0/);
+});

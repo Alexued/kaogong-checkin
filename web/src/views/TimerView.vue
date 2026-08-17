@@ -3,13 +3,17 @@
     <div class="timer-heading">
       <h1 class="sr-only">计时</h1>
       <div class="timer-mode" role="tablist" aria-label="计时模式">
-        <button type="button" :class="{ on: mode === 'stopwatch' }" :disabled="sessionActive" @click="mode = 'stopwatch'">计时</button>
-        <button type="button" :class="{ on: mode === 'countdown' }" :disabled="sessionActive" @click="mode = 'countdown'">倒计时</button>
-        <button type="button" :class="{ on: mode === 'pomodoro' }" :disabled="sessionActive" @click="mode = 'pomodoro'">番茄钟</button>
+        <span class="timer-mode-indicator" :style="{ transform: `translateX(${modeIndex * 100}%)` }" aria-hidden="true"></span>
+        <button type="button" role="tab" :aria-selected="mode === 'stopwatch'" :class="{ on: mode === 'stopwatch' }" :disabled="sessionActive" @click="setMode('stopwatch')">计时</button>
+        <button type="button" role="tab" :aria-selected="mode === 'countdown'" :class="{ on: mode === 'countdown' }" :disabled="sessionActive" @click="setMode('countdown')">倒计时</button>
+        <button type="button" role="tab" :aria-selected="mode === 'pomodoro'" :class="{ on: mode === 'pomodoro' }" :disabled="sessionActive" @click="setMode('pomodoro')">番茄钟</button>
       </div>
     </div>
 
-    <div class="timer-stage" :class="{ 'stopwatch-session': mode === 'stopwatch' && sessionActive }">
+    <div class="timer-mode-viewport" :class="modeDirection > 0 ? 'mode-forward' : 'mode-backward'">
+      <Transition name="timer-mode-view">
+        <div :key="mode" class="timer-mode-view">
+          <div class="timer-stage" :class="{ 'stopwatch-session': mode === 'stopwatch' && sessionActive }">
       <div v-if="mode === 'pomodoro'" class="pomodoro-stage">
         <div class="pomo-meta">
           <span>{{ pomoStageLabel }}</span>
@@ -60,9 +64,9 @@
         </div>
       </div>
       </template>
-    </div>
+          </div>
 
-    <div class="controls" data-testid="timer-controls">
+          <div class="controls" data-testid="timer-controls">
       <template v-if="mode === 'pomodoro'">
         <button v-if="pomodoro.stage !== 'focus' && !pomodoro.startedAt" class="round-btn sub stop" @click="skipPomodoroBreak"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 5 8 7-8 7z"/><path d="M18 5v14"/></svg><span>跳过</span></button>
         <button v-if="!pomodoro.startedAt" class="round-btn main start" @click="startPomodoro"><svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg><span>开始{{ pomoStageLabel }}</span></button>
@@ -81,6 +85,9 @@
         <button v-if="mode === 'stopwatch'" class="round-btn lap" :disabled="!sw.running" @click="sw.lap"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg><span>打点</span></button>
       </template>
       </template>
+          </div>
+        </div>
+      </Transition>
     </div>
 
     <router-link to="/timer/history" class="card history-entry"><span class="he-label">历史记录</span><span class="he-count">{{ recordsCount }} 条</span><span class="he-arrow">›</span></router-link>
@@ -132,6 +139,8 @@ const mode = ref<'stopwatch' | 'countdown' | 'pomodoro'>(pomodoro.startedAt ? 'p
 const countdownMinutes = ref(25);
 const countdownSeconds = ref(0);
 const presets = [5, 15, 25];
+const MODE_ORDER = ['stopwatch', 'countdown', 'pomodoro'] as const;
+const modeDirection = ref(1);
 const RING_LENGTH = 2 * Math.PI * 98;
 const sessionActive = computed(() => mode.value === 'pomodoro' ? !!pomodoro.startedAt : mode.value === 'countdown' ? !!countdown.startedAt : !!sw.startedAt);
 const isRunning = computed(() => mode.value === 'pomodoro' ? pomodoro.running : mode.value === 'countdown' ? countdown.running : sw.running);
@@ -158,6 +167,7 @@ const wheelSuffix = computed(() => wheelKind.value === 'every' ? '轮' : '分钟
 const wheelMin = computed(() => wheelKind.value === 'every' ? 2 : 1);
 const wheelMax = computed(() => wheelKind.value === 'focus' ? 180 : wheelKind.value === 'short' ? 60 : wheelKind.value === 'long' ? 120 : 12);
 const wheelPad = computed(() => wheelKind.value === 'every' ? 1 : 2);
+const modeIndex = computed(() => MODE_ORDER.indexOf(mode.value));
 const wheelValue = computed({
   get: () => ({ focus: focusMinutes.value, short: shortBreakMinutes.value, long: longBreakMinutes.value, every: longBreakEvery.value }[wheelKind.value]),
   set: (value: number) => applyWheelValue(value),
@@ -197,6 +207,11 @@ function pause() { if (mode.value === 'countdown') countdown.pause(); else sw.pa
 function resume() { if (mode.value === 'countdown') countdown.resume(); else sw.resume(); cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); }
 function beginFinish() { if (mode.value === 'countdown') countdown.pause(); else sw.pause(); cancelAnimationFrame(raf); tick(); finishing.value = true; }
 function setPreset(minutes: number) { countdownMinutes.value = minutes; countdownSeconds.value = 0; }
+function setMode(nextMode: typeof mode.value) {
+  if (sessionActive.value || mode.value === nextMode) return;
+  modeDirection.value = MODE_ORDER.indexOf(nextMode) >= MODE_ORDER.indexOf(mode.value) ? 1 : -1;
+  mode.value = nextMode;
+}
 function openWheel(kind: typeof wheelKind.value) { wheelKind.value = kind; wheelOpen.value = true; }
 function applyWheelValue(value: number) {
   if (wheelKind.value === 'focus') focusMinutes.value = value;
@@ -284,10 +299,19 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 .timer-page { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; }
 .timer-heading { display: flex; align-items: center; justify-content: flex-start; min-height: 44px; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-.timer-mode { display: flex; gap: 3px; padding: 3px; border-radius: 12px; background: var(--accent-soft); }
-.timer-mode button { min-width: 44px; min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--text-2); padding: 7px 10px; font-size: 12px; font-weight: 700; }
-.timer-mode button.on { background: var(--card); color: var(--accent-solid); box-shadow: var(--shadow); }
+.timer-mode { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; width: min(100%, 280px); padding: 3px; border-radius: 12px; background: var(--accent-soft); isolation: isolate; }
+.timer-mode-indicator { position: absolute; z-index: -1; inset: 3px auto 3px 3px; width: calc((100% - 6px) / 3); border-radius: 9px; background: var(--card); box-shadow: var(--shadow); transition: transform 320ms cubic-bezier(.22,1,.36,1); }
+.timer-mode button { position: relative; z-index: 1; min-width: 0; min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--text-2); padding: 7px 8px; font-size: 12px; font-weight: 700; }
+.timer-mode button.on { color: var(--accent-solid); }
 .timer-mode button:disabled { opacity: .65; }
+.timer-mode-viewport { position: relative; flex: 1 1 0; min-height: 0; overflow: hidden; }
+.timer-mode-view { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
+.timer-mode-view-enter-active,
+.timer-mode-view-leave-active { transition: opacity 320ms cubic-bezier(.22,1,.36,1), transform 320ms cubic-bezier(.22,1,.36,1); will-change: transform, opacity; }
+.timer-mode-view-enter-from { opacity: 0; transform: translateX(var(--mode-enter-x, 18px)) scale(.985); }
+.timer-mode-view-leave-to { opacity: 0; transform: translateX(var(--mode-leave-x, -12px)) scale(.99); pointer-events: none; }
+.mode-forward { --mode-enter-x: 18px; --mode-leave-x: -12px; }
+.mode-backward { --mode-enter-x: -18px; --mode-leave-x: 12px; }
 .timer-stage { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; padding: 12px 0; }
 .timer-stage.stopwatch-session { justify-content: flex-start; gap: 12px; padding: 8px 0 4px; }
 .countdown-clock-wrap { position: relative; display: grid; place-items: center; width: min(78vw, 300px); aspect-ratio: 1; margin: 0 auto; }
@@ -305,20 +329,22 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 .countdown-setup { display: grid; gap: 18px; place-items: center; }.preset-row { display: flex; gap: 8px; }.preset-row button { min-height: 44px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--card); color: var(--text-2); padding: 8px 12px; font-size: 12px; }.duration-wheels { display: grid; grid-template-columns: minmax(88px, 130px) auto minmax(88px, 130px); align-items: center; gap: 6px; }.duration-wheels :deep(.wheel-field) { width: 100%; }.duration-colon { margin-top: 22px; font-size: 28px; color: var(--text-3); }
 .pomodoro-stage { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; }.pomo-meta { width:min(78vw,300px); display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; color:var(--text-2); font-size:13px; font-weight:750; }.pomo-meta small { text-align:right; color:var(--text-3); }.pomo-dots { display:flex; gap:5px; }.pomo-dots i { width:8px; height:8px; border-radius:2px; background:var(--card-border); }.pomo-dots i.on { background:var(--accent-solid); }.pomo-settings { width:min(100%,430px); display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:10px; }.pomo-setting-button { min-width:0; min-height:76px; display:grid; align-content:center; gap:5px; border:1px solid var(--card-border); border-radius:8px; background:var(--bg-elev); color:var(--text-2); text-align:left; padding:9px; }.pomo-setting-button span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }.pomo-setting-button strong { color:var(--text); font-size:18px; font-variant-numeric:tabular-nums; }.pomo-setting-button small { margin-left:3px; color:var(--text-3); font-size:10px; font-weight:600; }.pomo-setting-button:active { border-color:var(--accent-solid); background:var(--accent-soft); }.pomo-settings .pomo-task { grid-column:1/-1; display:block; }.pomo-task .input { width:100%; margin-top:3px; font-size:12px; padding:7px 9px; }.pomo-complete-sheet { text-align:center; }.pomo-complete-sheet h2 { margin:12px 0 7px; font-size:22px; }.pomo-complete-sheet p { color:var(--text-2); font-size:13px; line-height:1.6; }.pomo-complete-sheet .btn { width:100%; margin-top:8px; }
 .laps-area { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; width: 100%; max-width: 420px; margin: 0 auto; overflow: hidden; border: 1px solid var(--card-border); border-radius: 12px; background: var(--card); }.laps-head { flex: 0 0 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 2px; }.laps-title { font-size: 13px; font-weight: 700; color: var(--text-3); }.font-ctl { display: flex; gap: 6px; }.font-btn { border: 1px solid var(--card-border); background: var(--card); color: var(--text-2); border-radius: 9px; padding: 3px 10px; font-size: 13px; font-weight: 700; }.font-btn:disabled { opacity: .4; }.laps-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }.laps-empty { display: grid; place-items: center; height: 100%; color: var(--text-3); font-size: 16px; }.lap { display: flex; align-items: center; gap: 14px; min-height: calc(1.7em + 12px); flex: 0 0 calc(1.7em + 12px); padding: 6px 8px; font-variant-numeric: tabular-nums; }.lap-no { width: 1.7em; height: 1.7em; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: .78em; font-weight: 800; flex: none; }.lap-split { font-weight: 700; flex: 1; }.lap-elapsed { color: var(--text-2); }
-.controls { flex: 0 0 auto; min-height: 116px; display: flex; justify-content: center; align-items: center; gap: 24px; padding: 10px 0 18px; }.round-btn { border: none; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; cursor: pointer; transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }.round-btn span { font-size: 12px; font-weight: 700; }.round-btn:active { transform: scale(.92); }.round-btn:disabled { opacity: .45; }.round-btn.main { width: 96px; height: 96px; }.round-btn.lap { width: 80px; height: 80px; background: linear-gradient(135deg,#3b82f6,#6366f1); box-shadow: 0 8px 24px rgba(59,130,246,.35); }.round-btn.sub { width: 64px; height: 64px; }.round-btn.start { background: linear-gradient(135deg,#34d399,#10b981); box-shadow: 0 10px 30px rgba(16,185,129,.45); }.round-btn.pause { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 10px 30px rgba(245,158,11,.45); }.round-btn.stop { background: linear-gradient(135deg,#f87171,#64748b); box-shadow: 0 6px 18px rgba(100,116,139,.35); }
+.controls { flex: 0 0 auto; min-height: 116px; display: flex; justify-content: center; align-items: center; gap: clamp(12px, 5vw, 24px); padding: 10px 0 18px; }.round-btn { flex: 0 0 auto; aspect-ratio: 1; box-sizing: border-box; border: none; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; cursor: pointer; transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1); }.round-btn span { font-size: 12px; font-weight: 700; }.round-btn:active { transform: scale(.92); }.round-btn:disabled { opacity: .45; }.round-btn.main { width: 96px; min-width: 96px; height: 96px; min-height: 96px; }.round-btn.lap { width: 80px; min-width: 80px; height: 80px; min-height: 80px; background: linear-gradient(135deg,#3b82f6,#6366f1); box-shadow: 0 8px 24px rgba(59,130,246,.35); }.round-btn.sub { width: 64px; min-width: 64px; height: 64px; min-height: 64px; }.round-btn.start { background: linear-gradient(135deg,#34d399,#10b981); box-shadow: 0 10px 30px rgba(16,185,129,.45); }.round-btn.pause { background: linear-gradient(135deg,#fbbf24,#f59e0b); box-shadow: 0 10px 30px rgba(245,158,11,.45); }.round-btn.stop { background: linear-gradient(135deg,#f87171,#64748b); box-shadow: 0 6px 18px rgba(100,116,139,.35); }
 .history-entry { display: flex; align-items: center; gap: 10px; padding: 15px 18px; text-decoration: none; color: var(--text); }.he-label { flex: 1; font-size: 15.5px; font-weight: 600; }.he-count { font-size: 13px; color: var(--text-3); }.he-arrow { font-size: 20px; color: var(--text-3); }
 .sheet-mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; justify-content: center; z-index: 100; }.sheet { width: 100%; max-width: 640px; max-height: 82vh; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); }.sheet-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; color:var(--accent-solid); }.sheet-title { margin: 0; font-size: 18px; color:var(--text); }.field { display: block; margin-bottom: 12px; }.field>span { display:block; font-size:13px; color:var(--text-2); margin-bottom:6px; }.save-summary { font-size:14px; color:var(--text-2); margin-bottom:12px; }.row-end { display:flex; align-items:center; }.row-end .gap { flex:1; }.row-end .btn+.btn { margin-left:8px; }
 .timer-sheet-enter-active,.timer-sheet-leave-active { transition: background-color 260ms cubic-bezier(.22,1,.36,1); }.timer-sheet-enter-active .sheet,.timer-sheet-leave-active .sheet { transition: transform 320ms cubic-bezier(.22,1,.36,1),opacity 240ms ease; }.timer-sheet-enter-from,.timer-sheet-leave-to { background-color: transparent; }.timer-sheet-enter-from .sheet,.timer-sheet-leave-to .sheet { transform: translateY(72px); opacity:0; }
 @media (orientation: landscape) and (max-height: 500px) {
   .timer-page.stopwatch-page-active { display: grid; grid-template-columns: minmax(0,1fr) minmax(272px,300px); grid-template-rows: 44px minmax(0,1fr); column-gap: 12px; }
   .stopwatch-page-active .timer-heading { grid-column: 1 / -1; grid-row: 1; }
-  .stopwatch-page-active .timer-stage { grid-column: 1; grid-row: 2; }
-  .stopwatch-page-active .timer-stage.stopwatch-session { display: grid; grid-template-columns: minmax(210px,.85fr) minmax(250px,1.15fr); align-items: center; gap: 10px; padding: 4px 0; }
+  .stopwatch-page-active .timer-mode-viewport { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: minmax(0,1fr) minmax(272px,300px); column-gap: 12px; }
+  .stopwatch-page-active .timer-mode-view { display: grid; grid-template-columns: minmax(0,1fr) minmax(272px,300px); column-gap: 12px; }
+  .stopwatch-page-active .timer-stage { grid-column: 1; grid-row: 1; }
+  .stopwatch-page-active .timer-stage.stopwatch-session { display: grid; grid-template-columns: minmax(180px,.85fr) minmax(220px,1.15fr); align-items: center; gap: 10px; padding: 4px 0; }
   .stopwatch-page-active .timer-stage.stopwatch-session .stopwatch-clock { width: 100%; height: 94px; }
   .stopwatch-page-active .timer-stage.stopwatch-session .stopwatch-clock .clock { font-size: clamp(34px,5vw,44px); line-height: 1; white-space: nowrap; }
   .stopwatch-page-active .laps-area { width: 100%; height: 100% !important; max-height: 243px; min-height: 0; }
-  .stopwatch-page-active .controls { grid-column: 2; grid-row: 2; align-self: center; min-height: 124px; gap: 12px; padding: 0; }
+  .stopwatch-page-active .controls { grid-column: 2; grid-row: 1; align-self: center; min-height: 124px; gap: 12px; padding: 0; }
   .stopwatch-page-active .history-entry { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .countdown-clock-wrap.completed,.timer-stage.stopwatch-session .stopwatch-clock { animation:none; }.stopwatch-clock { transition-duration:.01ms; }.ring-value { transition-duration:.01ms; }.timer-sheet-enter-active,.timer-sheet-leave-active,.timer-sheet-enter-active .sheet,.timer-sheet-leave-active .sheet { transition-duration:.01ms; } }
+@media (prefers-reduced-motion: reduce) { .countdown-clock-wrap.completed,.timer-stage.stopwatch-session .stopwatch-clock { animation:none; }.stopwatch-clock { transition-duration:.01ms; }.ring-value { transition-duration:.01ms; }.timer-mode-indicator,.timer-mode-view-enter-active,.timer-mode-view-leave-active,.timer-sheet-enter-active,.timer-sheet-leave-active,.timer-sheet-enter-active .sheet,.timer-sheet-leave-active .sheet { transition-duration:.01ms; } }
 </style>

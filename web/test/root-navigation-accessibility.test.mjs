@@ -19,3 +19,10 @@ test('root navigation exposes its current item on root and secondary routes', ()
   assert.match(router, /meta: \{ parentPath: '\/timer', rootTab: '\/timer' \}/);
   assert.match(router, /meta: \{ parentPath: '\/', rootTab: '\/' \}/);
 });
+
+test('root and secondary layers use shared depth transitions without unmounting root tabs', () => {
+  assert.match(app, /<main class="route-shell">/);
+  assert.match(app, /<Transition name="root-depth">[\s\S]*v-show="!isSecondary"/);
+  assert.match(app, /<Transition name="secondary-depth">[\s\S]*v-if="isSecondary"/);
+  assert.match(app, /:key="resolvedRoute\.fullPath"/);
+});
