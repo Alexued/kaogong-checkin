@@ -25,7 +25,7 @@
 | Android 测试版 | [kaogong-checkin-v0.17.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.17.0/kaogong-checkin-v0.17.0.apk) | 52.40 MiB | Android 7.0 或更高版本 | E19363BBFAB75D399266F33C89CE4D63828C82861C5E74C4D8479E911A01C565 |
 | Windows | [kaogong-checkin-windows-x64-setup-v0.15.1.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.15.1/kaogong-checkin-windows-x64-setup-v0.15.1.exe) | 109.11 MiB | Windows 10/11 x64 | 79A5ACB0A93A0B1A425DFF3ACF08CD9574C58D14B22DC592A760B994696C7255 |
 
-Android 0.17.0 为 internal-debug 测试版，已完成真机离线文本兑换链路；双实体手机相机互扫、心愿页窄屏及深色专项仍待补测。Windows 电脑伴侣保持 0.15.1，本次未重新发布。
+Android 0.17.0 为 internal-debug 测试版，已完成真机离线文本兑换链路及宠物目录回归，心愿页320px窄屏和深色浏览器专项已补测；双实体手机相机互扫、正常长时番茄和长期动画性能仍待验收。Windows 电脑伴侣保持 0.15.1，本次未重新发布。
 
 本项目目前没有代码签名证书。首次运行 Windows 安装程序时，SmartScreen 可能显示“Windows 已保护你的电脑”。确认文件来自本仓库发布页并核对 SHA-256 后，可点击“更多信息”继续运行。
 
