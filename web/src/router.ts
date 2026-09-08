@@ -8,6 +8,9 @@ import TasksView from './views/TasksView.vue';
 import StatsView from './views/StatsView.vue';
 import DayDetailView from './views/DayDetailView.vue';
 import SettingsView from './views/SettingsView.vue';
+import PetView from './views/PetView.vue';
+import RewardsView from './views/RewardsView.vue';
+import WishesView from './views/WishesView.vue';
 import { resolveStatsDayNavigation, resolveUnknownRoute } from './lib/routeValidation';
 
 export const router = createRouter({
@@ -21,6 +24,9 @@ export const router = createRouter({
       meta: { parentPath: '/', rootTab: '/' },
     },
     { path: '/timer', name: 'timer', component: TimerView },
+    { path: '/pet', name: 'pet', component: PetView, meta: { parentPath: '/timer', rootTab: '/timer' } },
+    { path: '/rewards', name: 'rewards', component: RewardsView, meta: { parentPath: '/pet', rootTab: '/timer' } },
+    { path: '/wishes', name: 'wishes', component: WishesView, meta: { parentPath: '/rewards', rootTab: '/timer' } },
     {
       path: '/timer/history',
       name: 'timer-history',

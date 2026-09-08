@@ -65,6 +65,10 @@ function isActive(to: string) {
 </script>
 
 <style scoped>
+:global(html.pet-reward-editing .tabbar) {
+  display: none;
+}
+
 .tabbar {
   position: fixed;
   left: 0;

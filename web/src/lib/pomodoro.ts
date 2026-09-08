@@ -15,13 +15,14 @@ interface PersistedPomodoro {
   longBreakMinutes: number;
   longBreakEvery: number;
   taskId: string;
+  testSession: boolean;
 }
 
 const STORAGE_KEY = 'kgc-pomodoro-v1';
 const defaults: PersistedPomodoro = {
   stage: 'focus', running: false, durationMs: 25 * 60_000, remainingAtPauseMs: 25 * 60_000,
   deadlineAt: 0, startedAt: null, focusesCompleted: 0, focusMinutes: 25, shortBreakMinutes: 5,
-  longBreakMinutes: 15, longBreakEvery: 4, taskId: '',
+  longBreakMinutes: 15, longBreakEvery: 4, taskId: '', testSession: false,
 };
 
 function load(): PersistedPomodoro {
@@ -42,7 +43,7 @@ export const pomodoro = reactive({
       remainingAtPauseMs: this.remainingAtPauseMs, deadlineAt: this.deadlineAt,
       startedAt: this.startedAt, focusesCompleted: this.focusesCompleted,
       focusMinutes: this.focusMinutes, shortBreakMinutes: this.shortBreakMinutes,
-      longBreakMinutes: this.longBreakMinutes, longBreakEvery: this.longBreakEvery, taskId: this.taskId,
+      longBreakMinutes: this.longBreakMinutes, longBreakEvery: this.longBreakEvery, taskId: this.taskId, testSession: this.testSession,
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot)); } catch { /* optional cache */ }
   },
@@ -65,10 +66,12 @@ export const pomodoro = reactive({
     this.remainingAtPauseMs = this.durationMs;
     this.persist();
   },
-  start() {
+  start(testSession = false) {
     if (this.running) return;
     if (!this.startedAt) {
+      this.testSession = testSession;
       this.durationMs = this.stageDurationMs();
+      if (this.testSession && this.stage === 'focus') this.durationMs = 5_000;
       this.remainingAtPauseMs = this.durationMs;
       this.startedAt = new Date().toISOString();
     }
@@ -83,7 +86,7 @@ export const pomodoro = reactive({
     this.deadlineAt = 0;
     this.persist();
   },
-  resume() { this.start(); },
+  resume() { this.start(this.testSession); },
   completeStage() {
     const completedStage = this.stage;
     const completed = {
@@ -92,10 +95,13 @@ export const pomodoro = reactive({
       durationMs: this.durationMs,
       taskId: this.taskId || null,
       round: this.focusesCompleted + 1,
+      testSession: this.testSession,
     };
     if (completedStage === 'focus') {
-      this.focusesCompleted += 1;
-      this.stage = this.focusesCompleted % this.longBreakEvery === 0 ? 'longBreak' : 'shortBreak';
+      if (!this.testSession) {
+        this.focusesCompleted += 1;
+        this.stage = this.focusesCompleted % this.longBreakEvery === 0 ? 'longBreak' : 'shortBreak';
+      }
     } else {
       this.stage = 'focus';
     }
@@ -104,16 +110,18 @@ export const pomodoro = reactive({
     this.deadlineAt = 0;
     this.durationMs = this.stageDurationMs();
     this.remainingAtPauseMs = this.durationMs;
+    this.testSession = false;
     this.persist();
     return completed;
   },
   skipBreak() {
     if (this.stage === 'focus') return;
     this.stage = 'focus'; this.running = false; this.startedAt = null; this.deadlineAt = 0;
-    this.durationMs = this.stageDurationMs(); this.remainingAtPauseMs = this.durationMs; this.persist();
+    this.durationMs = this.stageDurationMs(); this.remainingAtPauseMs = this.durationMs; this.testSession = false; this.persist();
   },
   resetCurrent() {
     this.running = false; this.startedAt = null; this.deadlineAt = 0;
+    this.testSession = false;
     this.durationMs = this.stageDurationMs(); this.remainingAtPauseMs = this.durationMs; this.persist();
   },
   resetCycle() {

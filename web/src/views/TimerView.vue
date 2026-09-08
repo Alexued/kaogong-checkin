@@ -1,5 +1,6 @@
 <template>
   <div class="page timer-page" :class="{ 'stopwatch-page-active': mode === 'stopwatch' && sessionActive }">
+    <PetCompanionCard :active="route.path === '/timer'" :running="isRunning" :session-active="sessionActive" />
     <div class="timer-heading">
       <h1 class="sr-only">计时</h1>
       <div class="timer-mode" role="tablist" aria-label="计时模式">
@@ -13,8 +14,9 @@
     <div class="timer-mode-viewport" :class="modeDirection > 0 ? 'mode-forward' : 'mode-backward'">
       <Transition name="timer-mode-view">
         <div :key="mode" class="timer-mode-view">
-          <div class="timer-stage" :class="{ 'stopwatch-session': mode === 'stopwatch' && sessionActive }">
+          <div class="timer-stage" :class="{ 'stopwatch-session': mode === 'stopwatch' && sessionActive, 'pomodoro-scroll': mode === 'pomodoro' }">
       <div v-if="mode === 'pomodoro'" class="pomodoro-stage">
+        <p v-if="pet.shortPomodoro" class="pomo-test-notice" role="status">内部测试：本轮专注为 5 秒，奖励仅进入沙盒，不写学习历史。</p>
         <div class="pomo-meta">
           <span>{{ pomoStageLabel }}</span>
           <div class="pomo-dots" :aria-label="`已完成 ${pomodoro.focusesCompleted} 个番茄`">
@@ -27,7 +29,7 @@
             <circle class="ring-track" cx="110" cy="110" r="98" />
             <circle class="ring-value" cx="110" cy="110" r="98" :style="{ strokeDashoffset: `${RING_LENGTH * (1 - pomodoroProgress)}` }" />
           </svg>
-          <div class="clock">{{ clockText }}</div>
+          <div class="clock">{{ pet.shortPomodoro && pomodoro.stage === 'focus' && !pomodoro.startedAt ? '00:05' : clockText }}</div>
         </div>
         <div v-if="!pomodoro.startedAt && pomodoro.stage === 'focus'" class="pomo-settings card">
           <button class="pomo-setting-button" type="button" @click="openWheel('focus')"><span>专注</span><strong>{{ focusMinutes }}<small>分</small></strong></button>
@@ -109,7 +111,9 @@
           <div class="sheet card pomo-complete-sheet">
             <PixelGrid pattern="confirm" :size="82" once label="番茄阶段完成" />
             <h2>{{ completedStage === 'focus' ? '完成一个番茄' : '休息结束' }}</h2>
-            <p>{{ completedStage === 'focus' ? '专注记录已经自动保存。让大脑短暂离开任务，再回来继续。' : '状态已经恢复，可以开始下一轮专注。' }}</p>
+            <p v-if="completedTestSession">本次为沙盒测试，未写入学习历史。{{ pet.message }}</p>
+            <p v-else>{{ completedStage === 'focus' ? '专注记录已经自动保存。让大脑短暂离开任务，再回来继续。' : '状态已经恢复，可以开始下一轮专注。' }}</p>
+            <button class="btn ghost" type="button" @click="pomodoroCompleted = false">返回计时页</button>
             <button class="btn" type="button" @click="continueAfterPomodoro">{{ pomodoro.stage === 'focus' ? '开始下一轮' : `开始${pomoStageLabel}` }}</button>
             <button v-if="pomodoro.stage !== 'focus'" class="btn ghost" type="button" @click="skipAfterPomodoro">跳过休息</button>
           </div>
@@ -131,8 +135,11 @@ import PixelGrid from '../components/PixelGrid.vue';
 import { confirmDialog } from '../lib/appDialog';
 import WheelPicker from '../components/WheelPicker.vue';
 import NumberWheelSheet from '../components/NumberWheelSheet.vue';
+import PetCompanionCard from '../components/PetCompanionCard.vue';
+import { usePetStore } from '../stores/pet';
 
 const store = useAppStore();
+const pet = usePetStore();
 const route = useRoute();
 const isGeneral = computed(() => store.settings.appMode === 'general');
 const mode = ref<'stopwatch' | 'countdown' | 'pomodoro'>(pomodoro.startedAt ? 'pomodoro' : countdown.startedAt ? 'countdown' : 'stopwatch');
@@ -157,6 +164,7 @@ const pomoTaskId = ref(pomodoro.taskId);
 const pomoStageLabel = computed(() => stageLabel(pomodoro.stage));
 const pomodoroProgress = computed(() => pomodoro.durationMs > 0 ? Math.max(0, Math.min(1, remainingDisplay.value / pomodoro.durationMs)) : 0);
 const pomodoroCompleted = ref(false);
+const completedTestSession = ref(false);
 const completedStage = ref<'focus' | 'shortBreak' | 'longBreak'>('focus');
 const wheelOpen = ref(false);
 const wheelKind = ref<'focus' | 'short' | 'long' | 'every'>('focus');
@@ -227,7 +235,7 @@ function scheduleTick() {
 
 function startPomodoro() {
   pomodoro.configure(focusMinutes.value, shortBreakMinutes.value, longBreakMinutes.value, longBreakEvery.value, pomoTaskId.value);
-  pomodoro.start();
+  pomodoro.start(pet.shortPomodoro);
   remainingDisplay.value = pomodoro.remainingMs();
   scheduleTick();
 }
@@ -246,15 +254,17 @@ function skipPomodoroBreak() { pomodoro.skipBreak(); remainingDisplay.value = po
 function completePomodoroStage() {
   const completed = pomodoro.completeStage();
   completedStage.value = completed.stage;
-  if (completed.stage === 'focus') {
+  completedTestSession.value = completed.testSession;
+  if (completed.stage === 'focus' && !completed.testSession) {
     store.saveTimer({ label: `番茄专注 · 第 ${completed.round} 轮`, taskId: completed.taskId, date: toLocalDateStr(new Date(completed.startedAt)), startedAt: completed.startedAt, durationMs: completed.durationMs, laps: [], mode: 'pomodoro' });
   }
+  if (completed.stage === 'focus') pet.awardFocus(completed.startedAt, completed.testSession);
   pomodoroCompleted.value = true;
   remainingDisplay.value = pomodoro.remainingMs(); clockText.value = fmtCountdown(remainingDisplay.value);
   if ('vibrate' in navigator) navigator.vibrate?.([22, 60, 22, 60, 34]);
 }
 
-function continueAfterPomodoro() { pomodoroCompleted.value = false; pomodoro.start(); scheduleTick(); }
+function continueAfterPomodoro() { pomodoroCompleted.value = false; pomodoro.start(pet.shortPomodoro); scheduleTick(); }
 function skipAfterPomodoro() { pomodoroCompleted.value = false; pomodoro.skipBreak(); remainingDisplay.value = pomodoro.remainingMs(); clockText.value = fmtCountdown(remainingDisplay.value); }
 
 const currentLaps = computed(() => sw.laps());
@@ -314,6 +324,14 @@ const recordsCount = computed(() => store.timers.filter((t) => !t.deleted).lengt
 .mode-backward { --mode-enter-x: -18px; --mode-leave-x: 12px; }
 .timer-stage { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; padding: 12px 0; }
 .timer-stage.stopwatch-session { justify-content: flex-start; gap: 12px; padding: 8px 0 4px; }
+.timer-stage.pomodoro-scroll { justify-content: flex-start; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.pomodoro-scroll .pomodoro-stage { flex: 0 0 auto; }
+.pomodoro-scroll .countdown-clock-wrap { flex: 0 0 auto; width: min(64vw, 220px); }
+@media (max-height: 700px) {
+  .pomodoro-scroll .countdown-clock-wrap { width: 120px; }
+  .pomodoro-scroll .countdown-clock-wrap .clock { font-size: 36px; }
+}
+.pomo-test-notice { margin: 0; padding: 8px 10px; width: 100%; box-sizing: border-box; color: var(--accent-solid); background: var(--accent-soft); border-radius: 10px; font-size: 12px; line-height: 1.5; }
 .countdown-clock-wrap { position: relative; display: grid; place-items: center; width: min(78vw, 300px); aspect-ratio: 1; margin: 0 auto; }
 .clock { text-align: center; font-size: clamp(72px, 21vw, 108px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; line-height: 1.1; background: linear-gradient(135deg, var(--accent-from), var(--accent-to)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .countdown-clock-wrap .clock { position: relative; z-index: 1; font-size: clamp(52px, 16vw, 88px); }

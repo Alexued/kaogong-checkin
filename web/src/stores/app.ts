@@ -252,7 +252,7 @@ export const useAppStore = defineStore('app', {
     /** 保存一条计时记录（结束后调用） */
     saveTimer(record: Omit<TimerRecord, 'id' | 'createdAt' | 'updatedAt' | 'deleted'>) {
       const t = now();
-      this.send({
+      return this.send({
         kind: 'upsert',
         entity: 'timer',
         payload: { ...record, id: uid(), createdAt: t, updatedAt: t, deleted: false },

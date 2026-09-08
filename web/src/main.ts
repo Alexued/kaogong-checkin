@@ -9,6 +9,7 @@ import { useAppStore } from './stores/app';
 import { initializeComputerSync } from './api/computer-sync';
 import { initializeDeviceSync } from './api/device-sync';
 import { dismissTopBackLayer, resolveBackAction } from './lib/backNavigation';
+import { initializePetDebug } from './lib/petDebug';
 import './styles/theme.css';
 import './styles/app.css';
 
@@ -58,5 +59,6 @@ if (Capacitor.isNativePlatform()) {
 
 void initializeComputerSync();
 void initializeDeviceSync(() => { void router.push('/settings/device-sync'); });
+void initializePetDebug();
 
 app.mount('#app');

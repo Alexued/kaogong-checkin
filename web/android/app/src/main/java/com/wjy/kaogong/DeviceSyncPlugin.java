@@ -174,10 +174,19 @@ public class DeviceSyncPlugin extends Plugin {
 
   @PluginMethod
   public void scanPeerQr(PluginCall call) {
+    scanQr(call, "扫描另一台设备的格记配对二维码");
+  }
+
+  @PluginMethod
+  public void scanWishQr(PluginCall call) {
+    scanQr(call, "离线扫描心愿券、兑换请求或小钥匙");
+  }
+
+  private void scanQr(PluginCall call, String prompt) {
     IntentIntegrator integrator = new IntentIntegrator(getActivity());
     integrator.setCaptureActivity(PeerQrCaptureActivity.class);
     integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE);
-    integrator.setPrompt("扫描另一台设备的格记配对二维码");
+    integrator.setPrompt(prompt);
     integrator.setBeepEnabled(false);
     integrator.setBarcodeImageEnabled(false);
     integrator.setOrientationLocked(true);

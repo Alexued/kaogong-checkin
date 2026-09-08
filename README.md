@@ -8,12 +8,24 @@
 
 测试报告：[报告目录](https://alexued.github.io/kaogong-checkin/reports/) · [v0.15.1 Android 与 Windows 发布验收](https://alexued.github.io/kaogong-checkin/reports/v0.15.1/TEST-REPORT.md)
 
+## 宠物、奖励与离线心愿券
+
+- 宠物中心提供仓鼠及 10 种新增宠物，每种新增宠物拥有独立的 SVG 动画动作、状态、装扮、喂养和番茄钟奖励联动。
+- “我的奖励”支持设置游戏、电影等现实奖励。奖励只记录兑换和使用状态，不会控制第三方应用。
+- 支持完全离线的“星星心愿券”：送出者生成二维码，另一台设备扫码收下；受赠者发起兑换请求，送出者扫描后签发一次性“小钥匙”，受赠者扫回确认后才扣星。也支持在没有相机时通过本地文本或文件传递。
+- 心愿券使用本机 P-256 签名验证，私钥不进入二维码、普通备份或网络；离线分享不需要互联网、账号、热点、蓝牙或监督关系绑定。固定的奖励名称和价格是分享时的快照，源奖励改价或停用后需要重新分享。
+- 开发版可在“我的奖励”标题连续点击 5 次，使用应用内自制数字键盘输入 192837 开启星星小工坊。它仅用于测试余额，不能绕过心愿券的小钥匙确认，也不是安全边界；进入后台或退出应用会自动锁定。
+
+离线功能的限制：面对面扫码只能证明签名来自某台曾生成心愿的设备，不能在线证明真人身份；已发出的小钥匙无法远程撤回；如果用户拥有 Root 权限或回滚全部本地存档，任何纯离线应用都无法保证防篡改。验收范围见 [v0.17.0报告](docs/reports/v0.17.0/TEST-REPORT.md)。
+
 ## 下载
 
 | 平台 | 文件 | 大小 | 系统要求 | SHA-256 |
 | --- | --- | --- | --- | --- |
-| Android | [kaogong-checkin-v0.15.1.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.15.1/kaogong-checkin-v0.15.1.apk) | 47.92 MiB | Android 7.0 或更高版本 | 8E3A1BABDD442321A2F2340A4E42BE4940D82127F70E7D870020D292EEAD83C2 |
+| Android 测试版 | [kaogong-checkin-v0.17.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.17.0/kaogong-checkin-v0.17.0.apk) | 52.40 MiB | Android 7.0 或更高版本 | E19363BBFAB75D399266F33C89CE4D63828C82861C5E74C4D8479E911A01C565 |
 | Windows | [kaogong-checkin-windows-x64-setup-v0.15.1.exe](https://github.com/Alexued/kaogong-checkin/releases/download/v0.15.1/kaogong-checkin-windows-x64-setup-v0.15.1.exe) | 109.11 MiB | Windows 10/11 x64 | 79A5ACB0A93A0B1A425DFF3ACF08CD9574C58D14B22DC592A760B994696C7255 |
+
+Android 0.17.0 为 internal-debug 测试版，已完成真机离线文本兑换链路；双实体手机相机互扫、心愿页窄屏及深色专项仍待补测。Windows 电脑伴侣保持 0.15.1，本次未重新发布。
 
 本项目目前没有代码签名证书。首次运行 Windows 安装程序时，SmartScreen 可能显示“Windows 已保护你的电脑”。确认文件来自本仓库发布页并核对 SHA-256 后，可点击“更多信息”继续运行。
 
