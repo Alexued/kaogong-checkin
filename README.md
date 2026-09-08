@@ -20,6 +20,26 @@
 
 ## 下载
 
+### 单手机双应用扫码测试
+
+2026-09-08 新增独立的“格记测试 A / B”，不覆盖原格记。已在同一台 Android 真机、关闭 Wi-Fi 和移动数据时，通过本地二维码截图完成发券、请求、签发钥匙、兑换扣星闭环；这不是双实体手机相机光学互扫。详见 [双应用二维码验收报告](docs/reports/v0.17.0/DUAL-APP-QR-TEST.md)。原 v0.17.0 发布 APK 保持不变。
+
+测试版使用独立包名及心愿签名身份；在“星星心愿券”中提供“测试：识别二维码图片”。图片经本机 ZXing 解码后进入原有验签流程，不绕过小钥匙。仅显式指定测试槽位的 debug 构建开放该入口，普通构建和 release 不开放。
+
+构建（在 web 目录运行，先配置 Android SDK 和 JDK 21）：
+
+```powershell
+npm run build -- --mode internal-debug
+npx cap sync android
+./android/gradlew.bat -p android :app:assembleDebug -PqrTestSlot=A
+# 将 android/app/build/outputs/apk/debug/app-debug.apk 另存为测试 A，再构建 B
+./android/gradlew.bat -p android :app:assembleDebug -PqrTestSlot=B
+```
+
+不要将 A/B 测试包作为正常升级包发布；未传 qrTestSlot 时仍构建原包名。
+
+### 已发布安装包
+
 | 平台 | 文件 | 大小 | 系统要求 | SHA-256 |
 | --- | --- | --- | --- | --- |
 | Android 测试版 | [kaogong-checkin-v0.17.0.apk](https://github.com/Alexued/kaogong-checkin/releases/download/v0.17.0/kaogong-checkin-v0.17.0.apk) | 52.40 MiB | Android 7.0 或更高版本 | E19363BBFAB75D399266F33C89CE4D63828C82861C5E74C4D8479E911A01C565 |

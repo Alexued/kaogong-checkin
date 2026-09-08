@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+def qrTestSlot = providers.gradleProperty('qrTestSlot').getOrElse('')
+if (!(qrTestSlot in ['', 'A', 'B'])) {
+    throw new GradleException('qrTestSlot must be A or B')
+}
+
 android {
     namespace = "com.wjy.kaogong"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,6 +13,11 @@ android {
     }
     defaultConfig {
         applicationId "com.wjy.kaogong"
+        if (qrTestSlot) {
+            applicationId "com.wjy.kaogong.qa${qrTestSlot.toLowerCase()}"
+        }
+        manifestPlaceholders = [appLabel: qrTestSlot ? "格记测试 ${qrTestSlot}" : '@string/app_name']
+        buildConfigField "boolean", "KGC_QR_TEST", qrTestSlot ? 'true' : 'false'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 22

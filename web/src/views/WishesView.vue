@@ -3,6 +3,7 @@
     <header class="wish-heading"><button class="btn ghost" type="button" @click="router.push('/rewards')">‹ 奖励</button><div><h1>星星心愿券</h1><p>一份小期待，一把小钥匙。</p></div></header>
     <section class="card wish-intro"><PetAvatar compact :active="false" /><div><strong>{{ pet.debugMode ? '测试信箱' : '心意不需要联网' }}</strong><p>扫码收下 · 请对方送出钥匙 · 兑换享用</p><small>☆ {{ pet.data.stars }} · {{ pet.debugMode ? '与真实钱包隔离' : '与你的奖励共用星星' }}</small></div></section>
     <p v-if="notice" class="wish-notice" role="status">{{ notice }}</p>
+    <section v-if="wishImageTestAllowed" class="card wish-transfer"><p>独立测试版 · 从本地截图识别二维码，不代表相机实扫验收。</p><button class="btn ghost" type="button" :disabled="busy" @click="scanImage">测试：识别二维码图片</button></section>
     <div class="wish-tools"><button class="btn" type="button" :disabled="busy" @click="scan">扫一扫心愿 / 小钥匙</button><button class="btn ghost" type="button" :disabled="busy" @click="manual = !manual">本地文本</button></div>
     <section v-if="manual" class="card wish-transfer"><h2>本地传递</h2><p>可粘贴心愿文本，或选择另一台设备给你的本地文件。不访问网络。</p><textarea v-model="incoming" class="input" rows="4" maxlength="2800" aria-label="心愿传递文本" placeholder="GEJI-WISH:1:…"></textarea><div class="wish-tools"><button class="btn" type="button" :disabled="busy || !incoming" @click="inspect(incoming)">读取文本</button><label class="btn ghost">选择本地文件<input type="file" accept=".txt,text/plain" :disabled="busy" @change="readFile"></label></div></section>
     <section v-if="staged" ref="preview" class="card wish-preview">
@@ -53,6 +54,7 @@ import { getWishIdentity } from '../storage/wishIdentity';
 import { approveWish, decodeWish, encodeWish, issueOffer, offerForRequest, receiveOffer, redeemWish, requestWish, verifyWish, wishHash, type SignedWish, type WishOffer, type WishRequest, type WishKey } from '../domain/wishes';
 import { confirmDialog } from '../lib/appDialog';
 import PetAvatar from '../components/PetAvatar.vue';
+import { NativePetDebug, wishImageTestAllowed } from '../lib/petDebug';
 const pet = usePetStore(); const router = useRouter(); const route = useRoute();
 const NativeScanner = registerPlugin<{ scanWishQr(): Promise<{ cancelled: boolean; value?: string }> }>('DeviceSync');
 const busy = ref(false); const notice = ref(''); const manual = ref(false); const incoming = ref('');
@@ -94,6 +96,13 @@ async function parse(source: string) {
   await nextTick(); preview.value?.scrollIntoView({ block: 'start', behavior: 'instant' });
 }
 async function inspect(source: string) { await action(() => parse(source)); }
+async function scanImage() { await action(async () => {
+  if (!wishImageTestAllowed.value) return;
+  const token = epoch;
+  const result = await NativePetDebug.scanWishImageQr();
+  if (!alive || token !== epoch || result.cancelled || !result.value) return;
+  await parse(result.value);
+}); }
 async function scan() { await action(async () => {
   if (!Capacitor.isNativePlatform()) { manual.value = true; notice.value = '浏览器请使用本地文本；安卓应用可离线扫码。'; return; }
   const token = epoch;
