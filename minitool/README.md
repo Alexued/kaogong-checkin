@@ -4,6 +4,8 @@
 
 ## 构建与验收
 
+Windows 打包使用系统 PowerShell/.NET ZipArchive（不需要 Python 或 7z）。打包器显式使用 `/` 分隔符，归档写入后复读全部条目并核对内容哈希，防止 `./index.html`、反斜杠路径等上传错误。修复包仍需在平台重新上传验证。
+
 ```powershell
 npm install
 npm run build
