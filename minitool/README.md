@@ -1,5 +1,21 @@
 # 格记 · 小红书小工具
 
+独立的离线小红书小工具目标，保留经典青绿色界面与学习/番茄钟/宠物/奖励/离线签名愿望能力。不会修改现有 Android、Windows 或“打卡助手”“考公打卡”产品。
+
+## 构建与验收
+
+```powershell
+npm install
+npm run build
+npm test
+npm run audit
+npm run package
+```
+
+发布 ZIP：`minitool/release/geji-xhs-minitool.zip`。完整实测边界见 `minitool/docs/ACCEPTANCE.md`。
+
+生产构建默认关闭开发者测试模式；测试星星不会写入生产配置。
+
 当前阶段：迁移设计与适配准备，尚无可上传产物，尚未完成平台验收。
 
 本目录用于新建「格记」小工具，不更新现有「打卡助手」「考公打卡」，不影响 Android / Windows 产品。

@@ -1,0 +1,20 @@
+{
+  "questionCount": 200,
+  "questionBytes": 305621,
+  "categories": [
+    "基期与现期",
+    "增长率",
+    "增长量",
+    "倍数与比值相关",
+    "比重问题",
+    "平均数问题",
+    "简单计算",
+    "综合分析",
+    "文字资料",
+    "统计表",
+    "统计图",
+    "综合资料"
+  ],
+  "testMode": false,
+  "platformAcceptance": "pending"
+}

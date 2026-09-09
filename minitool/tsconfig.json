@@ -1,0 +1,12 @@
+{
+  "extends": "../web/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "vue": ["../web/node_modules/vue"],
+      "pinia": ["../web/node_modules/pinia"],
+      "vue-router": ["../web/node_modules/vue-router"],
+      "@minitool/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "../web/src/env.d.ts"]
+}

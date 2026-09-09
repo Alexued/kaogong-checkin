@@ -1,0 +1,15 @@
+{
+  "name": "geji-xhs-minitool",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "audit": "node ../.codex/minitool-zip-builder/scripts/audit_artifact.mjs dist",
+    "package": "node scripts/package.mjs"
+  },
+  "dependencies": {
+    "jsqr": "1.4.0"
+  }
+}

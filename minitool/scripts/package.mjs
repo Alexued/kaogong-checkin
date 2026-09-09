@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+
+const root = path.resolve(import.meta.dirname, '..');
+const dist = path.join(root, 'dist');
+const release = path.join(root, 'release');
+if (!fs.existsSync(path.join(dist, 'index.html'))) throw new Error('dist/index.html missing; run npm run build first');
+const report = JSON.parse(fs.readFileSync(path.join(root, 'reports', 'build.json'), 'utf8'));
+if (report.testMode) throw new Error('refusing to package test-mode build');
+fs.mkdirSync(release, { recursive: true });
+const zipPath = path.join(release, 'geji-xhs-minitool.zip');
+if (fs.existsSync(zipPath)) fs.rmSync(zipPath);
+execFileSync('tar', ['-a', '-c', '-f', zipPath, '-C', dist, '.'], { stdio: 'inherit' });
+const hash = crypto.createHash('sha256').update(fs.readFileSync(zipPath)).digest('hex');
+const stat = fs.statSync(zipPath);
+const manifest = { file: path.basename(zipPath), bytes: stat.size, sha256: hash, testMode: false, platformAcceptance: 'pending' };
+fs.writeFileSync(path.join(release, 'geji-xhs-minitool.sha256'), `${hash}  ${manifest.file}\n`);
+fs.writeFileSync(path.join(root, 'reports', 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
+console.log(JSON.stringify(manifest, null, 2));
