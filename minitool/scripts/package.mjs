@@ -12,7 +12,8 @@ if (report.testMode) throw new Error('refusing to package test-mode build');
 fs.mkdirSync(release, { recursive: true });
 const zipPath = path.join(release, 'geji-xhs-minitool.zip');
 if (fs.existsSync(zipPath)) fs.rmSync(zipPath);
-execFileSync('tar', ['-a', '-c', '-f', zipPath, '-C', dist, '.'], { stdio: 'inherit' });
+execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+  `Compress-Archive -Path '${path.join(dist, 'index.html')}', '${path.join(dist, 'assets')}' -DestinationPath '${zipPath}' -Force`], { stdio: 'inherit' });
 const hash = crypto.createHash('sha256').update(fs.readFileSync(zipPath)).digest('hex');
 const stat = fs.statSync(zipPath);
 const manifest = { file: path.basename(zipPath), bytes: stat.size, sha256: hash, testMode: false, platformAcceptance: 'pending' };
